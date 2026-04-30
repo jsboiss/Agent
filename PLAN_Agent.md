@@ -2,7 +2,7 @@
 
 ## Summary
 
-Build a new C#/.NET Agent, not a Boop upgrade. Keep Boop’s best ideas: dispatcher/executor split, durable memory, memory graph, extraction, decay, consolidation, and chat-app integrations. Use a local Claude Code connection so the agent can use your Claude Pro/Max Claude Code allocation when available, while keeping C# as the owner of orchestration and memory.
+Build a new C#/.NET Agent, not a Boop upgrade. Keep Boop’s best ideas: pipeline/executor split, durable memory, memory graph, extraction, decay, consolidation, and chat-app integrations. Use a local Claude Code connection so the agent can use your Claude Pro/Max Claude Code allocation when available, while keeping C# as the owner of orchestration and memory.
 
 Important billing constraint: the local Claude runtime should be treated as a personal/local runtime. Official docs distinguish Claude Code subscription usage from normal API billing, and the Agent SDK docs describe API-key auth for third-party products.
 
@@ -33,7 +33,7 @@ Important billing constraint: the local Claude runtime should be treated as a pe
 - Retrieval ranking should combine semantic similarity, importance, recency, access frequency, permanent-memory boost, and current project/topic hints.
 - Keep memory creation conservative by default:
   - explicit “remember this” writes immediately,
-  - post-turn extraction proposes durable facts,
+  - post-message extraction proposes durable facts,
   - low-confidence inferred memories are marked accordingly.
 - Add consolidation:
   - merge duplicates,
@@ -58,14 +58,14 @@ Important billing constraint: the local Claude runtime should be treated as a pe
   - start with a local web chat/debug channel,
   - add Telegram channel next,
   - add iMessage channel later with platform-specific delivery isolated from core agent logic.
-- Chat channels should all call the same C# dispatcher pipeline.
+- Chat channels should all call the same C# agent pipeline.
 
 ## Agent Flow
 
-- Incoming message enters the C# dispatcher.
-- Dispatcher saves the message and recent conversation state.
+- Incoming message enters the C# agent pipeline.
+- The pipeline saves the message and recent conversation state.
 - MemoryScout starts immediately if the prompt is memory-relevant.
-- Dispatcher waits briefly for MemoryScout, default 150ms and max 300ms.
+- The pipeline waits briefly for MemoryScout, default 150ms and max 300ms.
 - If ready, compact memories are injected into the initial Claude context.
 - Claude receives tools for:
   - `search_memory`,
@@ -74,7 +74,7 @@ Important billing constraint: the local Claude runtime should be treated as a pe
   - automation/draft tools later.
 - Claude handles the model loop and tool-call protocol.
 - C# executes tools and returns results to Claude.
-- Post-turn extraction runs asynchronously and stores durable memory candidates.
+- Post-message extraction runs asynchronously and stores durable memory candidates.
 - Dashboard receives live events from the C# host.
 
 ## Test Plan
@@ -86,7 +86,7 @@ Important billing constraint: the local Claude runtime should be treated as a pe
 - Test Claude works without `ANTHROPIC_API_KEY` in the Claude environment.
 - Test fallback API channel separately only if added later.
 - Test SQLite-backed dashboard endpoints for table, graph, and event views.
-- Test Telegram/iMessage channels do not bypass dispatcher memory flow.
+- Test Telegram/iMessage channels do not bypass agent pipeline memory flow.
 
 ## Assumptions
 

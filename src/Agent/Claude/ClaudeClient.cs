@@ -1,4 +1,4 @@
-using Agent.Dispatching;
+using Agent.Pipeline;
 
 namespace Agent.Claude;
 

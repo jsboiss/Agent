@@ -1,4 +1,4 @@
-namespace Agent.Dispatching;
+namespace Agent.Pipeline;
 
 public sealed record AgentRequest(
     string ConversationId,

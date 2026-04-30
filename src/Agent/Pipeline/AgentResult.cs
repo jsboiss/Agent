@@ -1,6 +1,6 @@
 using Agent.Events;
 
-namespace Agent.Dispatching;
+namespace Agent.Pipeline;
 
 public sealed record AgentResult(
     string ConversationId,

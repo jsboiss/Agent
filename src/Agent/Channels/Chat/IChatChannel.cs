@@ -1,4 +1,4 @@
-using Agent.Dispatching;
+using Agent.Pipeline;
 
 namespace Agent.Channels.Chat;
 
@@ -6,5 +6,5 @@ public interface IChatChannel
 {
     string Channel { get; }
 
-    Task Start(IAgentDispatcher dispatcher, CancellationToken cancellationToken);
+    Task Start(IAgentPipeline pipeline, CancellationToken cancellationToken);
 }
