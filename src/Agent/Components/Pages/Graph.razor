@@ -1,0 +1,23 @@
+@page "/graph"
+
+<PageTitle>Graph</PageTitle>
+
+<MudStack Spacing="3">
+    <div>
+        <MudText Typo="Typo.overline" Color="Color.Secondary">Memory graph</MudText>
+        <MudText Typo="Typo.h4">Graph</MudText>
+    </div>
+
+    <MudPaper Class="pa-6 graph-surface" Elevation="0" Outlined="true">
+        <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Spacing="4">
+            <MudStack Row="true" Spacing="6" AlignItems="AlignItems.Center" Class="graph-nodes">
+                <MudAvatar Color="Color.Secondary" Size="Size.Large">segment</MudAvatar>
+                <MudAvatar Color="Color.Info" Size="Size.Large">memory</MudAvatar>
+                <MudAvatar Color="Color.Primary" Size="Size.Large">tier</MudAvatar>
+            </MudStack>
+            <MudText Align="Align.Center" Color="Color.Secondary">
+                Force-directed segment, tier, supersession, and source-turn graph goes here.
+            </MudText>
+        </MudStack>
+    </MudPaper>
+</MudStack>

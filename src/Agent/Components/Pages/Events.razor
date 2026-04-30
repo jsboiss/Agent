@@ -1,0 +1,19 @@
+@page "/events"
+
+<PageTitle>Events</PageTitle>
+
+<MudStack Spacing="3">
+    <div>
+        <MudText Typo="Typo.overline" Color="Color.Secondary">Live diagnostics</MudText>
+        <MudText Typo="Typo.h4">Events</MudText>
+    </div>
+
+    <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+        <MudTimeline TimelineOrientation="TimelineOrientation.Vertical">
+            <MudTimelineItem Color="Color.Primary" Icon="@Icons.Material.Filled.Chat">
+                <MudText Typo="Typo.subtitle1">ChatTurn</MudText>
+                <MudText Color="Color.Secondary">Conversation, recall, extraction, consolidation, and bridge events will stream here.</MudText>
+            </MudTimelineItem>
+        </MudTimeline>
+    </MudPaper>
+</MudStack>

@@ -1,0 +1,57 @@
+@page "/"
+
+<PageTitle>Chat</PageTitle>
+
+<MudStack Spacing="3">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+        <div>
+            <MudText Typo="Typo.overline" Color="Color.Secondary">Local debug channel</MudText>
+            <MudText Typo="Typo.h4">Chat</MudText>
+        </div>
+        <MudChip T="string" Color="Color.Warning" Variant="Variant.Outlined">Bridge offline</MudChip>
+    </MudStack>
+
+    <MudGrid Spacing="3">
+        <MudItem xs="12" lg="8">
+            <MudPaper Class="pa-4 chat-surface" Elevation="0" Outlined="true">
+                <MudStack Spacing="2">
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                        Incoming user turns will enter the dispatcher here.
+                    </MudAlert>
+                    <MudAlert Severity="Severity.Normal" Variant="Variant.Outlined">
+                        Assistant output, tool calls, and bridge errors will stream back here.
+                    </MudAlert>
+                    <MudSpacer />
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" sm="10">
+                            <MudTextField T="string" Placeholder="Message the harness" Variant="Variant.Outlined" Disabled="true" />
+                        </MudItem>
+                        <MudItem xs="12" sm="2">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Disabled="true">Send</MudButton>
+                        </MudItem>
+                    </MudGrid>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" lg="4">
+            <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+                <MudStack Spacing="3">
+                    <div>
+                        <MudText Typo="Typo.h6">Injected Memory</MudText>
+                        <MudText Color="Color.Secondary">No MemoryScout context has been loaded yet.</MudText>
+                    </div>
+                    <MudDivider />
+                    <div>
+                        <MudText Typo="Typo.h6">Tools</MudText>
+                        <MudChipSet T="string" Class="mt-2">
+                            <MudChip Value="@("search_memory")" Variant="Variant.Outlined">search_memory</MudChip>
+                            <MudChip Value="@("write_memory")" Variant="Variant.Outlined">write_memory</MudChip>
+                            <MudChip Value="@("spawn_agent")" Variant="Variant.Outlined">spawn_agent</MudChip>
+                        </MudChipSet>
+                    </div>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</MudStack>

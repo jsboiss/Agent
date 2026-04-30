@@ -1,0 +1,43 @@
+@page "/memories"
+
+<PageTitle>Memories</PageTitle>
+
+<MudStack Spacing="3">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+        <div>
+            <MudText Typo="Typo.overline" Color="Color.Secondary">SQLite memory store</MudText>
+            <MudText Typo="Typo.h4">Memories</MudText>
+        </div>
+        <MudTextField T="string" Placeholder="Search memories" Variant="Variant.Outlined" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Disabled="true" />
+    </MudStack>
+
+    <MudPaper Elevation="0" Outlined="true">
+        <MudTable Items="MemoryRows" Dense="true" Hover="true">
+            <HeaderContent>
+                <MudTh>Tier</MudTh>
+                <MudTh>Segment</MudTh>
+                <MudTh>Lifecycle</MudTh>
+                <MudTh>Memory</MudTh>
+                <MudTh>Score</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Tier">
+                    <MudChip T="string" Color="Color.Primary" Size="Size.Small">@context.Tier</MudChip>
+                </MudTd>
+                <MudTd DataLabel="Segment">@context.Segment</MudTd>
+                <MudTd DataLabel="Lifecycle">@context.Lifecycle</MudTd>
+                <MudTd DataLabel="Memory">@context.Text</MudTd>
+                <MudTd DataLabel="Score">@context.Score</MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudPaper>
+</MudStack>
+
+@code {
+    private IReadOnlyList<MemoryRow> MemoryRows { get; } =
+    [
+        new("permanent", "correction", "active", "Manual edit, archive, delete, and supersede controls will live here.", "n/a")
+    ];
+
+    private sealed record MemoryRow(string Tier, string Segment, string Lifecycle, string Text, string Score);
+}
