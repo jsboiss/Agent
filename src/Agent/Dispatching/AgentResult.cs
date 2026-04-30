@@ -1,8 +1,8 @@
 using Agent.Events;
 
-namespace Agent.AgentFlow;
+namespace Agent.Dispatching;
 
-public sealed record AgentTurnResult(
+public sealed record AgentResult(
     string ConversationId,
     string AssistantMessage,
     IReadOnlyList<AgentEvent> Events);

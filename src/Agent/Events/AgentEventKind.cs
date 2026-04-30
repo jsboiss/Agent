@@ -2,7 +2,7 @@ namespace Agent.Events;
 
 public enum AgentEventKind
 {
-    ChatTurn,
+    ChatMessage,
     MemoryRecall,
     MemoryWrite,
     MemoryExtraction,

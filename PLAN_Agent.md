@@ -23,7 +23,7 @@ Important billing constraint: the local Claude runtime should be treated as a pe
 - Store memories in SQLite with tiers: `short`, `long`, `permanent`.
 - Store segments: `identity`, `preference`, `correction`, `relationship`, `project`, `knowledge`, `context`.
 - Store lifecycle: `active`, `archived`, `pruned`.
-- Track `importance`, `confidence`, `accessCount`, `createdAt`, `updatedAt`, `lastAccessedAt`, `sourceTurnId`, `supersedes`, and optional embedding vector reference/data.
+- Track `importance`, `confidence`, `accessCount`, `createdAt`, `updatedAt`, `lastAccessedAt`, `sourceMessageId`, `supersedes`, and optional embedding vector reference/data.
 - Implement hybrid retrieval:
   - rule-based memory relevance classifier,
   - automatic MemoryScout prefetch before each Claude request,
@@ -46,14 +46,14 @@ Important billing constraint: the local Claude runtime should be treated as a pe
 - Blazor dashboard should expose:
   - searchable memory table,
   - force-directed memory graph grouped by segment/tier,
-  - event stream for recalls, writes, extractions, consolidations, and chat turns,
+  - event stream for recalls, writes, extractions, consolidations, and chat messages,
   - conversation/debug timeline,
   - manual memory edit/archive/delete controls.
 - Model memory graph from SQLite records:
   - memory nodes,
   - segment/tier hub nodes,
   - supersession edges,
-  - optional source-turn edges.
+  - optional source-message edges.
 - Add chat integrations behind channels:
   - start with a local web chat/debug channel,
   - add Telegram channel next,

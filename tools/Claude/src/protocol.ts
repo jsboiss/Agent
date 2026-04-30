@@ -1,4 +1,4 @@
-export interface ClaudeTurnRequest {
+export interface ClaudeRequest {
   conversationId: string;
   userMessage: string;
   memoryContext: string;
@@ -12,7 +12,7 @@ export interface ClaudeToolCall {
   arguments: Record<string, string>;
 }
 
-export interface ClaudeTurnResult {
+export interface ClaudeResult {
   assistantMessage: string;
   toolCalls: ClaudeToolCall[];
   usageMetadata: Record<string, string>;

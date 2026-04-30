@@ -2,5 +2,5 @@ namespace Agent.Claude;
 
 public interface IClaudeClient
 {
-    Task<ClaudeTurnResult> Send(ClaudeTurnRequest request, CancellationToken cancellationToken);
+    Task<ClaudeResult> Send(ClaudeRequest request, CancellationToken cancellationToken);
 }

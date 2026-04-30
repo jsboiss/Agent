@@ -1,6 +1,6 @@
-namespace Agent.AgentFlow;
+namespace Agent.Dispatching;
 
-public sealed record AgentTurnRequest(
+public sealed record AgentRequest(
     string ConversationId,
     string Channel,
     string UserMessage,

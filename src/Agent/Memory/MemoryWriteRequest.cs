@@ -6,4 +6,4 @@ public sealed record MemoryWriteRequest(
     MemorySegment Segment,
     double Importance,
     double Confidence,
-    string? SourceTurnId);
+    string? SourceMessageId);

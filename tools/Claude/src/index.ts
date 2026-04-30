@@ -1,6 +1,6 @@
-import { ClaudeTurnRequest, ClaudeTurnResult } from "./protocol.js";
+import { ClaudeRequest, ClaudeResult } from "./protocol.js";
 
-export async function handleTurn(request: ClaudeTurnRequest): Promise<ClaudeTurnResult> {
+export async function handleRequest(request: ClaudeRequest): Promise<ClaudeResult> {
   void request;
 
   return {

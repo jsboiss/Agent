@@ -24,7 +24,7 @@ public sealed record MemoryRecord
 
     public DateTimeOffset? LastAccessedAt { get; init; }
 
-    public string? SourceTurnId { get; init; }
+    public string? SourceMessageId { get; init; }
 
     public string? Supersedes { get; init; }
 

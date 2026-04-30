@@ -2,7 +2,7 @@ using Agent.Memory;
 
 namespace Agent.Claude;
 
-public sealed record ClaudeTurnRequest(
+public sealed record ClaudeRequest(
     string ConversationId,
     string UserMessage,
     string MemoryContext,
