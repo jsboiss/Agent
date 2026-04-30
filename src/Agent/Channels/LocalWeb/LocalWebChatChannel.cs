@@ -1,9 +1,9 @@
-using Agent.Adapters.Chat;
+using Agent.Channels.Chat;
 using Agent.AgentFlow;
 
-namespace Agent.Adapters.LocalWeb;
+namespace Agent.Channels.LocalWeb;
 
-public sealed class LocalWebChatAdapter : IChatAdapter
+public sealed class LocalWebChatChannel : IChatChannel
 {
     public string Channel => "local-web";
 

@@ -8,6 +8,6 @@ public enum AgentEventKind
     MemoryExtraction,
     MemoryConsolidation,
     ToolCall,
-    BridgeRequest,
-    BridgeError
+    ClaudeRequest,
+    ClaudeError
 }

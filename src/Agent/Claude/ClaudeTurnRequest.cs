@@ -1,8 +1,8 @@
 using Agent.Memory;
 
-namespace Agent.Bridge;
+namespace Agent.Claude;
 
-public sealed record BridgeTurnRequest(
+public sealed record ClaudeTurnRequest(
     string ConversationId,
     string UserMessage,
     string MemoryContext,

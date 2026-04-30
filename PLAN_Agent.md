@@ -2,21 +2,21 @@
 
 ## Summary
 
-Build a new C#/.NET Agent, not a Boop upgrade. Keep Boop’s best ideas: dispatcher/executor split, durable memory, memory graph, extraction, decay, consolidation, and chat-app integrations. Use a local Claude Code bridge so the harness can use your Claude Pro/Max Claude Code allocation when available, while keeping C# as the owner of orchestration and memory.
+Build a new C#/.NET Agent, not a Boop upgrade. Keep Boop’s best ideas: dispatcher/executor split, durable memory, memory graph, extraction, decay, consolidation, and chat-app integrations. Use a local Claude Code connection so the agent can use your Claude Pro/Max Claude Code allocation when available, while keeping C# as the owner of orchestration and memory.
 
-Important billing constraint: the local bridge should be treated as a personal/local runtime. Official docs distinguish Claude Code subscription usage from normal API billing, and the Agent SDK docs describe API-key auth for third-party products.
+Important billing constraint: the local Claude runtime should be treated as a personal/local runtime. Official docs distinguish Claude Code subscription usage from normal API billing, and the Agent SDK docs describe API-key auth for third-party products.
 
 ## Key Architecture
 
 - Use an ASP.NET Core host as the main process.
 - Use SQLite as the local memory and event store.
 - Use Blazor for the dashboard: chat view, memory table, memory graph, agent timeline, settings, and debug events.
-- Use a minimal local Agent SDK bridge process only for Claude Code execution.
-  - C# sends structured requests to the bridge.
-  - The bridge calls Claude Agent SDK / Claude Code.
-  - The bridge returns assistant messages, tool calls, results, usage metadata, and errors.
-  - No memory policy, ranking, extraction, or business logic lives in the bridge.
-- Do not set `ANTHROPIC_API_KEY` in the Claude Code bridge environment when the goal is subscription-backed usage; Claude Code docs say that API key auth takes precedence and can cause API billing.
+- Use a minimal local Claude process only for Claude Code execution.
+  - C# sends structured requests to Claude.
+  - Claude calls Claude Agent SDK / Claude Code.
+  - Claude returns assistant messages, tool calls, results, usage metadata, and errors.
+  - No memory policy, ranking, extraction, or business logic lives in Claude.
+- Do not set `ANTHROPIC_API_KEY` in the Claude Code environment when the goal is subscription-backed usage; Claude Code docs say that API key auth takes precedence and can cause API billing.
 
 ## Memory System
 
@@ -54,11 +54,11 @@ Important billing constraint: the local bridge should be treated as a personal/l
   - segment/tier hub nodes,
   - supersession edges,
   - optional source-turn edges.
-- Add chat integrations behind adapters:
+- Add chat integrations behind channels:
   - start with a local web chat/debug channel,
-  - add Telegram adapter next,
-  - add iMessage adapter later with platform-specific delivery isolated from core agent logic.
-- Chat adapters should all call the same C# dispatcher pipeline.
+  - add Telegram channel next,
+  - add iMessage channel later with platform-specific delivery isolated from core agent logic.
+- Chat channels should all call the same C# dispatcher pipeline.
 
 ## Agent Flow
 
@@ -72,8 +72,8 @@ Important billing constraint: the local bridge should be treated as a personal/l
   - `write_memory`,
   - `spawn_agent`,
   - automation/draft tools later.
-- Claude Code bridge handles the model loop and tool-call protocol.
-- C# executes tools and returns results to the bridge.
+- Claude handles the model loop and tool-call protocol.
+- C# executes tools and returns results to Claude.
 - Post-turn extraction runs asynchronously and stores durable memory candidates.
 - Dashboard receives live events from the C# host.
 
@@ -83,15 +83,15 @@ Important billing constraint: the local bridge should be treated as a personal/l
 - Test MemoryScout skips generic factual questions and simple one-off tasks.
 - Test reranking so semantic relevance dominates, but importance/recency/access improve ordering.
 - Test inactive, archived, pruned, and superseded memories are not injected by default.
-- Test Claude Code bridge works without `ANTHROPIC_API_KEY` in the bridge environment.
-- Test fallback API adapter separately only if added later.
+- Test Claude works without `ANTHROPIC_API_KEY` in the Claude environment.
+- Test fallback API channel separately only if added later.
 - Test SQLite-backed dashboard endpoints for table, graph, and event views.
-- Test Telegram/iMessage adapters do not bypass dispatcher memory flow.
+- Test Telegram/iMessage channels do not bypass dispatcher memory flow.
 
 ## Assumptions
 
 - C#/.NET owns the harness, memory, tools, dashboard, and integrations.
-- A minimal TypeScript or Python bridge is acceptable only because Claude Agent SDK is officially Python/TypeScript.
+- A minimal TypeScript or Python Claude process is acceptable only because Claude Agent SDK is officially Python/TypeScript.
 - Local SQLite is the first storage backend.
 - Blazor is the dashboard stack.
 - Initial target is a personal/local harness, not a hosted third-party SaaS.

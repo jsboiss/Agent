@@ -1,5 +1,5 @@
 {
-  "name": "claude-code-bridge",
+  "name": "claude",
   "private": true,
   "type": "module",
   "scripts": {

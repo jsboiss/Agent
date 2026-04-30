@@ -1,8 +1,8 @@
 using Agent.AgentFlow;
 
-namespace Agent.Adapters.Chat;
+namespace Agent.Channels.Chat;
 
-public interface IChatAdapter
+public interface IChatChannel
 {
     string Channel { get; }
 

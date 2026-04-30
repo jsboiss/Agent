@@ -1,6 +1,6 @@
-namespace Agent.Bridge;
+namespace Agent.Claude;
 
-public sealed record BridgeToolCall(
+public sealed record ClaudeToolCall(
     string Id,
     string Name,
     IReadOnlyDictionary<string, string> Arguments);

@@ -1,6 +1,6 @@
-namespace Agent.Bridge;
+namespace Agent.Claude;
 
-public sealed record ClaudeCodeBridgeOptions
+public sealed record ClaudeOptions
 {
     public required string Command { get; init; }
 

@@ -1,4 +1,4 @@
-export interface BridgeTurnRequest {
+export interface ClaudeTurnRequest {
   conversationId: string;
   userMessage: string;
   memoryContext: string;
@@ -6,15 +6,15 @@ export interface BridgeTurnRequest {
   availableTools: string[];
 }
 
-export interface BridgeToolCall {
+export interface ClaudeToolCall {
   id: string;
   name: string;
   arguments: Record<string, string>;
 }
 
-export interface BridgeTurnResult {
+export interface ClaudeTurnResult {
   assistantMessage: string;
-  toolCalls: BridgeToolCall[];
+  toolCalls: ClaudeToolCall[];
   usageMetadata: Record<string, string>;
   error?: string;
 }
