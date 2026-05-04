@@ -32,6 +32,16 @@
         <MudItem xs="12" md="6">
             <MudPaper Class="pa-4" Elevation="0" Outlined="true">
                 <MudStack Spacing="2">
+                    <MudText Typo="Typo.h6">Ollama</MudText>
+                    <MudTextField T="string" Label="Base URL" Value="@("http://localhost:11434/v1/")" Variant="Variant.Outlined" Disabled="true" />
+                    <MudTextField T="string" Label="Model" Value="@("qwen3.5:latest")" Variant="Variant.Outlined" Disabled="true" />
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+                <MudStack Spacing="2">
                     <MudText Typo="Typo.h6">Memory</MudText>
                     <MudTextField T="string" Label="SQLite connection" Value="@("Data Source=agent.db")" Variant="Variant.Outlined" Disabled="true" />
                 </MudStack>
