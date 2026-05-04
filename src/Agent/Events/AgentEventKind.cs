@@ -8,6 +8,6 @@ public enum AgentEventKind
     MemoryExtraction,
     MemoryConsolidation,
     ToolCall,
-    ClaudeRequest,
-    ClaudeError
+    ProviderRequest,
+    ProviderError
 }

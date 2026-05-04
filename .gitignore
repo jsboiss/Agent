@@ -4,6 +4,7 @@ obj/
 .vscode/
 *.user
 node_modules/
+dist/
 *.db
 *.db-shm
 *.db-wal

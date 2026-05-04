@@ -1,8 +1,8 @@
 using Agent.Events;
 
-namespace Agent.Pipeline;
+namespace Agent.Messages;
 
-public sealed record AgentResult(
+public sealed record MessageResult(
     string ConversationId,
     string AssistantMessage,
     IReadOnlyList<AgentEvent> Events);

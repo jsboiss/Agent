@@ -1,6 +1,6 @@
-namespace Agent.Pipeline;
+namespace Agent.Messages;
 
-public sealed record AgentRequest(
+public sealed record MessageRequest(
     string ConversationId,
     string Channel,
     string UserMessage,

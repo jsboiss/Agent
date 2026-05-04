@@ -1,6 +1,6 @@
-namespace Agent.Claude;
+namespace Agent.Providers;
 
-public sealed record ClaudeToolCall(
+public sealed record AgentProviderToolCall(
     string Id,
     string Name,
     IReadOnlyDictionary<string, string> Arguments);

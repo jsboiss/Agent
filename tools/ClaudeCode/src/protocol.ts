@@ -1,4 +1,7 @@
-export interface ClaudeRequest {
+export type ProviderKind = "ClaudeCode" | "Codex";
+
+export interface ProviderRequest {
+  kind: ProviderKind;
   conversationId: string;
   userMessage: string;
   memoryContext: string;
@@ -6,15 +9,15 @@ export interface ClaudeRequest {
   availableTools: string[];
 }
 
-export interface ClaudeToolCall {
+export interface ProviderToolCall {
   id: string;
   name: string;
   arguments: Record<string, string>;
 }
 
-export interface ClaudeResult {
+export interface ProviderResult {
   assistantMessage: string;
-  toolCalls: ClaudeToolCall[];
+  toolCalls: ProviderToolCall[];
   usageMetadata: Record<string, string>;
   error?: string;
 }

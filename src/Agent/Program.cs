@@ -1,5 +1,8 @@
 using Agent.Components;
 using Agent.Endpoints;
+using Agent.Providers;
+using Agent.Providers.ClaudeCode;
+using Agent.Providers.Codex;
 using MudBlazor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -8,6 +11,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddMudServices();
+builder.Services.AddSingleton<IAgentProviderClient, ClaudeCodeProviderClient>();
+builder.Services.AddSingleton<IAgentProviderClient, CodexProviderClient>();
+builder.Services.AddSingleton<IAgentProviderSelector, AgentProviderSelector>();
 
 var app = builder.Build();
 

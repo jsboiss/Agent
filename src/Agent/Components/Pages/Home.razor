@@ -8,7 +8,7 @@
             <MudText Typo="Typo.overline" Color="Color.Secondary">Local debug channel</MudText>
             <MudText Typo="Typo.h4">Chat</MudText>
         </div>
-        <MudChip T="string" Color="Color.Warning" Variant="Variant.Outlined">Claude offline</MudChip>
+        <MudChip T="string" Color="Color.Warning" Variant="Variant.Outlined">Providers offline</MudChip>
     </MudStack>
 
     <MudGrid Spacing="3">
@@ -16,10 +16,10 @@
             <MudPaper Class="pa-4 chat-surface" Elevation="0" Outlined="true">
                 <MudStack Spacing="2">
                     <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
-                        Incoming user messages will enter the agent pipeline here.
+                        Incoming user messages will enter the agent processor here.
                     </MudAlert>
                     <MudAlert Severity="Severity.Normal" Variant="Variant.Outlined">
-                        Assistant output, tool calls, and Claude errors will stream back here.
+                        Assistant output, tool calls, and provider errors will stream back here.
                     </MudAlert>
                     <MudSpacer />
                     <MudGrid Spacing="2">

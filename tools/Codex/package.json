@@ -1,5 +1,5 @@
 {
-  "name": "claude",
+  "name": "codex-provider",
   "private": true,
   "type": "module",
   "scripts": {

@@ -1,8 +1,9 @@
 using Agent.Memory;
 
-namespace Agent.Claude;
+namespace Agent.Providers;
 
-public sealed record ClaudeRequest(
+public sealed record AgentProviderRequest(
+    AgentProviderType Kind,
     string ConversationId,
     string UserMessage,
     string MemoryContext,
