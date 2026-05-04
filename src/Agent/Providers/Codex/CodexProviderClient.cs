@@ -4,7 +4,7 @@ namespace Agent.Providers.Codex;
 
 public sealed class CodexProviderClient : IAgentProviderClient
 {
-    public AgentProviderType Kind => AgentProviderType.Codex;
+    public AgentProviderType Type => AgentProviderType.Codex;
 
     public Task<AgentProviderResult> Send(AgentProviderRequest request, CancellationToken cancellationToken)
     {

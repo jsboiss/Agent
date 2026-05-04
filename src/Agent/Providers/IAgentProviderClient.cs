@@ -2,7 +2,7 @@ namespace Agent.Providers;
 
 public interface IAgentProviderClient
 {
-    AgentProviderType Kind { get; }
+    AgentProviderType Type { get; }
 
     Task<AgentProviderResult> Send(AgentProviderRequest request, CancellationToken cancellationToken);
 }

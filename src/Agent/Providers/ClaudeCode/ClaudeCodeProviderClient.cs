@@ -6,7 +6,7 @@ namespace Agent.Providers.ClaudeCode;
 
 public sealed class ClaudeCodeProviderClient(IHostEnvironment environment) : IAgentProviderClient
 {
-    public AgentProviderType Kind => AgentProviderType.ClaudeCode;
+    public AgentProviderType Type => AgentProviderType.ClaudeCode;
 
     private static JsonSerializerOptions JsonOptions { get; } = new(JsonSerializerDefaults.Web)
     {
@@ -15,7 +15,7 @@ public sealed class ClaudeCodeProviderClient(IHostEnvironment environment) : IAg
 
     public async Task<AgentProviderResult> Send(AgentProviderRequest request, CancellationToken cancellationToken)
     {
-        var providerDirectory = FindProviderDirectory(environment.ContentRootPath);
+        var providerDirectory = GetProviderDirectory(environment.ContentRootPath);
         var adapterPath = Path.Combine(providerDirectory, "dist", "index.js");
 
         if (!File.Exists(adapterPath))
@@ -24,8 +24,10 @@ public sealed class ClaudeCodeProviderClient(IHostEnvironment environment) : IAg
                 $"Claude Code provider adapter was not found at '{adapterPath}'. Run 'npm install' and 'npm run build' in '{providerDirectory}'.");
         }
 
-        using var process = StartProviderProcess(providerDirectory, adapterPath);
-        var providerRequest = ToProviderProcessRequest(request);
+        var startInfo = GetProcessStartInfo(providerDirectory, adapterPath);
+        using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Could not start Claude Code provider process.");
+        
+        var providerRequest = GetProviderProcessRequest(request);
         var standardErrorTask = process.StandardError.ReadToEndAsync(cancellationToken);
 
         await JsonSerializer.SerializeAsync(
@@ -62,7 +64,7 @@ public sealed class ClaudeCodeProviderClient(IHostEnvironment environment) : IAg
         return result;
     }
 
-    private static Process StartProviderProcess(string providerDirectory, string adapterPath)
+    private static ProcessStartInfo GetProcessStartInfo(string providerDirectory, string adapterPath)
     {
         var startInfo = new ProcessStartInfo
         {
@@ -77,11 +79,10 @@ public sealed class ClaudeCodeProviderClient(IHostEnvironment environment) : IAg
         startInfo.ArgumentList.Add(adapterPath);
         startInfo.Environment.Remove("ANTHROPIC_API_KEY");
 
-        return Process.Start(startInfo)
-            ?? throw new InvalidOperationException("Could not start Claude Code provider process.");
+        return startInfo;
     }
 
-    private static ProviderProcessRequest ToProviderProcessRequest(AgentProviderRequest request)
+    private static ProviderProcessRequest GetProviderProcessRequest(AgentProviderRequest request)
     {
         return new ProviderProcessRequest(
             request.Kind,
@@ -92,7 +93,7 @@ public sealed class ClaudeCodeProviderClient(IHostEnvironment environment) : IAg
             request.AvailableTools);
     }
 
-    private static string FindProviderDirectory(string contentRootPath)
+    private static string GetProviderDirectory(string contentRootPath)
     {
         var directory = new DirectoryInfo(contentRootPath);
 
@@ -113,7 +114,7 @@ public sealed class ClaudeCodeProviderClient(IHostEnvironment environment) : IAg
     }
 
     private sealed record ProviderProcessRequest(
-        AgentProviderType Kind,
+        AgentProviderType Type,
         string ConversationId,
         string UserMessage,
         string MemoryContext,

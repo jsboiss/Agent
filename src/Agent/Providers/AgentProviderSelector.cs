@@ -3,7 +3,7 @@ namespace Agent.Providers;
 public sealed class AgentProviderSelector(IEnumerable<IAgentProviderClient> clients) : IAgentProviderSelector
 {
     private IReadOnlyDictionary<AgentProviderType, IAgentProviderClient> Clients { get; } =
-        clients.ToDictionary(x => x.Kind);
+        clients.ToDictionary(x => x.Type);
 
     public IAgentProviderClient Get(AgentProviderType kind)
     {

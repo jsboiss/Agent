@@ -1,5 +1,3 @@
-using Agent.Providers;
-
 namespace Agent.Providers.ClaudeCode;
 
 public sealed record ClaudeCodeProviderOptions : AgentProviderOptions
