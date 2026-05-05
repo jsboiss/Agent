@@ -7,4 +7,5 @@ public sealed record MemoryExtractionRequest(
     ConversationEntry UserEntry,
     ConversationEntry? AssistantEntry,
     IReadOnlyList<ConversationEntry> ToolEntries,
-    IReadOnlyList<MemoryRecord> InjectedMemories);
+    IReadOnlyList<MemoryRecord> InjectedMemories,
+    IReadOnlyDictionary<string, string> Settings);

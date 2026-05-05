@@ -259,7 +259,9 @@ public sealed class AgentMessageProcessor(
             conversationId,
             new Dictionary<string, string>
             {
-                ["ConversationEntryId"] = userEntry.Id
+                ["ConversationEntryId"] = userEntry.Id,
+                ["mode"] = settings.Get("memory.extraction.mode") ?? string.Empty,
+                ["provider"] = settings.Get("memory.extraction.provider") ?? string.Empty
             }));
         var extraction = await memoryExtractor.Extract(
             new MemoryExtractionRequest(
@@ -267,7 +269,8 @@ public sealed class AgentMessageProcessor(
                 userEntry,
                 assistantEntry,
                 [],
-                injectedMemories),
+                injectedMemories,
+                settings.Values),
             cancellationToken);
 
         var reviewResult = await memoryCandidateReviewer.Review(

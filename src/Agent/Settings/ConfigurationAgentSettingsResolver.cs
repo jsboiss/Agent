@@ -15,6 +15,8 @@ public sealed class ConfigurationAgentSettingsResolver(IConfiguration configurat
         ["memory.enabled"] = "true",
         ["memory.scoutLimit"] = "5",
         ["memory.extraction.enabled"] = "true",
+        ["memory.extraction.mode"] = "rule-and-llm",
+        ["memory.extraction.provider"] = AgentProviderType.Ollama.ToString(),
         ["channel.delivery"] = "default"
     };
 
