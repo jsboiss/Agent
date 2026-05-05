@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Agent.Resources;
 
 namespace Agent.Providers.ClaudeCode;
 
@@ -88,6 +89,8 @@ public sealed class ClaudeCodeProviderClient(IHostEnvironment environment) : IAg
             request.Kind,
             request.ConversationId,
             request.UserMessage,
+            request.Resources.BuildSystemPrompt(),
+            request.Resources.Workspace,
             request.MemoryContext,
             request.InjectedMemories.Select(x => x.Id).ToArray(),
             request.AvailableTools);
@@ -117,6 +120,8 @@ public sealed class ClaudeCodeProviderClient(IHostEnvironment environment) : IAg
         AgentProviderType Type,
         string ConversationId,
         string UserMessage,
+        string SystemPrompt,
+        WorkspaceContext Workspace,
         string MemoryContext,
         IReadOnlyList<string> InjectedMemoryIds,
         IReadOnlyList<string> AvailableTools);

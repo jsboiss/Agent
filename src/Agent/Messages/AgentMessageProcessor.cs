@@ -2,13 +2,15 @@ using Agent.Conversations;
 using Agent.Events;
 using Agent.Memory;
 using Agent.Providers;
+using Agent.Resources;
 
 namespace Agent.Messages;
 
 public sealed class AgentMessageProcessor(
     IAgentProviderSelector providerSelector,
     IConversationResolver conversationResolver,
-    IConversationRepository conversationRepository) : IMessageProcessor
+    IConversationRepository conversationRepository,
+    IAgentResourceLoader resourceLoader) : IMessageProcessor
 {
     public async Task<MessageResult> Process(MessageRequest request, CancellationToken cancellationToken)
     {
@@ -24,14 +26,19 @@ public sealed class AgentMessageProcessor(
             null,
             cancellationToken);
 
-        var provider = providerSelector.Get(AgentProviderType.Ollama);
+        var providerType = AgentProviderType.Ollama;
+        var provider = providerSelector.Get(providerType);
+        var resources = await resourceLoader.Load(
+            new AgentResourceLoadRequest(conversation, request.Channel, providerType),
+            cancellationToken);
         var providerRequest = new AgentProviderRequest(
-            AgentProviderType.Ollama,
+            providerType,
             conversation.Id,
             request.UserMessage,
+            resources,
             string.Empty,
             Array.Empty<MemoryRecord>(),
-            ["search_memory", "write_memory", "spawn_agent"]);
+            resources.Workspace.AvailableTools);
 
         List<AgentEvent> events =
         [
@@ -64,7 +71,7 @@ public sealed class AgentMessageProcessor(
             conversation.Id,
             new Dictionary<string, string>
             {
-                ["provider"] = AgentProviderType.Ollama.ToString(),
+                ["provider"] = providerType.ToString(),
                 ["channel"] = request.Channel,
                 ["conversationEntryId"] = userEntry.Id
             });
@@ -79,7 +86,7 @@ public sealed class AgentMessageProcessor(
                 conversation.Id,
                 new Dictionary<string, string>
                 {
-                    ["provider"] = AgentProviderType.Ollama.ToString(),
+                    ["provider"] = providerType.ToString(),
                     ["conversationEntryId"] = userEntry.Id,
                     ["error"] = providerResult.Error
                 }));

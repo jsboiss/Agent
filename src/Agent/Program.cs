@@ -6,6 +6,7 @@ using Agent.Providers;
 using Agent.Providers.ClaudeCode;
 using Agent.Providers.Codex;
 using Agent.Providers.Ollama;
+using Agent.Resources;
 using Microsoft.Extensions.Options;
 using MudBlazor.Services;
 
@@ -28,6 +29,7 @@ builder.Services.AddSingleton<IAgentProviderClient>(x => x.GetRequiredService<Ol
 builder.Services.AddSingleton<IAgentProviderSelector, AgentProviderSelector>();
 builder.Services.AddSingleton<IConversationRepository, InMemoryConversationRepository>();
 builder.Services.AddSingleton<IConversationResolver, ConversationResolver>();
+builder.Services.AddSingleton<IAgentResourceLoader, AgentResourceLoader>();
 builder.Services.AddScoped<IMessageProcessor, AgentMessageProcessor>();
 
 var app = builder.Build();

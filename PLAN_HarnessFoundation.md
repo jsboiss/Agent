@@ -24,24 +24,24 @@ Reasoning: channels are delivery mechanisms, not conversation boundaries. This p
 
 ### Workspace Context And Resource Loading
 
-- Introduce `WorkspaceContext` instead of Pi-style runtime/cwd terminology.
-- `WorkspaceContext` should describe the project/folder the agent is operating in:
-  - root path
-  - current path
-  - project name
-  - loaded instructions
-  - applicable settings
-  - available tools
-- Add an `IAgentResourceLoader` responsible for building provider context before each request.
-- The resource loader should gather:
-  - global agent instructions
-  - workspace/project instructions such as `AGENTS.md`
-  - channel-specific delivery/style instructions
-  - provider constraints
-  - prompt templates
-  - tool catalogue entries
-  - compact memory context
-  - current conversation summary
+- [x] Introduce `WorkspaceContext` instead of Pi-style runtime/cwd terminology.
+- [x] `WorkspaceContext` should describe the project/folder the agent is operating in:
+  - [x] root path
+  - [x] current path
+  - [x] project name
+  - [x] loaded instructions
+  - [x] applicable settings
+  - [x] available tools
+- [x] Add an `IAgentResourceLoader` responsible for building provider context before each request.
+- [x] The resource loader should gather:
+  - [x] global agent instructions
+  - [x] workspace/project instructions such as `AGENTS.md`
+  - [x] channel-specific delivery/style instructions
+  - [x] provider constraints
+  - [x] prompt templates
+  - [x] tool catalogue entries
+  - [x] compact memory context
+  - [x] current conversation summary
 
 Reasoning: provider prompts should be assembled from explicit resources rather than scattered string-building. This keeps future dashboard, iMessage, Telegram, provider, and project behavior consistent.
 
@@ -133,7 +133,7 @@ Reasoning: the main chat is intended to be continuous over a long period, so pro
 
 1. [x] Add conversation persistence abstractions and records.
 2. [x] Route `MessageRequest` through conversation resolution instead of treating `ConversationId` as a raw caller-owned value.
-3. Add resource loading and `WorkspaceContext`.
+3. [x] Add resource loading and `WorkspaceContext`.
 4. Replace string tool availability with `AgentToolDefinition`.
 5. Expand event kinds and emit the new lifecycle events from `AgentMessageProcessor`.
 6. Add queue semantics for busy conversations.

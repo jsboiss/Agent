@@ -67,8 +67,7 @@ public sealed class OllamaProviderClient(HttpClient httpClient, IOptions<OllamaP
     private static string GetSystemPrompt(AgentProviderRequest request)
     {
         var prompt = new StringBuilder();
-        prompt.AppendLine("You are the local development model for the MainAgent harness.");
-        prompt.AppendLine("Respond directly and keep outputs concise unless more detail is requested.");
+        prompt.AppendLine(request.Resources.BuildSystemPrompt());
 
         if (!string.IsNullOrWhiteSpace(request.MemoryContext))
         {
@@ -85,17 +84,6 @@ public sealed class OllamaProviderClient(HttpClient httpClient, IOptions<OllamaP
             foreach (var memory in request.InjectedMemories)
             {
                 prompt.AppendLine($"- {memory.Id}");
-            }
-        }
-
-        if (request.AvailableTools.Count > 0)
-        {
-            prompt.AppendLine();
-            prompt.AppendLine("Available tools:");
-
-            foreach (var tool in request.AvailableTools)
-            {
-                prompt.AppendLine($"- {tool}");
             }
         }
 
