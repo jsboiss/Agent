@@ -19,6 +19,7 @@ public sealed class AgentMessageProcessor(
     IAgentToolExecutor toolExecutor,
     IMemoryScout memoryScout,
     IMemoryExtractor memoryExtractor,
+    IMemoryCandidateReviewer memoryCandidateReviewer,
     IMemoryStore memoryStore) : IMessageProcessor
 {
     private static int MaxToolIterations => 3;
@@ -269,29 +270,21 @@ public sealed class AgentMessageProcessor(
                 injectedMemories),
             cancellationToken);
 
+        var reviewResult = await memoryCandidateReviewer.Review(
+            new MemoryCandidateReviewRequest(conversationId, extraction.Memories),
+            cancellationToken);
         var written = 0;
         var skipped = 0;
 
-        foreach (var extractedMemory in extraction.Memories)
+        foreach (var review in reviewResult.Reviews)
         {
-            var existingMemories = await memoryStore.Search(
-                new MemorySearchRequest(
-                    extractedMemory.Text,
-                    1,
-                    new HashSet<MemoryLifecycle> { MemoryLifecycle.Active },
-                    new Dictionary<string, string>
-                    {
-                        ["conversationId"] = conversationId,
-                        ["source"] = "memory-extraction-dedupe"
-                    }),
-                cancellationToken);
-
-            if (existingMemories.Any(x => string.Equals(x.Text, extractedMemory.Text, StringComparison.OrdinalIgnoreCase)))
+            if (!review.Accepted)
             {
                 skipped++;
                 continue;
             }
 
+            var extractedMemory = review.Candidate;
             var memory = await memoryStore.Write(
                 new MemoryWriteRequest(
                     extractedMemory.Text,
@@ -312,6 +305,7 @@ public sealed class AgentMessageProcessor(
                     ["memoryId"] = memory.Id,
                     ["tier"] = memory.Tier.ToString(),
                     ["segment"] = memory.Segment.ToString(),
+                    ["reviewScore"] = review.Score.ToString("0.###"),
                     ["text"] = memory.Text
                 }));
         }
@@ -324,7 +318,9 @@ public sealed class AgentMessageProcessor(
                 ["ConversationEntryId"] = userEntry.Id,
                 ["proposedCount"] = extraction.Memories.Count.ToString(),
                 ["writtenCount"] = written.ToString(),
-                ["skippedCount"] = skipped.ToString()
+                ["skippedCount"] = skipped.ToString(),
+                ["reviewedCount"] = reviewResult.Reviews.Count.ToString(),
+                ["reviewSummary"] = string.Join("; ", reviewResult.Reviews.Select(x => $"{x.Score:0.##}:{x.Reason}"))
             }));
     }
 

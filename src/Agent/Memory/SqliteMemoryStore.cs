@@ -23,16 +23,27 @@ public sealed class SqliteMemoryStore(IOptions<SqliteMemoryOptions> options) : I
             : request.IncludedLifecycles;
 
         await using var command = connection.CreateCommand();
-        command.CommandText = """
+        var ftsQuery = GetFtsQuery(request.Query);
+        command.CommandText = string.IsNullOrWhiteSpace(ftsQuery)
+            ? """
             SELECT Id, Text, Tier, Segment, Lifecycle, Importance, Confidence, AccessCount,
                    CreatedAt, UpdatedAt, LastAccessedAt, SourceMessageId, Supersedes, EmbeddingReference
             FROM Memories
-            WHERE Text LIKE $query
-              AND Lifecycle IN (SELECT value FROM json_each($lifecycles))
+            WHERE Lifecycle IN (SELECT value FROM json_each($lifecycles))
             ORDER BY Importance DESC, Confidence DESC, UpdatedAt DESC
             LIMIT $limit;
+            """
+            : """
+            SELECT m.Id, m.Text, m.Tier, m.Segment, m.Lifecycle, m.Importance, m.Confidence, m.AccessCount,
+                   m.CreatedAt, m.UpdatedAt, m.LastAccessedAt, m.SourceMessageId, m.Supersedes, m.EmbeddingReference
+            FROM MemoriesFts f
+            JOIN Memories m ON m.Id = f.Id
+            WHERE MemoriesFts MATCH $query
+              AND m.Lifecycle IN (SELECT value FROM json_each($lifecycles))
+            ORDER BY bm25(MemoriesFts), m.Importance DESC, m.Confidence DESC, m.UpdatedAt DESC
+            LIMIT $limit;
             """;
-        command.Parameters.AddWithValue("$query", $"%{request.Query}%");
+        command.Parameters.AddWithValue("$query", ftsQuery);
         command.Parameters.AddWithValue("$lifecycles", GetJsonArray(lifecycles.Select(x => x.ToString()).ToArray()));
         command.Parameters.AddWithValue("$limit", limit);
 
@@ -143,6 +154,40 @@ public sealed class SqliteMemoryStore(IOptions<SqliteMemoryOptions> options) : I
 
             CREATE INDEX IF NOT EXISTS IX_Memories_Lifecycle ON Memories (Lifecycle);
             CREATE INDEX IF NOT EXISTS IX_Memories_UpdatedAt ON Memories (UpdatedAt);
+
+            CREATE VIRTUAL TABLE IF NOT EXISTS MemoriesFts USING fts5(
+                Id UNINDEXED,
+                Text,
+                Tier UNINDEXED,
+                Segment UNINDEXED,
+                content='Memories',
+                content_rowid='rowid'
+            );
+
+            CREATE TRIGGER IF NOT EXISTS Memories_AfterInsert_Fts
+            AFTER INSERT ON Memories
+            BEGIN
+                INSERT INTO MemoriesFts(rowid, Id, Text, Tier, Segment)
+                VALUES (new.rowid, new.Id, new.Text, new.Tier, new.Segment);
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS Memories_AfterUpdate_Fts
+            AFTER UPDATE ON Memories
+            BEGIN
+                INSERT INTO MemoriesFts(MemoriesFts, rowid, Id, Text, Tier, Segment)
+                VALUES ('delete', old.rowid, old.Id, old.Text, old.Tier, old.Segment);
+                INSERT INTO MemoriesFts(rowid, Id, Text, Tier, Segment)
+                VALUES (new.rowid, new.Id, new.Text, new.Tier, new.Segment);
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS Memories_AfterDelete_Fts
+            AFTER DELETE ON Memories
+            BEGIN
+                INSERT INTO MemoriesFts(MemoriesFts, rowid, Id, Text, Tier, Segment)
+                VALUES ('delete', old.rowid, old.Id, old.Text, old.Tier, old.Segment);
+            END;
+
+            INSERT INTO MemoriesFts(MemoriesFts) VALUES ('rebuild');
             """;
 
         await command.ExecuteNonQueryAsync(cancellationToken);
@@ -195,5 +240,19 @@ public sealed class SqliteMemoryStore(IOptions<SqliteMemoryOptions> options) : I
     private static string GetJsonArray(IEnumerable<string> values)
     {
         return JsonSerializer.Serialize(values);
+    }
+
+    private static string GetFtsQuery(string query)
+    {
+        var terms = query
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(x => x.Trim('"', '\'', '.', ',', ';', ':', '!', '?', '(', ')', '[', ']'))
+            .Where(x => x.Length >= 2)
+            .Select(x => $"\"{x.Replace("\"", "\"\"")}\"")
+            .ToArray();
+
+        return terms.Length == 0
+            ? string.Empty
+            : string.Join(" OR ", terms);
     }
 }
