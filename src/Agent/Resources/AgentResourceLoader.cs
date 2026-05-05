@@ -6,7 +6,6 @@ namespace Agent.Resources;
 
 public sealed class AgentResourceLoader(
     IWebHostEnvironment environment,
-    IConfiguration configuration,
     IConversationRepository conversationRepository) : IAgentResourceLoader
 {
     private static IReadOnlyList<AgentToolDefinition> DefaultTools =>
@@ -82,13 +81,12 @@ public sealed class AgentResourceLoader(
     {
         var rootPath = GetRootPath(environment.ContentRootPath);
         var workspaceInstructions = await ReadInstructions(rootPath, cancellationToken);
-        var applicableSettings = GetApplicableSettings(request);
         var workspace = new WorkspaceContext(
             rootPath,
             environment.ContentRootPath,
             Path.GetFileName(rootPath),
             string.IsNullOrWhiteSpace(workspaceInstructions) ? [] : [workspaceInstructions],
-            applicableSettings,
+            request.Settings.Values,
             DefaultTools);
 
         var entries = await conversationRepository.ListEntries(request.Conversation.Id, cancellationToken);
@@ -132,24 +130,6 @@ public sealed class AgentResourceLoader(
         }
 
         return await File.ReadAllTextAsync(path, cancellationToken);
-    }
-
-    private IReadOnlyDictionary<string, string> GetApplicableSettings(AgentResourceLoadRequest request)
-    {
-        Dictionary<string, string> settings = new(StringComparer.OrdinalIgnoreCase)
-        {
-            ["provider"] = request.ProviderType.ToString(),
-            ["channel"] = request.Channel
-        };
-
-        var model = configuration["Providers:Ollama:Model"];
-
-        if (!string.IsNullOrWhiteSpace(model))
-        {
-            settings["model"] = model;
-        }
-
-        return settings;
     }
 
     private static string GetGlobalInstructions()

@@ -4,4 +4,5 @@ public sealed record MessageRequest(
     string? ConversationId,
     string Channel,
     string UserMessage,
-    DateTimeOffset ReceivedAt);
+    DateTimeOffset ReceivedAt,
+    IReadOnlyDictionary<string, string>? Overrides = null);

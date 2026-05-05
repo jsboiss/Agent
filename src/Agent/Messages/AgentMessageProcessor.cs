@@ -3,6 +3,7 @@ using Agent.Events;
 using Agent.Memory;
 using Agent.Providers;
 using Agent.Resources;
+using Agent.Settings;
 
 namespace Agent.Messages;
 
@@ -11,7 +12,9 @@ public sealed class AgentMessageProcessor(
     IConversationResolver conversationResolver,
     IConversationRepository conversationRepository,
     IAgentResourceLoader resourceLoader,
-    IConversationPromptQueue promptQueue) : IMessageProcessor
+    IConversationPromptQueue promptQueue,
+    IAgentSettingsResolver settingsResolver,
+    IWebHostEnvironment environment) : IMessageProcessor
 {
     public async Task<MessageResult> Process(MessageRequest request, CancellationToken cancellationToken)
     {
@@ -19,6 +22,13 @@ public sealed class AgentMessageProcessor(
             new ConversationResolveRequest(request.Channel, request.ConversationId),
             cancellationToken);
         var conversation = resolution.Conversation;
+        var settings = await settingsResolver.Resolve(
+            new AgentSettingsResolveRequest(
+                conversation,
+                request.Channel,
+                GetWorkspaceRootPath(environment.ContentRootPath),
+                request.Overrides ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)),
+            cancellationToken);
         var started = promptQueue.TryStart(conversation.Id);
         var queueKind = promptQueue.Classify(request.UserMessage, !started);
         List<AgentEvent> events =
@@ -32,6 +42,7 @@ public sealed class AgentMessageProcessor(
                     ["conversationCreated"] = resolution.Created.ToString(),
                     ["conversationKind"] = conversation.Kind.ToString(),
                     ["queueKind"] = queueKind.ToString(),
+                    ["queueBehavior"] = settings.Get("queue.behavior") ?? string.Empty,
                     ["queued"] = (!started).ToString(),
                     ["receivedAt"] = request.ReceivedAt.ToString("O"),
                     ["message"] = request.UserMessage
@@ -86,10 +97,10 @@ public sealed class AgentMessageProcessor(
                 true);
         }
 
-        var providerType = AgentProviderType.Ollama;
+        var providerType = GetProviderType(settings);
         var provider = providerSelector.Get(providerType);
         var resources = await resourceLoader.Load(
-            new AgentResourceLoadRequest(conversation, request.Channel, providerType),
+            new AgentResourceLoadRequest(conversation, request.Channel, providerType, settings),
             cancellationToken);
         var providerRequest = new AgentProviderRequest(
             providerType,
@@ -198,5 +209,29 @@ public sealed class AgentMessageProcessor(
             conversationId,
             DateTimeOffset.UtcNow,
             data);
+    }
+
+    private static AgentProviderType GetProviderType(AgentSettings settings)
+    {
+        var provider = settings.Get("provider");
+
+        if (Enum.TryParse<AgentProviderType>(provider, true, out var providerType))
+        {
+            return providerType;
+        }
+
+        return AgentProviderType.Ollama;
+    }
+
+    private static string GetWorkspaceRootPath(string contentRootPath)
+    {
+        var directory = new DirectoryInfo(contentRootPath);
+
+        if (directory.Parent is not null && directory.Parent.Name.Equals("src", StringComparison.OrdinalIgnoreCase))
+        {
+            return directory.Parent.Parent?.FullName ?? directory.FullName;
+        }
+
+        return directory.FullName;
     }
 }

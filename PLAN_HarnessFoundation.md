@@ -100,15 +100,15 @@ Reasoning: phone messages often arrive while the agent is already working. Separ
 
 ### Settings Overrides
 
-- Add layered settings resolution:
-  1. app defaults
-  2. global user settings
-  3. workspace settings
-  4. conversation settings
-  5. channel settings
-  6. per-message overrides
-- Settings should cover provider selection, model options, queue behavior, compaction thresholds, memory behavior, and channel delivery preferences.
-- Channel settings must not create separate conversation identity by default.
+- [x] Add layered settings resolution:
+  1. [x] app defaults
+  2. [x] global user settings
+  3. [x] workspace settings
+  4. [x] conversation settings
+  5. [x] channel settings
+  6. [x] per-message overrides
+- [x] Settings should cover provider selection, model options, queue behavior, compaction thresholds, memory behavior, and channel delivery preferences.
+- [x] Channel settings must not create separate conversation identity by default.
 
 Reasoning: settings need to vary by project, channel, and conversation without hardcoding provider choice inside `AgentMessageProcessor`.
 
@@ -137,7 +137,7 @@ Reasoning: the main chat is intended to be continuous over a long period, so pro
 4. [x] Replace string tool availability with `AgentToolDefinition`.
 5. [x] Expand event kinds and emit the new lifecycle events from `AgentMessageProcessor`.
 6. [x] Add queue semantics for busy conversations.
-7. Add settings resolution layers.
+7. [x] Add settings resolution layers.
 8. Add conversation summary/compaction interfaces.
 9. Add sub-agent child conversation creation and result reporting.
 

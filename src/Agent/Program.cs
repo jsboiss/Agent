@@ -7,6 +7,7 @@ using Agent.Providers.ClaudeCode;
 using Agent.Providers.Codex;
 using Agent.Providers.Ollama;
 using Agent.Resources;
+using Agent.Settings;
 using Microsoft.Extensions.Options;
 using MudBlazor.Services;
 
@@ -31,6 +32,7 @@ builder.Services.AddSingleton<IConversationRepository, InMemoryConversationRepos
 builder.Services.AddSingleton<IConversationResolver, ConversationResolver>();
 builder.Services.AddSingleton<IAgentResourceLoader, AgentResourceLoader>();
 builder.Services.AddSingleton<IConversationPromptQueue, InMemoryConversationPromptQueue>();
+builder.Services.AddSingleton<IAgentSettingsResolver, ConfigurationAgentSettingsResolver>();
 builder.Services.AddScoped<IMessageProcessor, AgentMessageProcessor>();
 
 var app = builder.Build();
