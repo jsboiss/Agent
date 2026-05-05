@@ -1,4 +1,5 @@
 using Agent.Conversations;
+using Agent.Compaction;
 using Agent.Providers;
 using Agent.Tools;
 
@@ -6,7 +7,9 @@ namespace Agent.Resources;
 
 public sealed class AgentResourceLoader(
     IWebHostEnvironment environment,
-    IConversationRepository conversationRepository) : IAgentResourceLoader
+    IConversationRepository conversationRepository,
+    IConversationSummaryStore summaryStore,
+    IConversationCompactor conversationCompactor) : IAgentResourceLoader
 {
     private static IReadOnlyList<AgentToolDefinition> DefaultTools =>
     [
@@ -89,7 +92,17 @@ public sealed class AgentResourceLoader(
             request.Settings.Values,
             DefaultTools);
 
+        var recentEntryCount = GetRecentEntryCount(request.Settings.Values);
         var entries = await conversationRepository.ListEntries(request.Conversation.Id, cancellationToken);
+
+        if (entries.Count > recentEntryCount)
+        {
+            await conversationCompactor.Compact(
+                new ConversationCompactionRequest(request.Conversation, recentEntryCount),
+                cancellationToken);
+        }
+
+        var rollingSummary = await summaryStore.Get(request.Conversation.Id, cancellationToken);
 
         return new AgentResourceContext(
             workspace,
@@ -100,7 +113,7 @@ public sealed class AgentResourceLoader(
             GetPromptTemplate(workspace),
             GetToolContext(DefaultTools),
             string.Empty,
-            GetConversationSummary(entries));
+            GetConversationSummary(rollingSummary, entries, recentEntryCount));
     }
 
     private static string GetRootPath(string contentRootPath)
@@ -177,17 +190,34 @@ public sealed class AgentResourceLoader(
         return "Available tools:" + Environment.NewLine + string.Join(Environment.NewLine, lines);
     }
 
-    private static string GetConversationSummary(IReadOnlyList<ConversationEntry> entries)
+    private static string GetConversationSummary(
+        ConversationSummary? rollingSummary,
+        IReadOnlyList<ConversationEntry> entries,
+        int recentEntryCount)
     {
         if (entries.Count == 0)
         {
-            return string.Empty;
+            return rollingSummary?.Content ?? string.Empty;
         }
 
         var recentEntries = entries
-            .TakeLast(8)
+            .TakeLast(recentEntryCount)
             .Select(x => $"- {x.Role}: {x.Content}");
 
-        return "Current conversation summary:" + Environment.NewLine + string.Join(Environment.NewLine, recentEntries);
+        var recentSummary = "Recent exact entries:" + Environment.NewLine + string.Join(Environment.NewLine, recentEntries);
+
+        if (rollingSummary is null)
+        {
+            return recentSummary;
+        }
+
+        return rollingSummary.Content + Environment.NewLine + Environment.NewLine + recentSummary;
+    }
+
+    private static int GetRecentEntryCount(IReadOnlyDictionary<string, string> settings)
+    {
+        return int.TryParse(settings.GetValueOrDefault("compaction.recentEntryCount"), out var recentEntryCount)
+            ? Math.Max(1, recentEntryCount)
+            : 8;
     }
 }

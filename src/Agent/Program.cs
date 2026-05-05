@@ -1,4 +1,5 @@
 using Agent.Components;
+using Agent.Compaction;
 using Agent.Conversations;
 using Agent.Endpoints;
 using Agent.Messages;
@@ -8,6 +9,7 @@ using Agent.Providers.Codex;
 using Agent.Providers.Ollama;
 using Agent.Resources;
 using Agent.Settings;
+using Agent.SubAgents;
 using Microsoft.Extensions.Options;
 using MudBlazor.Services;
 
@@ -30,9 +32,12 @@ builder.Services.AddSingleton<IAgentProviderClient>(x => x.GetRequiredService<Ol
 builder.Services.AddSingleton<IAgentProviderSelector, AgentProviderSelector>();
 builder.Services.AddSingleton<IConversationRepository, InMemoryConversationRepository>();
 builder.Services.AddSingleton<IConversationResolver, ConversationResolver>();
+builder.Services.AddSingleton<IConversationSummaryStore, InMemoryConversationSummaryStore>();
+builder.Services.AddSingleton<IConversationCompactor, RollingConversationCompactor>();
 builder.Services.AddSingleton<IAgentResourceLoader, AgentResourceLoader>();
 builder.Services.AddSingleton<IConversationPromptQueue, InMemoryConversationPromptQueue>();
 builder.Services.AddSingleton<IAgentSettingsResolver, ConfigurationAgentSettingsResolver>();
+builder.Services.AddSingleton<ISubAgentCoordinator, SubAgentCoordinator>();
 builder.Services.AddScoped<IMessageProcessor, AgentMessageProcessor>();
 
 var app = builder.Build();

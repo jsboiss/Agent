@@ -11,6 +11,7 @@ public sealed class ConfigurationAgentSettingsResolver(IConfiguration configurat
         ["model"] = "qwen3.5:latest",
         ["queue.behavior"] = "enqueue-while-busy",
         ["compaction.threshold"] = "8000",
+        ["compaction.recentEntryCount"] = "8",
         ["memory.enabled"] = "true",
         ["channel.delivery"] = "default"
     };

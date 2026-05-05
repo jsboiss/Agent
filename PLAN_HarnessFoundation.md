@@ -114,18 +114,18 @@ Reasoning: settings need to vary by project, channel, and conversation without h
 
 ### Compaction And Sub-Agent Threads
 
-- Store the exact conversation log separately from prompt context.
-- Add rolling summaries for long-running conversations.
-- Keep durable memory extraction separate from summaries.
-- For the main conversation:
-  - never delete exact entries as part of compaction.
-  - use summaries to keep provider prompts bounded.
-  - continue extracting durable memory into SQLite.
-- For sub-agents:
-  - create a child conversation.
-  - pass a bounded context package from the main conversation.
-  - write the sub-agent result and summary back into the main conversation.
-  - avoid copying all sub-agent intermediate entries into the main thread.
+- [x] Store the exact conversation log separately from prompt context.
+- [x] Add rolling summaries for long-running conversations.
+- [x] Keep durable memory extraction separate from summaries.
+- [x] For the main conversation:
+  - [x] never delete exact entries as part of compaction.
+  - [x] use summaries to keep provider prompts bounded.
+  - [x] continue extracting durable memory into SQLite.
+- [x] For sub-agents:
+  - [x] create a child conversation.
+  - [x] pass a bounded context package from the main conversation.
+  - [x] write the sub-agent result and summary back into the main conversation.
+  - [x] avoid copying all sub-agent intermediate entries into the main thread.
 
 Reasoning: the main chat is intended to be continuous over a long period, so prompt context must compact without losing source history. Sub-agents should reduce main-thread noise while still contributing useful results and memories.
 
@@ -138,8 +138,8 @@ Reasoning: the main chat is intended to be continuous over a long period, so pro
 5. [x] Expand event kinds and emit the new lifecycle events from `AgentMessageProcessor`.
 6. [x] Add queue semantics for busy conversations.
 7. [x] Add settings resolution layers.
-8. Add conversation summary/compaction interfaces.
-9. Add sub-agent child conversation creation and result reporting.
+8. [x] Add conversation summary/compaction interfaces.
+9. [x] Add sub-agent child conversation creation and result reporting.
 
 Reasoning: conversation identity must come first because resources, events, queues, settings, and compaction all attach to conversations.
 
