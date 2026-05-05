@@ -22,10 +22,7 @@ public sealed class OllamaProviderClient(HttpClient httpClient, IOptions<OllamaP
         var ollamaRequest = new OllamaChatRequest(
             Options.Model,
             false,
-            [
-                new OllamaChatMessage("system", GetSystemPrompt(request)),
-                new OllamaChatMessage("user", request.UserMessage)
-            ],
+            GetMessages(request),
             request.AvailableTools.Select(GetToolDefinition).ToArray());
 
         using var response = await httpClient.PostAsJsonAsync("chat/completions", ollamaRequest, JsonOptions, cancellationToken);
@@ -92,6 +89,36 @@ public sealed class OllamaProviderClient(HttpClient httpClient, IOptions<OllamaP
         return prompt.ToString();
     }
 
+    private static IReadOnlyList<OllamaChatRequestMessage> GetMessages(AgentProviderRequest request)
+    {
+        List<OllamaChatRequestMessage> messages =
+        [
+            new OllamaChatRequestMessage("system", GetSystemPrompt(request)),
+            new OllamaChatRequestMessage("user", request.UserMessage)
+        ];
+
+        if (request.PriorToolCalls.Count == 0)
+        {
+            return messages;
+        }
+
+        messages.Add(new OllamaChatRequestMessage(
+            "assistant",
+            null,
+            request.PriorToolCalls.Select(GetToolCallMessage).ToArray()));
+
+        foreach (var toolResult in request.ToolResults)
+        {
+            messages.Add(new OllamaChatRequestMessage(
+                "tool",
+                toolResult.Content,
+                null,
+                toolResult.ToolCallId));
+        }
+
+        return messages;
+    }
+
     private static IReadOnlyDictionary<string, string> GetUsageMetadata(
         string model,
         OllamaChatResponse? response)
@@ -141,6 +168,16 @@ public sealed class OllamaProviderClient(HttpClient httpClient, IOptions<OllamaP
             .ToArray();
     }
 
+    private static OllamaRequestToolCall GetToolCallMessage(AgentProviderToolCall toolCall)
+    {
+        return new OllamaRequestToolCall(
+            toolCall.Id,
+            "function",
+            new OllamaRequestToolCallFunction(
+                toolCall.Name,
+                JsonSerializer.Serialize(toolCall.Arguments)));
+    }
+
     private static IReadOnlyDictionary<string, string> GetArguments(JsonElement arguments)
     {
         if (arguments.ValueKind == JsonValueKind.String)
@@ -167,13 +204,23 @@ public sealed class OllamaProviderClient(HttpClient httpClient, IOptions<OllamaP
     private sealed record OllamaChatRequest(
         string Model,
         bool Stream,
-        IReadOnlyList<OllamaChatMessage> Messages,
+        IReadOnlyList<OllamaChatRequestMessage> Messages,
         IReadOnlyList<OllamaToolDefinition> Tools);
 
-    private sealed record OllamaChatMessage(
+    private sealed record OllamaChatRequestMessage(
         string Role,
         string? Content,
-        [property: JsonPropertyName("tool_calls")] IReadOnlyList<OllamaToolCall>? ToolCalls = null);
+        [property: JsonPropertyName("tool_calls")] IReadOnlyList<OllamaRequestToolCall>? ToolCalls = null,
+        [property: JsonPropertyName("tool_call_id")] string? ToolCallId = null);
+
+    private sealed record OllamaRequestToolCall(
+        string? Id,
+        string Type,
+        OllamaRequestToolCallFunction Function);
+
+    private sealed record OllamaRequestToolCallFunction(
+        string Name,
+        string Arguments);
 
     private sealed record OllamaToolDefinition(
         string Type,
@@ -190,7 +237,11 @@ public sealed class OllamaProviderClient(HttpClient httpClient, IOptions<OllamaP
         OllamaUsage? Usage);
 
     private sealed record OllamaChatChoice(
-        OllamaChatMessage Message);
+        OllamaChatResponseMessage Message);
+
+    private sealed record OllamaChatResponseMessage(
+        string? Content,
+        [property: JsonPropertyName("tool_calls")] IReadOnlyList<OllamaToolCall>? ToolCalls = null);
 
     private sealed record OllamaToolCall(
         string? Id,

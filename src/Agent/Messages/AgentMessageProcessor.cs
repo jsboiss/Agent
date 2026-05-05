@@ -18,6 +18,8 @@ public sealed class AgentMessageProcessor(
     IWebHostEnvironment environment,
     IAgentToolExecutor toolExecutor) : IMessageProcessor
 {
+    private static int MaxToolIterations => 3;
+
     public async Task<MessageResult> Process(MessageRequest request, CancellationToken cancellationToken)
     {
         var resolution = await conversationResolver.Resolve(
@@ -111,124 +113,27 @@ public sealed class AgentMessageProcessor(
             resources,
             string.Empty,
             Array.Empty<MemoryRecord>(),
-            resources.Workspace.AvailableTools);
-
-        var providerEvent = GetEvent(
-            AgentEventKind.ProviderRequestStarted,
-            conversation.Id,
-            new Dictionary<string, string>
-            {
-                ["provider"] = providerType.ToString(),
-                ["channel"] = request.Channel,
-                ["ConversationEntryId"] = userEntry.Id
-            });
+            resources.Workspace.AvailableTools,
+            [],
+            []);
 
         try
         {
-            events.Add(providerEvent);
-            var providerResult = await provider.Send(providerRequest, cancellationToken);
+            var providerResult = await RunProviderToolLoop(
+                provider,
+                providerRequest,
+                request.Channel,
+                userEntry.Id,
+                events,
+                cancellationToken);
 
             if (!string.IsNullOrWhiteSpace(providerResult.AssistantMessage))
-            {
-                events.Add(GetEvent(
-                    AgentEventKind.ProviderTextDelta,
-                    conversation.Id,
-                    new Dictionary<string, string>
-                    {
-                        ["provider"] = providerType.ToString(),
-                        ["ConversationEntryId"] = userEntry.Id,
-                        ["text"] = providerResult.AssistantMessage
-                    }));
-            }
-
-            if (!string.IsNullOrWhiteSpace(providerResult.Error))
-            {
-                events.Add(GetEvent(
-                    AgentEventKind.ProviderError,
-                    conversation.Id,
-                    new Dictionary<string, string>
-                    {
-                        ["provider"] = providerType.ToString(),
-                        ["ConversationEntryId"] = userEntry.Id,
-                        ["error"] = providerResult.Error
-                    }));
-            }
-
-            events.Add(GetEvent(
-                AgentEventKind.ProviderTurnCompleted,
-                conversation.Id,
-                new Dictionary<string, string>
-                {
-                    ["provider"] = providerType.ToString(),
-                    ["ConversationEntryId"] = userEntry.Id,
-                    ["toolCallCount"] = providerResult.ToolCalls.Count.ToString(),
-                    ["hasError"] = (!string.IsNullOrWhiteSpace(providerResult.Error)).ToString()
-                }));
-
-            List<AgentToolResult> toolResults = [];
-
-            foreach (var toolCall in providerResult.ToolCalls)
-            {
-                events.Add(GetEvent(
-                    AgentEventKind.ToolCallStarted,
-                    conversation.Id,
-                    new Dictionary<string, string>
-                    {
-                        ["toolCallId"] = toolCall.Id,
-                        ["toolName"] = toolCall.Name,
-                        ["ConversationEntryId"] = userEntry.Id
-                    }));
-
-                var toolResult = await toolExecutor.Execute(
-                    new AgentToolRequest(
-                        toolCall.Name,
-                        toolCall.Arguments,
-                        conversation.Id,
-                        request.Channel),
-                    cancellationToken);
-                toolResults.Add(toolResult);
-                var toolEntry = await conversationRepository.AddEntry(
-                    conversation.Id,
-                    ConversationEntryRole.Tool,
-                    request.Channel,
-                    toolResult.Content,
-                    userEntry.Id,
-                    cancellationToken);
-
-                events.Add(GetEvent(
-                    AgentEventKind.ToolCallOutput,
-                    conversation.Id,
-                    new Dictionary<string, string>
-                    {
-                        ["toolCallId"] = toolCall.Id,
-                        ["toolName"] = toolCall.Name,
-                        ["ConversationEntryId"] = toolEntry.Id,
-                        ["ParentEntryId"] = userEntry.Id,
-                        ["output"] = toolResult.Content
-                    }));
-                events.Add(GetEvent(
-                    AgentEventKind.ToolCallCompleted,
-                    conversation.Id,
-                    new Dictionary<string, string>
-                    {
-                        ["toolCallId"] = toolCall.Id,
-                        ["toolName"] = toolCall.Name,
-                        ["ConversationEntryId"] = toolEntry.Id,
-                        ["succeeded"] = toolResult.Succeeded.ToString()
-                    }));
-            }
-
-            var assistantMessage = string.IsNullOrWhiteSpace(providerResult.AssistantMessage) && toolResults.Count > 0
-                ? string.Join(Environment.NewLine, toolResults.Select(x => x.Content))
-                : providerResult.AssistantMessage;
-
-            if (!string.IsNullOrWhiteSpace(assistantMessage))
             {
                 var assistantEntry = await conversationRepository.AddEntry(
                     conversation.Id,
                     ConversationEntryRole.Assistant,
                     request.Channel,
-                    assistantMessage,
+                    providerResult.AssistantMessage,
                     userEntry.Id,
                     cancellationToken);
 
@@ -241,13 +146,13 @@ public sealed class AgentMessageProcessor(
                         ["channel"] = request.Channel,
                         ["ConversationEntryId"] = assistantEntry.Id,
                         ["ParentEntryId"] = userEntry.Id,
-                        ["message"] = assistantMessage
+                        ["message"] = providerResult.AssistantMessage
                     }));
             }
 
             return new MessageResult(
                 conversation.Id,
-                assistantMessage,
+                providerResult.AssistantMessage,
                 events,
                 queueKind);
         }
@@ -255,6 +160,192 @@ public sealed class AgentMessageProcessor(
         {
             promptQueue.Complete(conversation.Id);
         }
+    }
+
+    private async Task<AgentProviderResult> RunProviderToolLoop(
+        IAgentProviderClient provider,
+        AgentProviderRequest initialRequest,
+        string channel,
+        string userEntryId,
+        List<AgentEvent> events,
+        CancellationToken cancellationToken)
+    {
+        var providerRequest = initialRequest;
+        AgentProviderResult? providerResult = null;
+        List<AgentProviderToolCall> priorToolCalls = [];
+        List<AgentProviderToolResult> providerToolResults = [];
+
+        for (var iteration = 1; iteration <= MaxToolIterations; iteration++)
+        {
+            events.Add(GetProviderRequestStartedEvent(providerRequest, channel, userEntryId, iteration));
+            providerResult = await provider.Send(providerRequest, cancellationToken);
+            AddProviderEvents(providerResult, providerRequest, userEntryId, iteration, events);
+
+            if (providerResult.ToolCalls.Count == 0)
+            {
+                return providerResult;
+            }
+
+            var toolResults = await ExecuteToolCalls(
+                providerResult.ToolCalls,
+                providerRequest.ConversationId,
+                channel,
+                userEntryId,
+                events,
+                cancellationToken);
+
+            priorToolCalls.AddRange(providerResult.ToolCalls);
+            providerToolResults.AddRange(toolResults);
+
+            providerRequest = providerRequest with
+            {
+                PriorToolCalls = priorToolCalls.ToArray(),
+                ToolResults = providerToolResults.ToArray()
+            };
+        }
+
+        return providerResult is null
+            ? new AgentProviderResult(string.Empty, [], new Dictionary<string, string>(), "Provider loop did not run.")
+            : providerResult with
+            {
+                AssistantMessage = string.IsNullOrWhiteSpace(providerResult.AssistantMessage)
+                    ? "Tool loop stopped after the maximum number of iterations."
+                    : providerResult.AssistantMessage
+            };
+    }
+
+    private async Task<IReadOnlyList<AgentProviderToolResult>> ExecuteToolCalls(
+        IReadOnlyList<AgentProviderToolCall> toolCalls,
+        string conversationId,
+        string channel,
+        string userEntryId,
+        List<AgentEvent> events,
+        CancellationToken cancellationToken)
+    {
+        List<AgentProviderToolResult> results = [];
+
+        foreach (var toolCall in toolCalls)
+        {
+            events.Add(GetEvent(
+                AgentEventKind.ToolCallStarted,
+                conversationId,
+                new Dictionary<string, string>
+                {
+                    ["toolCallId"] = toolCall.Id,
+                    ["toolName"] = toolCall.Name,
+                    ["ConversationEntryId"] = userEntryId
+                }));
+
+            var toolResult = await toolExecutor.Execute(
+                new AgentToolRequest(
+                    toolCall.Name,
+                    toolCall.Arguments,
+                    conversationId,
+                    channel),
+                cancellationToken);
+            var toolEntry = await conversationRepository.AddEntry(
+                conversationId,
+                ConversationEntryRole.Tool,
+                channel,
+                toolResult.Content,
+                userEntryId,
+                cancellationToken);
+
+            events.Add(GetEvent(
+                AgentEventKind.ToolCallOutput,
+                conversationId,
+                new Dictionary<string, string>
+                {
+                    ["toolCallId"] = toolCall.Id,
+                    ["toolName"] = toolCall.Name,
+                    ["ConversationEntryId"] = toolEntry.Id,
+                    ["ParentEntryId"] = userEntryId,
+                    ["output"] = toolResult.Content
+                }));
+            events.Add(GetEvent(
+                AgentEventKind.ToolCallCompleted,
+                conversationId,
+                new Dictionary<string, string>
+                {
+                    ["toolCallId"] = toolCall.Id,
+                    ["toolName"] = toolCall.Name,
+                    ["ConversationEntryId"] = toolEntry.Id,
+                    ["succeeded"] = toolResult.Succeeded.ToString()
+                }));
+
+            results.Add(new AgentProviderToolResult(
+                toolCall.Id,
+                toolCall.Name,
+                toolResult.Content));
+        }
+
+        return results;
+    }
+
+    private static AgentEvent GetProviderRequestStartedEvent(
+        AgentProviderRequest request,
+        string channel,
+        string userEntryId,
+        int iteration)
+    {
+        return GetEvent(
+            AgentEventKind.ProviderRequestStarted,
+            request.ConversationId,
+            new Dictionary<string, string>
+            {
+                ["provider"] = request.Kind.ToString(),
+                ["channel"] = channel,
+                ["ConversationEntryId"] = userEntryId,
+                ["iteration"] = iteration.ToString()
+            });
+    }
+
+    private static void AddProviderEvents(
+        AgentProviderResult providerResult,
+        AgentProviderRequest request,
+        string userEntryId,
+        int iteration,
+        List<AgentEvent> events)
+    {
+        if (!string.IsNullOrWhiteSpace(providerResult.AssistantMessage))
+        {
+            events.Add(GetEvent(
+                AgentEventKind.ProviderTextDelta,
+                request.ConversationId,
+                new Dictionary<string, string>
+                {
+                    ["provider"] = request.Kind.ToString(),
+                    ["ConversationEntryId"] = userEntryId,
+                    ["iteration"] = iteration.ToString(),
+                    ["text"] = providerResult.AssistantMessage
+                }));
+        }
+
+        if (!string.IsNullOrWhiteSpace(providerResult.Error))
+        {
+            events.Add(GetEvent(
+                AgentEventKind.ProviderError,
+                request.ConversationId,
+                new Dictionary<string, string>
+                {
+                    ["provider"] = request.Kind.ToString(),
+                    ["ConversationEntryId"] = userEntryId,
+                    ["iteration"] = iteration.ToString(),
+                    ["error"] = providerResult.Error
+                }));
+        }
+
+        events.Add(GetEvent(
+            AgentEventKind.ProviderTurnCompleted,
+            request.ConversationId,
+            new Dictionary<string, string>
+            {
+                ["provider"] = request.Kind.ToString(),
+                ["ConversationEntryId"] = userEntryId,
+                ["iteration"] = iteration.ToString(),
+                ["toolCallCount"] = providerResult.ToolCalls.Count.ToString(),
+                ["hasError"] = (!string.IsNullOrWhiteSpace(providerResult.Error)).ToString()
+            }));
     }
 
     private static AgentEvent GetEvent(

@@ -9,6 +9,8 @@ export interface ProviderRequest {
   memoryContext: string;
   injectedMemoryIds: string[];
   availableTools: AgentToolDefinition[];
+  priorToolCalls: ProviderToolCall[];
+  toolResults: ProviderToolResult[];
 }
 
 export interface WorkspaceContext {
@@ -31,6 +33,12 @@ export interface ProviderToolCall {
   id: string;
   name: string;
   arguments: Record<string, string>;
+}
+
+export interface ProviderToolResult {
+  toolCallId: string;
+  name: string;
+  content: string;
 }
 
 export interface ProviderResult {

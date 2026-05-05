@@ -11,4 +11,6 @@ public sealed record AgentProviderRequest(
     AgentResourceContext Resources,
     string MemoryContext,
     IReadOnlyList<MemoryRecord> InjectedMemories,
-    IReadOnlyList<AgentToolDefinition> AvailableTools);
+    IReadOnlyList<AgentToolDefinition> AvailableTools,
+    IReadOnlyList<AgentProviderToolCall> PriorToolCalls,
+    IReadOnlyList<AgentProviderToolResult> ToolResults);

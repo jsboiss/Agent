@@ -94,7 +94,9 @@ public sealed class ClaudeCodeProviderClient(IHostEnvironment environment) : IAg
             request.Resources.Workspace,
             request.MemoryContext,
             request.InjectedMemories.Select(x => x.Id).ToArray(),
-            request.AvailableTools);
+            request.AvailableTools,
+            request.PriorToolCalls,
+            request.ToolResults);
     }
 
     private static string GetProviderDirectory(string contentRootPath)
@@ -125,5 +127,7 @@ public sealed class ClaudeCodeProviderClient(IHostEnvironment environment) : IAg
         WorkspaceContext Workspace,
         string MemoryContext,
         IReadOnlyList<string> InjectedMemoryIds,
-        IReadOnlyList<AgentToolDefinition> AvailableTools);
+        IReadOnlyList<AgentToolDefinition> AvailableTools,
+        IReadOnlyList<AgentProviderToolCall> PriorToolCalls,
+        IReadOnlyList<AgentProviderToolResult> ToolResults);
 }
