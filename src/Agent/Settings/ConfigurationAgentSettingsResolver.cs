@@ -13,6 +13,7 @@ public sealed class ConfigurationAgentSettingsResolver(IConfiguration configurat
         ["compaction.threshold"] = "8000",
         ["compaction.recentEntryCount"] = "8",
         ["memory.enabled"] = "true",
+        ["memory.scoutLimit"] = "5",
         ["channel.delivery"] = "default"
     };
 

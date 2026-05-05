@@ -16,7 +16,8 @@ public sealed class AgentMessageProcessor(
     IConversationPromptQueue promptQueue,
     IAgentSettingsResolver settingsResolver,
     IWebHostEnvironment environment,
-    IAgentToolExecutor toolExecutor) : IMessageProcessor
+    IAgentToolExecutor toolExecutor,
+    IMemoryScout memoryScout) : IMessageProcessor
 {
     private static int MaxToolIterations => 3;
 
@@ -106,13 +107,21 @@ public sealed class AgentMessageProcessor(
         var resources = await resourceLoader.Load(
             new AgentResourceLoadRequest(conversation, request.Channel, providerType, settings),
             cancellationToken);
+        var memoryScoutResult = await PrefetchMemory(
+            conversation.Id,
+            request,
+            userEntry.Id,
+            settings,
+            events,
+            cancellationToken);
+
         var providerRequest = new AgentProviderRequest(
             providerType,
             conversation.Id,
             request.UserMessage,
             resources,
-            string.Empty,
-            Array.Empty<MemoryRecord>(),
+            memoryScoutResult.CompactContext,
+            memoryScoutResult.Memories,
             resources.Workspace.AvailableTools,
             [],
             []);
@@ -212,6 +221,63 @@ public sealed class AgentMessageProcessor(
                     ? "Tool loop stopped after the maximum number of iterations."
                     : providerResult.AssistantMessage
             };
+    }
+
+    private async Task<MemoryScoutResult> PrefetchMemory(
+        string conversationId,
+        MessageRequest request,
+        string userEntryId,
+        AgentSettings settings,
+        List<AgentEvent> events,
+        CancellationToken cancellationToken)
+    {
+        if (string.Equals(settings.Get("memory.enabled"), "false", StringComparison.OrdinalIgnoreCase))
+        {
+            return new MemoryScoutResult(false, [], string.Empty);
+        }
+
+        events.Add(GetEvent(
+            AgentEventKind.MemoryScoutStarted,
+            conversationId,
+            new Dictionary<string, string>
+            {
+                ["ConversationEntryId"] = userEntryId,
+                ["channel"] = request.Channel
+            }));
+        var result = await memoryScout.Prefetch(
+            new MemoryScoutRequest(
+                conversationId,
+                request.UserMessage,
+                new Dictionary<string, string>
+                {
+                    ["channel"] = request.Channel,
+                    ["ConversationEntryId"] = userEntryId,
+                    ["limit"] = settings.Get("memory.scoutLimit") ?? "5"
+                }),
+            cancellationToken);
+        events.Add(GetEvent(
+            AgentEventKind.MemoryScoutCompleted,
+            conversationId,
+            new Dictionary<string, string>
+            {
+                ["ConversationEntryId"] = userEntryId,
+                ["memoryCount"] = result.Memories.Count.ToString(),
+                ["isMemoryRelevant"] = result.IsMemoryRelevant.ToString()
+            }));
+
+        if (result.IsMemoryRelevant)
+        {
+            events.Add(GetEvent(
+                AgentEventKind.MemoryInjected,
+                conversationId,
+                new Dictionary<string, string>
+                {
+                    ["ConversationEntryId"] = userEntryId,
+                    ["memoryIds"] = string.Join(",", result.Memories.Select(x => x.Id))
+                }));
+        }
+
+        return result;
     }
 
     private async Task<IReadOnlyList<AgentProviderToolResult>> ExecuteToolCalls(

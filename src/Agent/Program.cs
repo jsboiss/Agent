@@ -43,6 +43,7 @@ builder.Services.AddSingleton<IConversationPromptQueue, InMemoryConversationProm
 builder.Services.AddSingleton<IAgentSettingsResolver, ConfigurationAgentSettingsResolver>();
 builder.Services.AddSingleton<ISubAgentCoordinator, SubAgentCoordinator>();
 builder.Services.AddSingleton<IMemoryStore, SqliteMemoryStore>();
+builder.Services.AddSingleton<IMemoryScout, MemoryScout>();
 builder.Services.AddSingleton<IAgentToolExecutor, AgentToolExecutor>();
 builder.Services.AddScoped<IMessageProcessor, AgentMessageProcessor>();
 
