@@ -1,4 +1,5 @@
 using Agent.Components;
+using Agent.Conversations;
 using Agent.Endpoints;
 using Agent.Messages;
 using Agent.Providers;
@@ -25,6 +26,8 @@ builder.Services.AddSingleton<IAgentProviderClient, ClaudeCodeProviderClient>();
 builder.Services.AddSingleton<IAgentProviderClient, CodexProviderClient>();
 builder.Services.AddSingleton<IAgentProviderClient>(x => x.GetRequiredService<OllamaProviderClient>());
 builder.Services.AddSingleton<IAgentProviderSelector, AgentProviderSelector>();
+builder.Services.AddSingleton<IConversationRepository, InMemoryConversationRepository>();
+builder.Services.AddSingleton<IConversationResolver, ConversationResolver>();
 builder.Services.AddScoped<IMessageProcessor, AgentMessageProcessor>();
 
 var app = builder.Build();

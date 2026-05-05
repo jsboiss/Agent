@@ -92,8 +92,6 @@
 </MudStack>
 
 @code {
-    private string ConversationId { get; } = Guid.NewGuid().ToString("N");
-
     private List<ChatMessage> Messages { get; } = [];
 
     private string UserMessage { get; set; } = string.Empty;
@@ -122,7 +120,7 @@
         try
         {
             var result = await MessageProcessor.Process(
-                new MessageRequest(ConversationId, "local-web", message, DateTimeOffset.UtcNow),
+                new MessageRequest(null, "local-web", message, DateTimeOffset.UtcNow),
                 CancellationToken.None);
 
             if (string.IsNullOrWhiteSpace(result.AssistantMessage))
