@@ -17,7 +17,9 @@ public sealed class AgentMessageProcessor(
     IAgentSettingsResolver settingsResolver,
     IWebHostEnvironment environment,
     IAgentToolExecutor toolExecutor,
-    IMemoryScout memoryScout) : IMessageProcessor
+    IMemoryScout memoryScout,
+    IMemoryExtractor memoryExtractor,
+    IMemoryStore memoryStore) : IMessageProcessor
 {
     private static int MaxToolIterations => 3;
 
@@ -157,6 +159,15 @@ public sealed class AgentMessageProcessor(
                         ["ParentEntryId"] = userEntry.Id,
                         ["message"] = providerResult.AssistantMessage
                     }));
+
+                await ExtractMemories(
+                    conversation.Id,
+                    userEntry,
+                    assistantEntry,
+                    memoryScoutResult.Memories,
+                    settings,
+                    events,
+                    cancellationToken);
             }
 
             return new MessageResult(
@@ -221,6 +232,100 @@ public sealed class AgentMessageProcessor(
                     ? "Tool loop stopped after the maximum number of iterations."
                     : providerResult.AssistantMessage
             };
+    }
+
+    private async Task ExtractMemories(
+        string conversationId,
+        ConversationEntry userEntry,
+        ConversationEntry assistantEntry,
+        IReadOnlyList<MemoryRecord> injectedMemories,
+        AgentSettings settings,
+        List<AgentEvent> events,
+        CancellationToken cancellationToken)
+    {
+        if (string.Equals(settings.Get("memory.enabled"), "false", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        if (string.Equals(settings.Get("memory.extraction.enabled"), "false", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        events.Add(GetEvent(
+            AgentEventKind.MemoryExtractionStarted,
+            conversationId,
+            new Dictionary<string, string>
+            {
+                ["ConversationEntryId"] = userEntry.Id
+            }));
+        var extraction = await memoryExtractor.Extract(
+            new MemoryExtractionRequest(
+                conversationId,
+                userEntry,
+                assistantEntry,
+                [],
+                injectedMemories),
+            cancellationToken);
+
+        var written = 0;
+        var skipped = 0;
+
+        foreach (var extractedMemory in extraction.Memories)
+        {
+            var existingMemories = await memoryStore.Search(
+                new MemorySearchRequest(
+                    extractedMemory.Text,
+                    1,
+                    new HashSet<MemoryLifecycle> { MemoryLifecycle.Active },
+                    new Dictionary<string, string>
+                    {
+                        ["conversationId"] = conversationId,
+                        ["source"] = "memory-extraction-dedupe"
+                    }),
+                cancellationToken);
+
+            if (existingMemories.Any(x => string.Equals(x.Text, extractedMemory.Text, StringComparison.OrdinalIgnoreCase)))
+            {
+                skipped++;
+                continue;
+            }
+
+            var memory = await memoryStore.Write(
+                new MemoryWriteRequest(
+                    extractedMemory.Text,
+                    extractedMemory.Tier,
+                    extractedMemory.Segment,
+                    extractedMemory.Importance,
+                    extractedMemory.Confidence,
+                    extractedMemory.SourceMessageId),
+                cancellationToken);
+            written++;
+
+            events.Add(GetEvent(
+                AgentEventKind.MemoryWrite,
+                conversationId,
+                new Dictionary<string, string>
+                {
+                    ["ConversationEntryId"] = userEntry.Id,
+                    ["memoryId"] = memory.Id,
+                    ["tier"] = memory.Tier.ToString(),
+                    ["segment"] = memory.Segment.ToString(),
+                    ["text"] = memory.Text
+                }));
+        }
+
+        events.Add(GetEvent(
+            AgentEventKind.MemoryExtractionCompleted,
+            conversationId,
+            new Dictionary<string, string>
+            {
+                ["ConversationEntryId"] = userEntry.Id,
+                ["proposedCount"] = extraction.Memories.Count.ToString(),
+                ["writtenCount"] = written.ToString(),
+                ["skippedCount"] = skipped.ToString()
+            }));
     }
 
     private async Task<MemoryScoutResult> PrefetchMemory(

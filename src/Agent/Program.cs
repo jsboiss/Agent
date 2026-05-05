@@ -44,6 +44,7 @@ builder.Services.AddSingleton<IAgentSettingsResolver, ConfigurationAgentSettings
 builder.Services.AddSingleton<ISubAgentCoordinator, SubAgentCoordinator>();
 builder.Services.AddSingleton<IMemoryStore, SqliteMemoryStore>();
 builder.Services.AddSingleton<IMemoryScout, MemoryScout>();
+builder.Services.AddSingleton<IMemoryExtractor, RuleBasedMemoryExtractor>();
 builder.Services.AddSingleton<IAgentToolExecutor, AgentToolExecutor>();
 builder.Services.AddScoped<IMessageProcessor, AgentMessageProcessor>();
 

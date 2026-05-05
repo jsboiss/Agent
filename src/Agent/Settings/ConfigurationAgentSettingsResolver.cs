@@ -14,6 +14,7 @@ public sealed class ConfigurationAgentSettingsResolver(IConfiguration configurat
         ["compaction.recentEntryCount"] = "8",
         ["memory.enabled"] = "true",
         ["memory.scoutLimit"] = "5",
+        ["memory.extraction.enabled"] = "true",
         ["channel.delivery"] = "default"
     };
 
