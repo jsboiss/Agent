@@ -30,6 +30,7 @@ builder.Services.AddSingleton<IAgentProviderSelector, AgentProviderSelector>();
 builder.Services.AddSingleton<IConversationRepository, InMemoryConversationRepository>();
 builder.Services.AddSingleton<IConversationResolver, ConversationResolver>();
 builder.Services.AddSingleton<IAgentResourceLoader, AgentResourceLoader>();
+builder.Services.AddSingleton<IConversationPromptQueue, InMemoryConversationPromptQueue>();
 builder.Services.AddScoped<IMessageProcessor, AgentMessageProcessor>();
 
 var app = builder.Build();

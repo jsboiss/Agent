@@ -5,4 +5,6 @@ namespace Agent.Messages;
 public sealed record MessageResult(
     string ConversationId,
     string AssistantMessage,
-    IReadOnlyList<AgentEvent> Events);
+    IReadOnlyList<AgentEvent> Events,
+    QueuedMessageKind QueueKind = QueuedMessageKind.Prompt,
+    bool Queued = false);

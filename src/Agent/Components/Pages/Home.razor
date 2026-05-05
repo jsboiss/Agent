@@ -123,7 +123,11 @@
                 new MessageRequest(null, "local-web", message, DateTimeOffset.UtcNow),
                 CancellationToken.None);
 
-            if (string.IsNullOrWhiteSpace(result.AssistantMessage))
+            if (result.Queued)
+            {
+                Messages.Add(new ChatMessage("System", $"Queued as {result.QueueKind}."));
+            }
+            else if (string.IsNullOrWhiteSpace(result.AssistantMessage))
             {
                 ErrorMessage = result.Events
                     .FirstOrDefault(x => x.Kind == Agent.Events.AgentEventKind.ProviderError)

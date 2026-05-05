@@ -85,16 +85,16 @@ Reasoning: the dashboard should explain what the agent did regardless of which c
 
 ### Prompt Queueing
 
-- Add queued message semantics:
-  - `Prompt`: normal message when idle.
-  - `Steer`: user correction/instruction while an agent run is active.
-  - `FollowUp`: message to process after the current run completes.
-- Add a per-conversation queue.
-- When a channel receives a message while the conversation is active, classify it as steer or follow-up.
-- Start with conservative rules:
-  - explicit correction language such as “actually”, “stop”, “instead”, or “use this” becomes `Steer`.
-  - additive language such as “also”, “after that”, or “when done” becomes `FollowUp`.
-  - otherwise default to `FollowUp` while busy and `Prompt` while idle.
+- [x] Add queued message semantics:
+  - [x] `Prompt`: normal message when idle.
+  - [x] `Steer`: user correction/instruction while an agent run is active.
+  - [x] `FollowUp`: message to process after the current run completes.
+- [x] Add a per-conversation queue.
+- [x] When a channel receives a message while the conversation is active, classify it as steer or follow-up.
+- [x] Start with conservative rules:
+  - [x] explicit correction language such as “actually”, “stop”, “instead”, or “use this” becomes `Steer`.
+  - [x] additive language such as “also”, “after that”, or “when done” becomes `FollowUp`.
+  - [x] otherwise default to `FollowUp` while busy and `Prompt` while idle.
 
 Reasoning: phone messages often arrive while the agent is already working. Separating steering from follow-up avoids losing corrections or accidentally starting parallel work in the same conversation.
 
@@ -136,7 +136,7 @@ Reasoning: the main chat is intended to be continuous over a long period, so pro
 3. [x] Add resource loading and `WorkspaceContext`.
 4. [x] Replace string tool availability with `AgentToolDefinition`.
 5. [x] Expand event kinds and emit the new lifecycle events from `AgentMessageProcessor`.
-6. Add queue semantics for busy conversations.
+6. [x] Add queue semantics for busy conversations.
 7. Add settings resolution layers.
 8. Add conversation summary/compaction interfaces.
 9. Add sub-agent child conversation creation and result reporting.
