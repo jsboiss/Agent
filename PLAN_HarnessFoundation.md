@@ -64,22 +64,22 @@ Reasoning: string tool names do not give providers enough information to call to
 
 ### Event Timeline
 
-- Expand `AgentEventKind` into a richer timeline:
-  - message received
-  - message persisted
-  - provider request started
-  - provider text delta
-  - provider turn completed
-  - provider retry started/completed
-  - tool call started/output/completed
-  - memory scout started/completed
-  - memory injected
-  - memory extraction started/completed
-  - memory consolidation started/completed
-  - compaction started/completed
-  - provider error
-- Keep events linked by `ConversationId`.
-- Include `ConversationEntryId` in event data when the event is tied to a specific message or tool result.
+- [x] Expand `AgentEventKind` into a richer timeline:
+  - [x] message received
+  - [x] message persisted
+  - [x] provider request started
+  - [x] provider text delta
+  - [x] provider turn completed
+  - [x] provider retry started/completed
+  - [x] tool call started/output/completed
+  - [x] memory scout started/completed
+  - [x] memory injected
+  - [x] memory extraction started/completed
+  - [x] memory consolidation started/completed
+  - [x] compaction started/completed
+  - [x] provider error
+- [x] Keep events linked by `ConversationId`.
+- [x] Include `ConversationEntryId` in event data when the event is tied to a specific message or tool result.
 
 Reasoning: the dashboard should explain what the agent did regardless of which channel initiated the work. Fine-grained events also make debugging providers, memory injection, and sub-agents much easier.
 
@@ -135,7 +135,7 @@ Reasoning: the main chat is intended to be continuous over a long period, so pro
 2. [x] Route `MessageRequest` through conversation resolution instead of treating `ConversationId` as a raw caller-owned value.
 3. [x] Add resource loading and `WorkspaceContext`.
 4. [x] Replace string tool availability with `AgentToolDefinition`.
-5. Expand event kinds and emit the new lifecycle events from `AgentMessageProcessor`.
+5. [x] Expand event kinds and emit the new lifecycle events from `AgentMessageProcessor`.
 6. Add queue semantics for busy conversations.
 7. Add settings resolution layers.
 8. Add conversation summary/compaction interfaces.

@@ -18,6 +18,21 @@ public sealed class AgentMessageProcessor(
             new ConversationResolveRequest(request.Channel, request.ConversationId),
             cancellationToken);
         var conversation = resolution.Conversation;
+        List<AgentEvent> events =
+        [
+            GetEvent(
+                AgentEventKind.MessageReceived,
+                conversation.Id,
+                new Dictionary<string, string>
+                {
+                    ["channel"] = request.Channel,
+                    ["conversationCreated"] = resolution.Created.ToString(),
+                    ["conversationKind"] = conversation.Kind.ToString(),
+                    ["receivedAt"] = request.ReceivedAt.ToString("O"),
+                    ["message"] = request.UserMessage
+                })
+        ];
+
         var userEntry = await conversationRepository.AddEntry(
             conversation.Id,
             ConversationEntryRole.User,
@@ -25,6 +40,17 @@ public sealed class AgentMessageProcessor(
             request.UserMessage,
             null,
             cancellationToken);
+
+        events.Add(GetEvent(
+            AgentEventKind.MessagePersisted,
+            conversation.Id,
+            new Dictionary<string, string>
+            {
+                ["role"] = ConversationEntryRole.User.ToString(),
+                ["channel"] = request.Channel,
+                ["ConversationEntryId"] = userEntry.Id,
+                ["message"] = request.UserMessage
+            }));
 
         var providerType = AgentProviderType.Ollama;
         var provider = providerSelector.Get(providerType);
@@ -40,44 +66,31 @@ public sealed class AgentMessageProcessor(
             Array.Empty<MemoryRecord>(),
             resources.Workspace.AvailableTools);
 
-        List<AgentEvent> events =
-        [
-            GetEvent(
-                AgentEventKind.ChatMessage,
-                conversation.Id,
-                new Dictionary<string, string>
-                {
-                    ["role"] = "user",
-                    ["channel"] = request.Channel,
-                    ["conversationEntryId"] = userEntry.Id,
-                    ["message"] = request.UserMessage
-                })
-        ];
-
-        if (resolution.Created)
-        {
-            events.Add(GetEvent(
-                AgentEventKind.ChatMessage,
-                conversation.Id,
-                new Dictionary<string, string>
-                {
-                    ["conversationKind"] = conversation.Kind.ToString(),
-                    ["message"] = "Conversation created."
-                }));
-        }
-
         var providerEvent = GetEvent(
-            AgentEventKind.ProviderRequest,
+            AgentEventKind.ProviderRequestStarted,
             conversation.Id,
             new Dictionary<string, string>
             {
                 ["provider"] = providerType.ToString(),
                 ["channel"] = request.Channel,
-                ["conversationEntryId"] = userEntry.Id
+                ["ConversationEntryId"] = userEntry.Id
             });
 
         events.Add(providerEvent);
         var providerResult = await provider.Send(providerRequest, cancellationToken);
+
+        if (!string.IsNullOrWhiteSpace(providerResult.AssistantMessage))
+        {
+            events.Add(GetEvent(
+                AgentEventKind.ProviderTextDelta,
+                conversation.Id,
+                new Dictionary<string, string>
+                {
+                    ["provider"] = providerType.ToString(),
+                    ["ConversationEntryId"] = userEntry.Id,
+                    ["text"] = providerResult.AssistantMessage
+                }));
+        }
 
         if (!string.IsNullOrWhiteSpace(providerResult.Error))
         {
@@ -87,10 +100,21 @@ public sealed class AgentMessageProcessor(
                 new Dictionary<string, string>
                 {
                     ["provider"] = providerType.ToString(),
-                    ["conversationEntryId"] = userEntry.Id,
+                    ["ConversationEntryId"] = userEntry.Id,
                     ["error"] = providerResult.Error
                 }));
         }
+
+        events.Add(GetEvent(
+            AgentEventKind.ProviderTurnCompleted,
+            conversation.Id,
+            new Dictionary<string, string>
+            {
+                ["provider"] = providerType.ToString(),
+                ["ConversationEntryId"] = userEntry.Id,
+                ["toolCallCount"] = providerResult.ToolCalls.Count.ToString(),
+                ["hasError"] = (!string.IsNullOrWhiteSpace(providerResult.Error)).ToString()
+            }));
 
         if (!string.IsNullOrWhiteSpace(providerResult.AssistantMessage))
         {
@@ -103,14 +127,14 @@ public sealed class AgentMessageProcessor(
                 cancellationToken);
 
             events.Add(GetEvent(
-                AgentEventKind.ChatMessage,
+                AgentEventKind.MessagePersisted,
                 conversation.Id,
                 new Dictionary<string, string>
                 {
-                    ["role"] = "assistant",
+                    ["role"] = ConversationEntryRole.Assistant.ToString(),
                     ["channel"] = request.Channel,
-                    ["conversationEntryId"] = assistantEntry.Id,
-                    ["parentEntryId"] = userEntry.Id,
+                    ["ConversationEntryId"] = assistantEntry.Id,
+                    ["ParentEntryId"] = userEntry.Id,
                     ["message"] = providerResult.AssistantMessage
                 }));
         }
