@@ -1,5 +1,6 @@
 using Agent.Conversations;
 using Agent.Providers;
+using Agent.Tools;
 
 namespace Agent.Resources;
 
@@ -8,7 +9,72 @@ public sealed class AgentResourceLoader(
     IConfiguration configuration,
     IConversationRepository conversationRepository) : IAgentResourceLoader
 {
-    private static IReadOnlyList<string> DefaultTools => ["search_memory", "write_memory", "spawn_agent"];
+    private static IReadOnlyList<AgentToolDefinition> DefaultTools =>
+    [
+        new AgentToolDefinition(
+            "search_memory",
+            "Search durable agent memory for relevant records before answering.",
+            """
+            {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "string",
+                  "description": "Search text for memory lookup."
+                },
+                "limit": {
+                  "type": "integer",
+                  "description": "Maximum memory records to return.",
+                  "minimum": 1,
+                  "maximum": 20
+                }
+              },
+              "required": ["query"]
+            }
+            """,
+            "Matching memory records with ids, tiers, lifecycle state, and content."),
+        new AgentToolDefinition(
+            "write_memory",
+            "Write a durable memory record when the user gives stable information worth preserving.",
+            """
+            {
+              "type": "object",
+              "properties": {
+                "content": {
+                  "type": "string",
+                  "description": "Memory content to store."
+                },
+                "tier": {
+                  "type": "string",
+                  "description": "Memory tier.",
+                  "enum": ["Core", "Project", "Session"]
+                }
+              },
+              "required": ["content"]
+            }
+            """,
+            "The stored memory record id and metadata."),
+        new AgentToolDefinition(
+            "spawn_agent",
+            "Create a child sub-agent conversation for explicit delegated work.",
+            """
+            {
+              "type": "object",
+              "properties": {
+                "task": {
+                  "type": "string",
+                  "description": "Self-contained task for the sub-agent."
+                },
+                "parentEntryId": {
+                  "type": "string",
+                  "description": "Conversation entry id where the child conversation branches from."
+                }
+              },
+              "required": ["task", "parentEntryId"]
+            }
+            """,
+            "A child conversation id and final sub-agent result summary.")
+    ];
 
     public async Task<AgentResourceContext> Load(
         AgentResourceLoadRequest request,
@@ -118,14 +184,17 @@ public sealed class AgentResourceLoader(
         return $"Workspace: {workspace.ProjectName}{Environment.NewLine}Root path: {workspace.RootPath}{Environment.NewLine}Current path: {workspace.CurrentPath}";
     }
 
-    private static string GetToolContext(IReadOnlyList<string> tools)
+    private static string GetToolContext(IReadOnlyList<AgentToolDefinition> tools)
     {
         if (tools.Count == 0)
         {
             return string.Empty;
         }
 
-        return "Available tools:" + Environment.NewLine + string.Join(Environment.NewLine, tools.Select(x => $"- {x}"));
+        var lines = tools.Select(x =>
+            $"- {x.Name}: {x.Description}{Environment.NewLine}  Parameters: {x.JsonParameterSchema}{Environment.NewLine}  Result: {x.ResultDescription}");
+
+        return "Available tools:" + Environment.NewLine + string.Join(Environment.NewLine, lines);
     }
 
     private static string GetConversationSummary(IReadOnlyList<ConversationEntry> entries)

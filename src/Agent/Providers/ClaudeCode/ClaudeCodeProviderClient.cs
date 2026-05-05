@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Agent.Resources;
+using Agent.Tools;
 
 namespace Agent.Providers.ClaudeCode;
 
@@ -124,5 +125,5 @@ public sealed class ClaudeCodeProviderClient(IHostEnvironment environment) : IAg
         WorkspaceContext Workspace,
         string MemoryContext,
         IReadOnlyList<string> InjectedMemoryIds,
-        IReadOnlyList<string> AvailableTools);
+        IReadOnlyList<AgentToolDefinition> AvailableTools);
 }

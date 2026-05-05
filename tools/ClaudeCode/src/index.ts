@@ -8,7 +8,8 @@ export async function handleRequest(request: ProviderRequest): Promise<ProviderR
     toolCalls: [],
     usageMetadata: {
       conversationId: request.conversationId,
-      injectedMemoryCount: request.injectedMemoryIds.length.toString()
+      injectedMemoryCount: request.injectedMemoryIds.length.toString(),
+      availableToolCount: request.availableTools.length.toString()
     }
   };
 }

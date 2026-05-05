@@ -4,9 +4,27 @@ export interface ProviderRequest {
   kind: ProviderKind;
   conversationId: string;
   userMessage: string;
+  systemPrompt: string;
+  workspace: WorkspaceContext;
   memoryContext: string;
   injectedMemoryIds: string[];
-  availableTools: string[];
+  availableTools: AgentToolDefinition[];
+}
+
+export interface WorkspaceContext {
+  rootPath: string;
+  currentPath: string;
+  projectName: string;
+  loadedInstructions: string[];
+  applicableSettings: Record<string, string>;
+  availableTools: AgentToolDefinition[];
+}
+
+export interface AgentToolDefinition {
+  name: string;
+  description: string;
+  jsonParameterSchema: string;
+  resultDescription?: string;
 }
 
 export interface ProviderToolCall {

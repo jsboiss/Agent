@@ -47,18 +47,18 @@ Reasoning: provider prompts should be assembled from explicit resources rather t
 
 ### Tool Catalogue
 
-- Replace `AvailableTools: IReadOnlyList<string>` in provider requests with real tool definitions.
-- Add `AgentToolDefinition` with:
-  - `Name`
-  - `Description`
-  - JSON parameter schema
-  - optional result description
-- Keep tool execution in C# through `IAgentToolExecutor`.
-- Initial catalogue entries should include:
-  - `search_memory`
-  - `write_memory`
-  - `spawn_agent`
-- Update provider adapters so they receive schemas and return structured tool calls.
+- [x] Replace `AvailableTools: IReadOnlyList<string>` in provider requests with real tool definitions.
+- [x] Add `AgentToolDefinition` with:
+  - [x] `Name`
+  - [x] `Description`
+  - [x] JSON parameter schema
+  - [x] optional result description
+- [x] Keep tool execution in C# through `IAgentToolExecutor`.
+- [x] Initial catalogue entries should include:
+  - [x] `search_memory`
+  - [x] `write_memory`
+  - [x] `spawn_agent`
+- [x] Update provider adapters so they receive schemas and return structured tool calls.
 
 Reasoning: string tool names do not give providers enough information to call tools reliably. A catalogue lets C# remain the authority while providers get clear tool contracts.
 
@@ -134,7 +134,7 @@ Reasoning: the main chat is intended to be continuous over a long period, so pro
 1. [x] Add conversation persistence abstractions and records.
 2. [x] Route `MessageRequest` through conversation resolution instead of treating `ConversationId` as a raw caller-owned value.
 3. [x] Add resource loading and `WorkspaceContext`.
-4. Replace string tool availability with `AgentToolDefinition`.
+4. [x] Replace string tool availability with `AgentToolDefinition`.
 5. Expand event kinds and emit the new lifecycle events from `AgentMessageProcessor`.
 6. Add queue semantics for busy conversations.
 7. Add settings resolution layers.

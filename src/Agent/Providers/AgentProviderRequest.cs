@@ -1,5 +1,6 @@
 using Agent.Memory;
 using Agent.Resources;
+using Agent.Tools;
 
 namespace Agent.Providers;
 
@@ -10,4 +11,4 @@ public sealed record AgentProviderRequest(
     AgentResourceContext Resources,
     string MemoryContext,
     IReadOnlyList<MemoryRecord> InjectedMemories,
-    IReadOnlyList<string> AvailableTools);
+    IReadOnlyList<AgentToolDefinition> AvailableTools);
