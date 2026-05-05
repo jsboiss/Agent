@@ -2,6 +2,7 @@ using Agent.Components;
 using Agent.Compaction;
 using Agent.Conversations;
 using Agent.Endpoints;
+using Agent.Memory;
 using Agent.Messages;
 using Agent.Providers;
 using Agent.Providers.ClaudeCode;
@@ -10,6 +11,7 @@ using Agent.Providers.Ollama;
 using Agent.Resources;
 using Agent.Settings;
 using Agent.SubAgents;
+using Agent.Tools;
 using Microsoft.Extensions.Options;
 using MudBlazor.Services;
 
@@ -21,6 +23,8 @@ builder.Services.AddRazorComponents()
 builder.Services.AddMudServices();
 builder.Services.Configure<OllamaProviderOptions>(
     builder.Configuration.GetSection(OllamaProviderOptions.SectionName));
+builder.Services.Configure<SqliteMemoryOptions>(
+    builder.Configuration.GetSection("Memory:Sqlite"));
 builder.Services.AddHttpClient<OllamaProviderClient>((services, httpClient) =>
 {
     var options = services.GetRequiredService<IOptions<OllamaProviderOptions>>().Value;
@@ -38,6 +42,8 @@ builder.Services.AddSingleton<IAgentResourceLoader, AgentResourceLoader>();
 builder.Services.AddSingleton<IConversationPromptQueue, InMemoryConversationPromptQueue>();
 builder.Services.AddSingleton<IAgentSettingsResolver, ConfigurationAgentSettingsResolver>();
 builder.Services.AddSingleton<ISubAgentCoordinator, SubAgentCoordinator>();
+builder.Services.AddSingleton<IMemoryStore, SqliteMemoryStore>();
+builder.Services.AddSingleton<IAgentToolExecutor, AgentToolExecutor>();
 builder.Services.AddScoped<IMessageProcessor, AgentMessageProcessor>();
 
 var app = builder.Build();

@@ -1,16 +1,199 @@
-using Agent.Memory;
+using System.Text.Json;
+using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Options;
 
 namespace Agent.Memory;
 
-public sealed class SqliteMemoryStore : IMemoryStore
+public sealed class SqliteMemoryStore(IOptions<SqliteMemoryOptions> options) : IMemoryStore
 {
-    public Task<IReadOnlyList<MemoryRecord>> Search(MemorySearchRequest request, CancellationToken cancellationToken)
+    private SqliteMemoryOptions Options { get; } = options.Value;
+
+    public async Task<IReadOnlyList<MemoryRecord>> Search(
+        MemorySearchRequest request,
+        CancellationToken cancellationToken)
     {
-        throw new NotImplementedException("SQLite memory search is scaffolded but not implemented.");
+        await EnsureDatabase(cancellationToken);
+
+        await using var connection = new SqliteConnection(Options.ConnectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        var limit = request.Limit <= 0 ? 5 : request.Limit;
+        var lifecycles = request.IncludedLifecycles.Count == 0
+            ? new HashSet<MemoryLifecycle> { MemoryLifecycle.Active }
+            : request.IncludedLifecycles;
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT Id, Text, Tier, Segment, Lifecycle, Importance, Confidence, AccessCount,
+                   CreatedAt, UpdatedAt, LastAccessedAt, SourceMessageId, Supersedes, EmbeddingReference
+            FROM Memories
+            WHERE Text LIKE $query
+              AND Lifecycle IN (SELECT value FROM json_each($lifecycles))
+            ORDER BY Importance DESC, Confidence DESC, UpdatedAt DESC
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$query", $"%{request.Query}%");
+        command.Parameters.AddWithValue("$lifecycles", GetJsonArray(lifecycles.Select(x => x.ToString()).ToArray()));
+        command.Parameters.AddWithValue("$limit", limit);
+
+        List<MemoryRecord> memories = [];
+        List<string> ids = [];
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var memory = GetMemoryRecord(reader);
+            memories.Add(memory);
+            ids.Add(memory.Id);
+        }
+
+        await UpdateAccessMetadata(connection, ids, cancellationToken);
+
+        return memories;
     }
 
-    public Task<MemoryRecord> Write(MemoryWriteRequest request, CancellationToken cancellationToken)
+    public async Task<MemoryRecord> Write(
+        MemoryWriteRequest request,
+        CancellationToken cancellationToken)
     {
-        throw new NotImplementedException("SQLite memory writes are scaffolded but not implemented.");
+        await EnsureDatabase(cancellationToken);
+
+        var timestamp = DateTimeOffset.UtcNow;
+        var memory = new MemoryRecord
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Text = request.Text,
+            Tier = request.Tier,
+            Segment = request.Segment,
+            Lifecycle = MemoryLifecycle.Active,
+            Importance = request.Importance,
+            Confidence = request.Confidence,
+            AccessCount = 0,
+            CreatedAt = timestamp,
+            UpdatedAt = timestamp,
+            SourceMessageId = request.SourceMessageId
+        };
+
+        await using var connection = new SqliteConnection(Options.ConnectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            INSERT INTO Memories (
+                Id, Text, Tier, Segment, Lifecycle, Importance, Confidence, AccessCount,
+                CreatedAt, UpdatedAt, LastAccessedAt, SourceMessageId, Supersedes, EmbeddingReference
+            )
+            VALUES (
+                $id, $text, $tier, $segment, $lifecycle, $importance, $confidence, $accessCount,
+                $createdAt, $updatedAt, NULL, $sourceMessageId, NULL, NULL
+            );
+            """;
+        command.Parameters.AddWithValue("$id", memory.Id);
+        command.Parameters.AddWithValue("$text", memory.Text);
+        command.Parameters.AddWithValue("$tier", memory.Tier.ToString());
+        command.Parameters.AddWithValue("$segment", memory.Segment.ToString());
+        command.Parameters.AddWithValue("$lifecycle", memory.Lifecycle.ToString());
+        command.Parameters.AddWithValue("$importance", memory.Importance);
+        command.Parameters.AddWithValue("$confidence", memory.Confidence);
+        command.Parameters.AddWithValue("$accessCount", memory.AccessCount);
+        command.Parameters.AddWithValue("$createdAt", memory.CreatedAt.ToString("O"));
+        command.Parameters.AddWithValue("$updatedAt", memory.UpdatedAt.ToString("O"));
+        command.Parameters.AddWithValue("$sourceMessageId", (object?)memory.SourceMessageId ?? DBNull.Value);
+
+        await command.ExecuteNonQueryAsync(cancellationToken);
+
+        return memory;
+    }
+
+    private async Task EnsureDatabase(CancellationToken cancellationToken)
+    {
+        var builder = new SqliteConnectionStringBuilder(Options.ConnectionString);
+
+        if (!string.IsNullOrWhiteSpace(builder.DataSource))
+        {
+            var directory = Path.GetDirectoryName(Path.GetFullPath(builder.DataSource));
+
+            if (!string.IsNullOrWhiteSpace(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+        }
+
+        await using var connection = new SqliteConnection(Options.ConnectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            CREATE TABLE IF NOT EXISTS Memories (
+                Id TEXT PRIMARY KEY,
+                Text TEXT NOT NULL,
+                Tier TEXT NOT NULL,
+                Segment TEXT NOT NULL,
+                Lifecycle TEXT NOT NULL,
+                Importance REAL NOT NULL,
+                Confidence REAL NOT NULL,
+                AccessCount INTEGER NOT NULL,
+                CreatedAt TEXT NOT NULL,
+                UpdatedAt TEXT NOT NULL,
+                LastAccessedAt TEXT NULL,
+                SourceMessageId TEXT NULL,
+                Supersedes TEXT NULL,
+                EmbeddingReference TEXT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS IX_Memories_Lifecycle ON Memories (Lifecycle);
+            CREATE INDEX IF NOT EXISTS IX_Memories_UpdatedAt ON Memories (UpdatedAt);
+            """;
+
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static MemoryRecord GetMemoryRecord(SqliteDataReader reader)
+    {
+        return new MemoryRecord
+        {
+            Id = reader.GetString(0),
+            Text = reader.GetString(1),
+            Tier = Enum.Parse<MemoryTier>(reader.GetString(2)),
+            Segment = Enum.Parse<MemorySegment>(reader.GetString(3)),
+            Lifecycle = Enum.Parse<MemoryLifecycle>(reader.GetString(4)),
+            Importance = reader.GetDouble(5),
+            Confidence = reader.GetDouble(6),
+            AccessCount = reader.GetInt32(7),
+            CreatedAt = DateTimeOffset.Parse(reader.GetString(8)),
+            UpdatedAt = DateTimeOffset.Parse(reader.GetString(9)),
+            LastAccessedAt = reader.IsDBNull(10) ? null : DateTimeOffset.Parse(reader.GetString(10)),
+            SourceMessageId = reader.IsDBNull(11) ? null : reader.GetString(11),
+            Supersedes = reader.IsDBNull(12) ? null : reader.GetString(12),
+            EmbeddingReference = reader.IsDBNull(13) ? null : reader.GetString(13)
+        };
+    }
+
+    private static async Task UpdateAccessMetadata(
+        SqliteConnection connection,
+        IReadOnlyList<string> ids,
+        CancellationToken cancellationToken)
+    {
+        if (ids.Count == 0)
+        {
+            return;
+        }
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE Memories
+            SET AccessCount = AccessCount + 1,
+                LastAccessedAt = $lastAccessedAt
+            WHERE Id IN (SELECT value FROM json_each($ids));
+            """;
+        command.Parameters.AddWithValue("$lastAccessedAt", DateTimeOffset.UtcNow.ToString("O"));
+        command.Parameters.AddWithValue("$ids", GetJsonArray(ids));
+
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static string GetJsonArray(IEnumerable<string> values)
+    {
+        return JsonSerializer.Serialize(values);
     }
 }

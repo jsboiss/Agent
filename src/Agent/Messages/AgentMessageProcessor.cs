@@ -4,6 +4,7 @@ using Agent.Memory;
 using Agent.Providers;
 using Agent.Resources;
 using Agent.Settings;
+using Agent.Tools;
 
 namespace Agent.Messages;
 
@@ -14,7 +15,8 @@ public sealed class AgentMessageProcessor(
     IAgentResourceLoader resourceLoader,
     IConversationPromptQueue promptQueue,
     IAgentSettingsResolver settingsResolver,
-    IWebHostEnvironment environment) : IMessageProcessor
+    IWebHostEnvironment environment,
+    IAgentToolExecutor toolExecutor) : IMessageProcessor
 {
     public async Task<MessageResult> Process(MessageRequest request, CancellationToken cancellationToken)
     {
@@ -163,13 +165,70 @@ public sealed class AgentMessageProcessor(
                     ["hasError"] = (!string.IsNullOrWhiteSpace(providerResult.Error)).ToString()
                 }));
 
-            if (!string.IsNullOrWhiteSpace(providerResult.AssistantMessage))
+            List<AgentToolResult> toolResults = [];
+
+            foreach (var toolCall in providerResult.ToolCalls)
+            {
+                events.Add(GetEvent(
+                    AgentEventKind.ToolCallStarted,
+                    conversation.Id,
+                    new Dictionary<string, string>
+                    {
+                        ["toolCallId"] = toolCall.Id,
+                        ["toolName"] = toolCall.Name,
+                        ["ConversationEntryId"] = userEntry.Id
+                    }));
+
+                var toolResult = await toolExecutor.Execute(
+                    new AgentToolRequest(
+                        toolCall.Name,
+                        toolCall.Arguments,
+                        conversation.Id,
+                        request.Channel),
+                    cancellationToken);
+                toolResults.Add(toolResult);
+                var toolEntry = await conversationRepository.AddEntry(
+                    conversation.Id,
+                    ConversationEntryRole.Tool,
+                    request.Channel,
+                    toolResult.Content,
+                    userEntry.Id,
+                    cancellationToken);
+
+                events.Add(GetEvent(
+                    AgentEventKind.ToolCallOutput,
+                    conversation.Id,
+                    new Dictionary<string, string>
+                    {
+                        ["toolCallId"] = toolCall.Id,
+                        ["toolName"] = toolCall.Name,
+                        ["ConversationEntryId"] = toolEntry.Id,
+                        ["ParentEntryId"] = userEntry.Id,
+                        ["output"] = toolResult.Content
+                    }));
+                events.Add(GetEvent(
+                    AgentEventKind.ToolCallCompleted,
+                    conversation.Id,
+                    new Dictionary<string, string>
+                    {
+                        ["toolCallId"] = toolCall.Id,
+                        ["toolName"] = toolCall.Name,
+                        ["ConversationEntryId"] = toolEntry.Id,
+                        ["succeeded"] = toolResult.Succeeded.ToString()
+                    }));
+            }
+
+            var assistantMessage = string.IsNullOrWhiteSpace(providerResult.AssistantMessage) && toolResults.Count > 0
+                ? string.Join(Environment.NewLine, toolResults.Select(x => x.Content))
+                : providerResult.AssistantMessage;
+
+            if (!string.IsNullOrWhiteSpace(assistantMessage))
             {
                 var assistantEntry = await conversationRepository.AddEntry(
                     conversation.Id,
                     ConversationEntryRole.Assistant,
                     request.Channel,
-                    providerResult.AssistantMessage,
+                    assistantMessage,
                     userEntry.Id,
                     cancellationToken);
 
@@ -182,13 +241,13 @@ public sealed class AgentMessageProcessor(
                         ["channel"] = request.Channel,
                         ["ConversationEntryId"] = assistantEntry.Id,
                         ["ParentEntryId"] = userEntry.Id,
-                        ["message"] = providerResult.AssistantMessage
+                        ["message"] = assistantMessage
                     }));
             }
 
             return new MessageResult(
                 conversation.Id,
-                providerResult.AssistantMessage,
+                assistantMessage,
                 events,
                 queueKind);
         }
