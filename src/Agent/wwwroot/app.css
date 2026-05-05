@@ -8,6 +8,33 @@ body {
     min-height: 480px;
 }
 
+.chat-scroll {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    max-height: 56vh;
+    min-height: 320px;
+    overflow-y: auto;
+}
+
+.chat-message {
+    max-width: 88%;
+    white-space: pre-wrap;
+}
+
+.chat-message-user {
+    align-self: flex-end;
+    background: var(--mud-palette-primary-hover);
+}
+
+.chat-message-assistant {
+    align-self: flex-start;
+}
+
+.message-text {
+    overflow-wrap: anywhere;
+}
+
 .graph-surface {
     min-height: 420px;
 }

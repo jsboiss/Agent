@@ -1,5 +1,6 @@
 using Agent.Components;
 using Agent.Endpoints;
+using Agent.Messages;
 using Agent.Providers;
 using Agent.Providers.ClaudeCode;
 using Agent.Providers.Codex;
@@ -24,6 +25,7 @@ builder.Services.AddSingleton<IAgentProviderClient, ClaudeCodeProviderClient>();
 builder.Services.AddSingleton<IAgentProviderClient, CodexProviderClient>();
 builder.Services.AddSingleton<IAgentProviderClient>(x => x.GetRequiredService<OllamaProviderClient>());
 builder.Services.AddSingleton<IAgentProviderSelector, AgentProviderSelector>();
+builder.Services.AddScoped<IMessageProcessor, AgentMessageProcessor>();
 
 var app = builder.Build();
 

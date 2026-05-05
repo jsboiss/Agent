@@ -1,4 +1,7 @@
 @page "/"
+@rendermode InteractiveServer
+@using Agent.Messages
+@inject IMessageProcessor MessageProcessor
 
 <PageTitle>Chat</PageTitle>
 
@@ -8,26 +11,58 @@
             <MudText Typo="Typo.overline" Color="Color.Secondary">Local debug channel</MudText>
             <MudText Typo="Typo.h4">Chat</MudText>
         </div>
-        <MudChip T="string" Color="Color.Warning" Variant="Variant.Outlined">Providers offline</MudChip>
+        <MudChip T="string" Color="Color.Success" Variant="Variant.Outlined">Ollama: qwen3.5</MudChip>
     </MudStack>
 
     <MudGrid Spacing="3">
         <MudItem xs="12" lg="8">
             <MudPaper Class="pa-4 chat-surface" Elevation="0" Outlined="true">
                 <MudStack Spacing="2">
-                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
-                        Incoming user messages will enter the agent processor here.
-                    </MudAlert>
-                    <MudAlert Severity="Severity.Normal" Variant="Variant.Outlined">
-                        Assistant output, tool calls, and provider errors will stream back here.
-                    </MudAlert>
+                    <div class="chat-scroll">
+                        @if (Messages.Count == 0)
+                        {
+                            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                                Send a message to qwen3.5 through the local Ollama provider.
+                            </MudAlert>
+                        }
+                        else
+                        {
+                            @foreach (var message in Messages)
+                            {
+                                <MudPaper Class="@GetMessageClass(message)" Elevation="0" Outlined="true">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@message.Role</MudText>
+                                    <MudText Class="message-text">@message.Content</MudText>
+                                </MudPaper>
+                            }
+                        }
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+                    {
+                        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">
+                            @ErrorMessage
+                        </MudAlert>
+                    }
+
                     <MudSpacer />
                     <MudGrid Spacing="2">
                         <MudItem xs="12" sm="10">
-                            <MudTextField T="string" Placeholder="Message the harness" Variant="Variant.Outlined" Disabled="true" />
+                            <MudTextField T="string"
+                                          @bind-Value="UserMessage"
+                                          Placeholder="Message qwen3.5"
+                                          Variant="Variant.Outlined"
+                                          Lines="2"
+                                          Disabled="IsSending"
+                                          OnKeyDown="HandleKeyDown" />
                         </MudItem>
                         <MudItem xs="12" sm="2">
-                            <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Disabled="true">Send</MudButton>
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       FullWidth="true"
+                                       Disabled="!CanSend"
+                                       OnClick="SendMessage">
+                                @SendButtonText
+                            </MudButton>
                         </MudItem>
                     </MudGrid>
                 </MudStack>
@@ -55,3 +90,77 @@
         </MudItem>
     </MudGrid>
 </MudStack>
+
+@code {
+    private string ConversationId { get; } = Guid.NewGuid().ToString("N");
+
+    private List<ChatMessage> Messages { get; } = [];
+
+    private string UserMessage { get; set; } = string.Empty;
+
+    private string? ErrorMessage { get; set; }
+
+    private bool IsSending { get; set; }
+
+    private bool CanSend => !IsSending && !string.IsNullOrWhiteSpace(UserMessage);
+
+    private string SendButtonText => IsSending ? "Sending" : "Send";
+
+    private async Task SendMessage()
+    {
+        if (!CanSend)
+        {
+            return;
+        }
+
+        var message = UserMessage.Trim();
+        UserMessage = string.Empty;
+        ErrorMessage = null;
+        IsSending = true;
+        Messages.Add(new ChatMessage("You", message));
+
+        try
+        {
+            var result = await MessageProcessor.Process(
+                new MessageRequest(ConversationId, "local-web", message, DateTimeOffset.UtcNow),
+                CancellationToken.None);
+
+            if (string.IsNullOrWhiteSpace(result.AssistantMessage))
+            {
+                ErrorMessage = result.Events
+                    .FirstOrDefault(x => x.Kind == Agent.Events.AgentEventKind.ProviderError)
+                    ?.Data
+                    .GetValueOrDefault("error");
+            }
+            else
+            {
+                Messages.Add(new ChatMessage("qwen3.5", result.AssistantMessage));
+            }
+        }
+        catch (Exception exception)
+        {
+            ErrorMessage = exception.Message;
+        }
+        finally
+        {
+            IsSending = false;
+        }
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter" && !args.ShiftKey && CanSend)
+        {
+            await SendMessage();
+        }
+    }
+
+    private static string GetMessageClass(ChatMessage message)
+    {
+        return message.Role == "You"
+            ? "pa-3 chat-message chat-message-user"
+            : "pa-3 chat-message chat-message-assistant";
+    }
+
+    private sealed record ChatMessage(string Role, string Content);
+}
