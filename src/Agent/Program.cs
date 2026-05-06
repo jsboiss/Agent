@@ -1,4 +1,3 @@
-using Agent.Components;
 using Agent.Compaction;
 using Agent.Conversations;
 using Agent.Dashboard;
@@ -19,8 +18,7 @@ using Microsoft.Extensions.Options;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
+builder.Services.AddOpenApi();
 builder.Services.Configure<OllamaProviderOptions>(
     builder.Configuration.GetSection(OllamaProviderOptions.SectionName));
 builder.Services.Configure<SqliteMemoryOptions>(
@@ -55,7 +53,7 @@ builder.Services.AddScoped<IChatDashboardService, ChatDashboardService>();
 builder.Services.AddScoped<IMemoryDashboardService, MemoryDashboardService>();
 builder.Services.AddScoped<IRunTimelineService, RunTimelineService>();
 builder.Services.AddScoped<IMemoryGraphService, MemoryGraphService>();
-builder.Services.AddScoped<DashboardUiState>();
+builder.Services.AddScoped<ISettingsDashboardService, SettingsDashboardService>();
 builder.Services.AddScoped<IMessageProcessor, AgentMessageProcessor>();
 
 var app = builder.Build();
@@ -70,11 +68,22 @@ if (!app.Environment.IsDevelopment())
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 
-app.UseAntiforgery();
-
-app.MapStaticAssets();
+app.MapOpenApi();
+app.UseDefaultFiles();
+app.UseStaticFiles();
 app.MapDashboardEndpoints();
-app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
+app.MapFallback(async context =>
+{
+    if (context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
+        || context.Request.Path.StartsWithSegments("/openapi", StringComparison.OrdinalIgnoreCase))
+    {
+        context.Response.StatusCode = StatusCodes.Status404NotFound;
+
+        return;
+    }
+
+    context.Response.ContentType = "text/html";
+    await context.Response.SendFileAsync(Path.Combine(app.Environment.WebRootPath, "index.html"));
+});
 
 app.Run();

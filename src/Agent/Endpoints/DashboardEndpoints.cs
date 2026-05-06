@@ -6,20 +6,32 @@ public static class DashboardEndpoints
 {
     public static IEndpointRouteBuilder MapDashboardEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var group = endpoints.MapGroup("/api/dashboard");
+        var group = endpoints.MapGroup("/api/dashboard")
+            .WithTags("Dashboard");
 
         group.MapGet(
             "/chat/main",
             async (IChatDashboardService service, CancellationToken cancellationToken) =>
-                await service.LoadMain(cancellationToken));
+                await service.LoadMain(cancellationToken))
+            .WithName("GetMainChat");
         group.MapPost(
             "/chat/main/messages",
             async (SendChatMessageRequest request, IChatDashboardService service, CancellationToken cancellationToken) =>
-                await service.SendPrompt(request, cancellationToken));
+                await service.SendPrompt(request, cancellationToken))
+            .WithName("SendMainChatMessage");
+        group.MapPost(
+            "/chat/main/stream",
+            async (SendChatMessageRequest request, IChatDashboardService service, HttpResponse response, CancellationToken cancellationToken) =>
+            {
+                response.ContentType = "text/plain; charset=utf-8";
+                await service.StreamPrompt(request, response.Body, cancellationToken);
+            })
+            .WithName("StreamMainChatMessage");
         group.MapGet(
             "/runs",
             async (string? conversationId, string? filter, IRunTimelineService service, CancellationToken cancellationToken) =>
-                await service.List(conversationId, filter ?? "All", cancellationToken));
+                await service.List(conversationId, filter ?? "All", cancellationToken))
+            .WithName("GetRuns");
         group.MapGet(
             "/memories",
             async (string? query, string? lifecycle, string? segment, string? tier, IMemoryDashboardService service, CancellationToken cancellationToken) =>
@@ -29,15 +41,18 @@ public static class DashboardEndpoints
                         lifecycle ?? "Active",
                         segment ?? "All",
                         tier ?? "All"),
-                    cancellationToken));
+                    cancellationToken))
+            .WithName("GetMemories");
         group.MapPost(
             "/memories",
             async (MemoryWriteDto request, IMemoryDashboardService service, CancellationToken cancellationToken) =>
-                await service.Write(request, cancellationToken));
+                await service.Write(request, cancellationToken))
+            .WithName("WriteMemory");
         group.MapPatch(
             "/memories/{id}/lifecycle",
             async (string id, MemoryLifecycleUpdateDto request, IMemoryDashboardService service, CancellationToken cancellationToken) =>
-                await service.UpdateLifecycle(id, request, cancellationToken));
+                await service.UpdateLifecycle(id, request, cancellationToken))
+            .WithName("UpdateMemoryLifecycle");
         group.MapDelete(
             "/memories/{id}",
             async (string id, IMemoryDashboardService service, CancellationToken cancellationToken) =>
@@ -45,11 +60,18 @@ public static class DashboardEndpoints
                 await service.Delete(id, cancellationToken);
 
                 return Results.NoContent();
-            });
+            })
+            .WithName("DeleteMemory");
         group.MapGet(
             "/graph",
             async (IMemoryGraphService service, CancellationToken cancellationToken) =>
-                await service.Build(cancellationToken));
+                await service.Build(cancellationToken))
+            .WithName("GetGraph");
+        group.MapGet(
+            "/settings",
+            async (ISettingsDashboardService service, CancellationToken cancellationToken) =>
+                await service.Load(cancellationToken))
+            .WithName("GetSettings");
 
         return endpoints;
     }

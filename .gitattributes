@@ -10,6 +10,10 @@
 *.css text eol=crlf
 *.js text eol=crlf
 *.ts text eol=crlf
+*.tsx text eol=crlf
+*.html text eol=crlf
+*.svg text eol=crlf
+*.webmanifest text eol=crlf
 
 *.png binary
 *.jpg binary
