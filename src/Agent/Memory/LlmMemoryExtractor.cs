@@ -83,7 +83,10 @@ public sealed class LlmMemoryExtractor(IAgentProviderSelector providerSelector) 
         return $$"""
         Extract only durable user-authored memories from this turn.
         Do not infer facts from assistant text.
-        Do not store transient requests, one-off tasks, greetings, or tool output.
+        Do not store transient requests, one-off tasks, greetings, tool output, provider errors, or assistant failures.
+        Treat phrases like "remember this", "don't forget it", and "keep this in mind" as emphasis, not as the memory content.
+        Extract the underlying durable fact from natural language, even when it is phrased casually or without punctuation.
+        Rewrite memories as clear third-person facts about the user or the user's world.
         Return JSON only with this schema:
         {
           "memories": [

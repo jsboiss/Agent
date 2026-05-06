@@ -37,7 +37,7 @@ public sealed class SubAgentCoordinator(
             "local-web",
             StringComparison.OrdinalIgnoreCase);
 
-        if (!allowsMutation)
+        if (!allowsMutation && !request.Capabilities.HasFlag(SubAgentCapabilities.ReadOnly))
         {
             var refusal = "Remote execution is disabled for the active workspace. Enable RemoteExecutionAllowed before starting background work from this channel.";
             var refusalEntry = await conversationRepository.AddEntry(
@@ -74,7 +74,10 @@ public sealed class SubAgentCoordinator(
                 request.ParentEntryId,
                 request.Task,
                 request.Channel,
-                allowsMutation),
+                allowsMutation && !request.RequiresConfirmation,
+                request.Capabilities,
+                request.RequiresConfirmation,
+                request.NotificationTarget),
             cancellationToken);
 
         var summary = $"Sub-agent {childConversation.Id} queued as background run {run.Id}: {request.Task}";
@@ -95,7 +98,14 @@ public sealed class SubAgentCoordinator(
 
     private static string GetContextPackage(SubAgentRunRequest request)
     {
-        return $"Task: {request.Task}{Environment.NewLine}ParentEntryId: {request.ParentEntryId}";
+        return string.Join(
+            Environment.NewLine,
+            [
+                $"Task: {request.Task}",
+                $"ParentEntryId: {request.ParentEntryId}",
+                $"Capabilities: {request.Capabilities}",
+                $"RequiresConfirmation: {request.RequiresConfirmation}"
+            ]);
     }
 
     private static string GetWorkspaceRootPath(string contentRootPath)

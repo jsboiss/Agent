@@ -171,6 +171,53 @@ public sealed class SqliteMemoryStore(IOptions<SqliteMemoryOptions> options) : I
             ?? throw new InvalidOperationException($"Memory '{id}' was not found after update.");
     }
 
+    public async Task<MemoryRecord> Update(
+        string id,
+        string text,
+        MemoryTier tier,
+        MemorySegment segment,
+        double importance,
+        double confidence,
+        string? supersedes,
+        CancellationToken cancellationToken)
+    {
+        await EnsureDatabase(cancellationToken);
+
+        await using var connection = new SqliteConnection(Options.ConnectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE Memories
+            SET Text = $text,
+                Tier = $tier,
+                Segment = $segment,
+                Importance = $importance,
+                Confidence = $confidence,
+                Supersedes = $supersedes,
+                UpdatedAt = $updatedAt
+            WHERE Id = $id;
+            """;
+        command.Parameters.AddWithValue("$id", id);
+        command.Parameters.AddWithValue("$text", text);
+        command.Parameters.AddWithValue("$tier", tier.ToString());
+        command.Parameters.AddWithValue("$segment", segment.ToString());
+        command.Parameters.AddWithValue("$importance", importance);
+        command.Parameters.AddWithValue("$confidence", confidence);
+        command.Parameters.AddWithValue("$supersedes", (object?)supersedes ?? DBNull.Value);
+        command.Parameters.AddWithValue("$updatedAt", DateTimeOffset.UtcNow.ToString("O"));
+
+        var updatedCount = await command.ExecuteNonQueryAsync(cancellationToken);
+
+        if (updatedCount == 0)
+        {
+            throw new InvalidOperationException($"Memory '{id}' was not found.");
+        }
+
+        return await Get(id, cancellationToken)
+            ?? throw new InvalidOperationException($"Memory '{id}' was not found after update.");
+    }
+
     public async Task Delete(string id, CancellationToken cancellationToken)
     {
         await EnsureDatabase(cancellationToken);

@@ -1,17 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bot, BrainCircuit, GitBranch, MessageSquareText, Network, Settings } from "lucide-react";
+import { Bot, BrainCircuit, GitBranch, MessageSquareText, Network, Settings, SlidersHorizontal } from "lucide-react";
 import { ChatPage } from "./pages/ChatPage";
 import { GraphPage } from "./pages/GraphPage";
 import { MemoriesPage } from "./pages/MemoriesPage";
 import { RunsPage } from "./pages/RunsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SubAgentsPage } from "./pages/SubAgentsPage";
+import { OperationsPage } from "./pages/OperationsPage";
 
 const navItems = [
   { path: "/", label: "Chat", icon: MessageSquareText },
   { path: "/memories", label: "Memories", icon: BrainCircuit },
   { path: "/runs", label: "Runs", icon: GitBranch },
   { path: "/subagents", label: "Subagents", icon: Bot },
+  { path: "/operations", label: "Operations", icon: SlidersHorizontal },
   { path: "/graph", label: "Graph", icon: Network },
   { path: "/settings", label: "Settings", icon: Settings }
 ];
@@ -35,6 +37,8 @@ export function App() {
         return <RunsPage />;
       case "/subagents":
         return <SubAgentsPage />;
+      case "/operations":
+        return <OperationsPage />;
       case "/graph":
         return <GraphPage />;
       case "/settings":

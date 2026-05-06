@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Copy, DatabaseZap } from "lucide-react";
+import { Copy, DatabaseZap, Sparkles, Trash2 } from "lucide-react";
 import { useGetSettings } from "../../api/generated";
 import { ErrorState, IconButton, LoadingState, PageFrame, Panel } from "../components";
 
@@ -11,6 +11,7 @@ export function SettingsPage() {
   const [isCompacting, setIsCompacting] = useState(false);
   const [compactionResult, setCompactionResult] = useState<string | null>(null);
   const [compactionError, setCompactionError] = useState<string | null>(null);
+  const [maintenanceResult, setMaintenanceResult] = useState<string | null>(null);
 
   async function compactMain() {
     setIsCompacting(true);
@@ -51,6 +52,26 @@ export function SettingsPage() {
     }
   }
 
+  async function runMemoryMaintenance(path: string) {
+    setMaintenanceResult(null);
+
+    const response = await fetch(path, { method: "POST" });
+
+    if (!response.ok) {
+      throw new Error(`Memory maintenance failed: ${response.status}`);
+    }
+
+    const result = await response.json() as {
+      scanned: number;
+      archived: number;
+      pruned: number;
+      merged: number;
+      superseded: number;
+      summary: string;
+    };
+    setMaintenanceResult(`${result.summary} Scanned ${result.scanned}; archived ${result.archived}; pruned ${result.pruned}; merged ${result.merged}; superseded ${result.superseded}.`);
+  }
+
   return (
     <PageFrame
       eyebrow="Read-only configuration"
@@ -65,6 +86,7 @@ export function SettingsPage() {
       {settingsQuery.isLoading && <LoadingState />}
       {settingsQuery.isError && <ErrorState error={settingsQuery.error} />}
       {compactionResult && <p className="muted">{compactionResult}</p>}
+      {maintenanceResult && <p className="muted">{maintenanceResult}</p>}
       {compactionError && <ErrorState error={new Error(compactionError)} />}
       {snapshot && (
         <div className="settings-grid">
@@ -85,6 +107,18 @@ export function SettingsPage() {
               ["SQLite", snapshot.memoryConnectionString]
             ]}
           />
+          <Panel title="Memory Maintenance">
+            <div className="row-actions">
+              <button className="secondary-action" onClick={() => void runMemoryMaintenance("/api/dashboard/memory/cleanup")} type="button">
+                <Trash2 size={14} />
+                Cleanup
+              </button>
+              <button className="secondary-action" onClick={() => void runMemoryMaintenance("/api/dashboard/memory/consolidate")} type="button">
+                <Sparkles size={14} />
+                Consolidate
+              </button>
+            </div>
+          </Panel>
           <SettingsPanel
             title="Compaction"
             rows={[

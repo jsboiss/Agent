@@ -8,4 +8,7 @@ public sealed record SubAgentWorkItem(
     string ParentEntryId,
     string Task,
     string Channel,
-    bool AllowsMutation);
+    bool AllowsMutation,
+    SubAgentCapabilities Capabilities,
+    bool RequiresConfirmation,
+    string? NotificationTarget);

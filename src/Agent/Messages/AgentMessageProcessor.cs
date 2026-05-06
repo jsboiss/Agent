@@ -1,6 +1,7 @@
 using Agent.Conversations;
 using Agent.Events;
 using Agent.Memory;
+using Agent.Notifications;
 using Agent.Providers;
 using Agent.Resources;
 using Agent.Settings;
@@ -30,7 +31,8 @@ public sealed class AgentMessageProcessor(
     IAgentRunStore runStore,
     IConversationMirrorStore mirrorStore,
     IAgentMessageRouter messageRouter,
-    IAgentTokenTracker tokenTracker) : IMessageProcessor
+    IAgentTokenTracker tokenTracker,
+    IAgentNotifier notifier) : IMessageProcessor
 {
     private static int MaxToolIterations => 3;
 
@@ -62,6 +64,7 @@ public sealed class AgentMessageProcessor(
             request.UserMessage,
             cancellationToken);
         var trustedChannel = IsTrustedChannel(request);
+        var notificationTarget = GetNotificationTarget(request);
         var started = promptQueue.TryStart(conversation.Id);
         var queueKind = promptQueue.Classify(request.UserMessage, !started);
         List<AgentEvent> events =
@@ -121,6 +124,21 @@ public sealed class AgentMessageProcessor(
                 eventCursor,
                 cancellationToken,
                 queueKind);
+        }
+
+        var explicitMemoryResult = await TryHandleExplicitMemoryRequest(
+            conversation.Id,
+            request.Channel,
+            userEntry,
+            settings,
+            events,
+            eventCursor,
+            cancellationToken);
+
+        if (explicitMemoryResult is not null)
+        {
+            promptQueue.Complete(conversation.Id);
+            return explicitMemoryResult;
         }
 
         if (route.RouteKind != AgentRouteKind.Chat && !route.AllowsMutation)
@@ -248,6 +266,7 @@ public sealed class AgentMessageProcessor(
                 events,
                 eventCursor,
                 settings,
+                notificationTarget,
                 cancellationToken);
 
             if (!string.IsNullOrWhiteSpace(providerResult.AssistantMessage))
@@ -499,6 +518,7 @@ public sealed class AgentMessageProcessor(
         List<AgentEvent> events,
         EventPublishCursor eventCursor,
         AgentSettings settings,
+        string? notificationTarget,
         CancellationToken cancellationToken)
     {
         var providerRequest = initialRequest;
@@ -521,11 +541,13 @@ public sealed class AgentMessageProcessor(
 
             if (providerResult.ToolCalls.Count == 0 && delegationToolCall is not null)
             {
+                await SendDelegationAck(channel, notificationTarget, cancellationToken);
                 var delegationResults = await ExecuteToolCalls(
                     [delegationToolCall],
                     providerRequest.ConversationId,
                     channel,
                     userEntryId,
+                    notificationTarget,
                     executedToolKeys,
                     events,
                     eventCursor,
@@ -552,6 +574,7 @@ public sealed class AgentMessageProcessor(
                 providerRequest.ConversationId,
                 channel,
                 userEntryId,
+                notificationTarget,
                 executedToolKeys,
                 events,
                 eventCursor,
@@ -734,11 +757,133 @@ public sealed class AgentMessageProcessor(
         return result;
     }
 
+    private async Task<MessageResult?> TryHandleExplicitMemoryRequest(
+        string conversationId,
+        string channel,
+        ConversationEntry userEntry,
+        AgentSettings settings,
+        List<AgentEvent> events,
+        EventPublishCursor eventCursor,
+        CancellationToken cancellationToken)
+    {
+        if (!IsExplicitRememberThat(userEntry.Content)
+            || string.Equals(settings.Get("memory.enabled"), "false", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var entries = await conversationRepository.ListEntries(conversationId, cancellationToken);
+        var sourceEntry = entries
+            .Where(x => !string.Equals(x.Id, userEntry.Id, StringComparison.OrdinalIgnoreCase))
+            .Where(x => x.Role is ConversationEntryRole.User or ConversationEntryRole.Assistant)
+            .OrderByDescending(x => x.CreatedAt)
+            .FirstOrDefault();
+
+        if (sourceEntry is null)
+        {
+            return null;
+        }
+
+        var memoryText = GetMemoryTextFromPriorEntry(sourceEntry.Content);
+
+        if (string.IsNullOrWhiteSpace(memoryText))
+        {
+            return null;
+        }
+
+        var memory = await memoryStore.Write(
+            new MemoryWriteRequest(
+                memoryText,
+                MemoryTier.Long,
+                GetSegmentForExplicitMemory(memoryText),
+                0.8,
+                0.9,
+                sourceEntry.Id),
+            cancellationToken);
+        events.Add(GetEvent(
+            AgentEventKind.MemoryWrite,
+            conversationId,
+            new Dictionary<string, string>
+            {
+                ["ConversationEntryId"] = userEntry.Id,
+                ["sourceEntryId"] = sourceEntry.Id,
+                ["memoryId"] = memory.Id,
+                ["tier"] = memory.Tier.ToString(),
+                ["segment"] = memory.Segment.ToString(),
+                ["text"] = memory.Text
+            }));
+
+        var assistantMessage = $"Saved that to memory: {memory.Text}";
+        var assistantEntry = await conversationRepository.AddEntry(
+            conversationId,
+            ConversationEntryRole.Assistant,
+            channel,
+            assistantMessage,
+            userEntry.Id,
+            cancellationToken);
+        events.Add(GetEvent(
+            AgentEventKind.MessagePersisted,
+            conversationId,
+            new Dictionary<string, string>
+            {
+                ["role"] = ConversationEntryRole.Assistant.ToString(),
+                ["channel"] = channel,
+                ["ConversationEntryId"] = assistantEntry.Id,
+                ["ParentEntryId"] = userEntry.Id,
+                ["message"] = assistantMessage
+            }));
+
+        return await Complete(
+            conversationId,
+            assistantMessage,
+            events,
+            eventCursor,
+            cancellationToken,
+            QueuedMessageKind.Prompt);
+    }
+
+    private static bool IsExplicitRememberThat(string value)
+    {
+        var normalized = value.Trim().TrimEnd('.', '!', '?');
+
+        return string.Equals(normalized, "remember that", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalized, "remember this", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalized, "save that", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalized, "save this", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string GetMemoryTextFromPriorEntry(string content)
+    {
+        var value = content.Trim();
+        var prefixIndex = value.IndexOf("your ", StringComparison.OrdinalIgnoreCase);
+
+        if (prefixIndex >= 0)
+        {
+            value = "User's " + value[(prefixIndex + "your ".Length)..];
+        }
+
+        return value
+            .Trim()
+            .Trim('"')
+            .TrimEnd('.');
+    }
+
+    private static MemorySegment GetSegmentForExplicitMemory(string text)
+    {
+        return text.Contains(" name is ", StringComparison.OrdinalIgnoreCase)
+            || text.Contains("girlfriend", StringComparison.OrdinalIgnoreCase)
+            || text.Contains("boyfriend", StringComparison.OrdinalIgnoreCase)
+            || text.Contains("partner", StringComparison.OrdinalIgnoreCase)
+            ? MemorySegment.Relationship
+            : MemorySegment.Context;
+    }
+
     private async Task<IReadOnlyList<AgentProviderToolResult>> ExecuteToolCalls(
         IReadOnlyList<AgentProviderToolCall> toolCalls,
         string conversationId,
         string channel,
         string userEntryId,
+        string? notificationTarget,
         ISet<string> executedToolKeys,
         List<AgentEvent> events,
         EventPublishCursor eventCursor,
@@ -778,11 +923,11 @@ public sealed class AgentMessageProcessor(
             {
                 toolResult = await toolExecutor.Execute(
                     new AgentToolRequest(
-                        toolCall.Name,
-                        toolCall.Arguments,
-                        conversationId,
-                        channel,
-                        userEntryId),
+                toolCall.Name,
+                AddNotificationTarget(toolCall.Arguments, notificationTarget),
+                conversationId,
+                channel,
+                userEntryId),
                     cancellationToken);
             }
 
@@ -851,7 +996,9 @@ public sealed class AgentMessageProcessor(
                 new Dictionary<string, string>
                 {
                     ["task"] = task,
-                    ["parentEntryId"] = userEntryId
+                    ["parentEntryId"] = userEntryId,
+                    ["capabilities"] = "ReadOnly,Code",
+                    ["requiresConfirmation"] = "true"
                 });
         }
         catch (JsonException)
@@ -889,6 +1036,29 @@ public sealed class AgentMessageProcessor(
         return (assistantMessage[..start] + assistantMessage[afterEnd..]).Trim();
     }
 
+    private async Task SendDelegationAck(
+        string channel,
+        string? notificationTarget,
+        CancellationToken cancellationToken)
+    {
+        if (!IsMobileChannel(channel))
+        {
+            return;
+        }
+
+        await notifier.Send(
+            channel,
+            notificationTarget,
+            "Queued that for a background Codex run.",
+            cancellationToken);
+    }
+
+    private static bool IsMobileChannel(string channel)
+    {
+        return string.Equals(channel, "telegram", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(channel, "imessage", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string? GetDelegationJson(string assistantMessage)
     {
         var startTag = "<delegate_to_sub_agent>";
@@ -906,6 +1076,41 @@ public sealed class AgentMessageProcessor(
         return end < 0
             ? null
             : assistantMessage[contentStart..end].Trim();
+    }
+
+    private static string? GetNotificationTarget(MessageRequest request)
+    {
+        if (request.Overrides?.TryGetValue("telegramChatId", out var telegramChatId) == true)
+        {
+            return telegramChatId;
+        }
+
+        if (request.Overrides?.TryGetValue("notificationTarget", out var notificationTarget) == true)
+        {
+            return notificationTarget;
+        }
+
+        return null;
+    }
+
+    private static IReadOnlyDictionary<string, string> AddNotificationTarget(
+        IReadOnlyDictionary<string, string> arguments,
+        string? notificationTarget)
+    {
+        if (string.IsNullOrWhiteSpace(notificationTarget)
+            || arguments.ContainsKey("notificationTarget")
+            || arguments.ContainsKey("target"))
+        {
+            return arguments;
+        }
+
+        var values = new Dictionary<string, string>(arguments, StringComparer.OrdinalIgnoreCase)
+        {
+            ["notificationTarget"] = notificationTarget,
+            ["target"] = notificationTarget
+        };
+
+        return values;
     }
 
     private static string GetToolLoopFallback(

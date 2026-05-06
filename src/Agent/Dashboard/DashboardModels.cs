@@ -154,6 +154,61 @@ public sealed record ManualCompactionResponse(
     int SkippedMemoryCount,
     DateTimeOffset UpdatedAt);
 
+public sealed record TelegramStatusResponse(
+    bool Enabled,
+    int TrustedChatCount);
+
+public sealed record RunActionResponse(
+    string RunId,
+    string Status,
+    string Message);
+
+public sealed record DraftRow(
+    string Id,
+    string Kind,
+    string Summary,
+    string Payload,
+    string? SourceRunId,
+    string ConversationId,
+    string Channel,
+    string Status,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt);
+
+public sealed record AutomationRow(
+    string Id,
+    string Name,
+    string Task,
+    string Schedule,
+    string Status,
+    string ConversationId,
+    string Channel,
+    string? NotificationTarget,
+    string Capabilities,
+    DateTimeOffset? NextRunAt,
+    DateTimeOffset? LastRunAt,
+    string? LastRunId,
+    string? LastResult);
+
+public sealed record AutomationCreateDto(
+    string Name,
+    string Task,
+    string Schedule,
+    string Channel,
+    string? ConversationId,
+    string? NotificationTarget,
+    string? Capabilities);
+
+public sealed record AutomationToggleDto(bool Enabled);
+
+public sealed record MemoryMaintenanceResponse(
+    int Scanned,
+    int Archived,
+    int Pruned,
+    int Merged,
+    int Superseded,
+    string Summary);
+
 public interface IChatDashboardService
 {
     Task<ChatDashboardSnapshot> LoadMain(CancellationToken cancellationToken);
@@ -214,4 +269,31 @@ public interface ISettingsDashboardService
 public interface ICompactionDashboardService
 {
     Task<ManualCompactionResponse> CompactMain(CancellationToken cancellationToken);
+}
+
+public interface IOperationsDashboardService
+{
+    TelegramStatusResponse GetTelegramStatus();
+
+    Task<RunActionResponse> CancelRun(string runId, CancellationToken cancellationToken);
+
+    Task<RunActionResponse> RetryRun(string runId, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<DraftRow>> ListDrafts(string? status, CancellationToken cancellationToken);
+
+    Task<DraftRow> ApproveDraft(string id, CancellationToken cancellationToken);
+
+    Task<DraftRow> RejectDraft(string id, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<AutomationRow>> ListAutomations(CancellationToken cancellationToken);
+
+    Task<AutomationRow> CreateAutomation(AutomationCreateDto request, CancellationToken cancellationToken);
+
+    Task<AutomationRow> ToggleAutomation(string id, AutomationToggleDto request, CancellationToken cancellationToken);
+
+    Task DeleteAutomation(string id, CancellationToken cancellationToken);
+
+    Task<MemoryMaintenanceResponse> CleanupMemory(CancellationToken cancellationToken);
+
+    Task<MemoryMaintenanceResponse> ConsolidateMemory(CancellationToken cancellationToken);
 }

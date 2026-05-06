@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { RefreshCcw } from "lucide-react";
+import { RotateCcw, Square, RefreshCcw } from "lucide-react";
 import { EmptyState, ErrorState, formatLocalDateTime, IconButton, LoadingState, PageFrame, StatusChip } from "../components";
 
 interface SubAgentRunRow {
@@ -64,6 +64,16 @@ export function SubAgentsPage() {
     }
   }
 
+  async function runAction(path: string) {
+    const response = await fetch(path, { method: "POST" });
+
+    if (!response.ok) {
+      throw new Error(`Run action failed: ${response.status}`);
+    }
+
+    await load();
+  }
+
   useEffect(() => {
     void load();
   }, []);
@@ -120,6 +130,18 @@ export function SubAgentsPage() {
           {!selectedRun && <p className="muted">Select a subagent run to inspect it.</p>}
           {selectedRun && (
             <>
+              <div className="row-actions">
+                {(selectedRun.status === "Created" || selectedRun.status === "Running") && (
+                  <button className="secondary-action" onClick={() => void runAction(`/api/dashboard/runs/${selectedRun.id}/cancel`)} type="button">
+                    <Square size={14} />
+                    Cancel
+                  </button>
+                )}
+                <button className="secondary-action" onClick={() => void runAction(`/api/dashboard/runs/${selectedRun.id}/retry`)} type="button">
+                  <RotateCcw size={14} />
+                  Retry
+                </button>
+              </div>
               <section className="inspector-message">
                 <h3>Task</h3>
                 <p>{selectedRun.prompt}</p>

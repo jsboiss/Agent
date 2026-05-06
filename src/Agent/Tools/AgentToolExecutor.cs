@@ -1,11 +1,20 @@
 using Agent.Memory;
+using Agent.Automations;
+using Agent.Drafts;
+using Agent.Notifications;
 using Agent.SubAgents;
+using Agent.Workspaces;
 
 namespace Agent.Tools;
 
 public sealed class AgentToolExecutor(
     IMemoryStore memoryStore,
-    ISubAgentCoordinator subAgentCoordinator) : IAgentToolExecutor
+    ISubAgentCoordinator subAgentCoordinator,
+    IAgentNotifier notifier,
+    IAgentDraftStore draftStore,
+    IAutomationStore automationStore,
+    IAutomationScheduler automationScheduler,
+    IAgentRunStore runStore) : IAgentToolExecutor
 {
     public async Task<AgentToolResult> Execute(
         AgentToolRequest request,
@@ -16,6 +25,17 @@ public sealed class AgentToolExecutor(
             "search_memory" => await SearchMemory(request, cancellationToken),
             "write_memory" => await WriteMemory(request, cancellationToken),
             "spawn_agent" => await SpawnAgent(request, cancellationToken),
+            "send_ack" => await SendAck(request, cancellationToken),
+            "save_draft" => await SaveDraft(request, cancellationToken),
+            "list_drafts" => await ListDrafts(request, cancellationToken),
+            "approve_draft" => await UpdateDraft(request, DraftStatus.Approved, cancellationToken),
+            "reject_draft" => await UpdateDraft(request, DraftStatus.Rejected, cancellationToken),
+            "create_automation" => await CreateAutomation(request, cancellationToken),
+            "list_automations" => await ListAutomations(request, cancellationToken),
+            "toggle_automation" => await ToggleAutomation(request, cancellationToken),
+            "delete_automation" => await DeleteAutomation(request, cancellationToken),
+            "cancel_run" => await CancelRun(request, cancellationToken),
+            "retry_run" => await RetryRun(request, cancellationToken),
             _ => new AgentToolResult(
                 request.Name,
                 false,
@@ -30,6 +50,9 @@ public sealed class AgentToolExecutor(
     {
         var task = request.Arguments.GetValueOrDefault("task") ?? string.Empty;
         var parentEntryId = request.Arguments.GetValueOrDefault("parentEntryId") ?? request.ParentEntryId;
+        var capabilities = GetCapabilities(request.Arguments.GetValueOrDefault("capabilities"));
+        var requiresConfirmation = GetBool(request.Arguments.GetValueOrDefault("requiresConfirmation"), IsMobileChannel(request.Channel));
+        var notificationTarget = request.Arguments.GetValueOrDefault("notificationTarget");
 
         if (string.IsNullOrWhiteSpace(task))
         {
@@ -45,7 +68,10 @@ public sealed class AgentToolExecutor(
                 request.ConversationId,
                 parentEntryId,
                 task,
-                request.Channel),
+                request.Channel,
+                capabilities,
+                requiresConfirmation,
+                notificationTarget),
             cancellationToken);
 
         return new AgentToolResult(
@@ -60,6 +86,208 @@ public sealed class AgentToolExecutor(
                 ["codexThreadId"] = result.CodexThreadId ?? string.Empty,
                 ["status"] = result.Status
             });
+    }
+
+    private async Task<AgentToolResult> SendAck(
+        AgentToolRequest request,
+        CancellationToken cancellationToken)
+    {
+        var message = request.Arguments.GetValueOrDefault("message") ?? "Working on it.";
+        var target = request.Arguments.GetValueOrDefault("target");
+        await notifier.Send(request.Channel, target, message, cancellationToken);
+
+        return new AgentToolResult(request.Name, true, "Acknowledgement sent.", new Dictionary<string, string>());
+    }
+
+    private async Task<AgentToolResult> SaveDraft(
+        AgentToolRequest request,
+        CancellationToken cancellationToken)
+    {
+        var kind = request.Arguments.GetValueOrDefault("kind") ?? "action";
+        var summary = request.Arguments.GetValueOrDefault("summary") ?? string.Empty;
+        var payload = request.Arguments.GetValueOrDefault("payload") ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(summary) || string.IsNullOrWhiteSpace(payload))
+        {
+            return new AgentToolResult(request.Name, false, "Missing required draft summary or payload.", new Dictionary<string, string>());
+        }
+
+        var draft = await draftStore.Create(
+            new DraftWriteRequest(
+                kind,
+                summary,
+                payload,
+                request.Arguments.GetValueOrDefault("sourceRunId"),
+                request.ConversationId,
+                request.Channel),
+            cancellationToken);
+
+        return new AgentToolResult(
+            request.Name,
+            true,
+            $"Draft saved: {draft.Id}. Ask the user to approve or reject it.",
+            new Dictionary<string, string>
+            {
+                ["draftId"] = draft.Id,
+                ["status"] = draft.Status.ToString()
+            });
+    }
+
+    private async Task<AgentToolResult> ListDrafts(
+        AgentToolRequest request,
+        CancellationToken cancellationToken)
+    {
+        var status = GetNullableEnum<DraftStatus>(request.Arguments.GetValueOrDefault("status"));
+        var drafts = await draftStore.List(status, 20, cancellationToken);
+        var content = drafts.Count == 0
+            ? "No drafts found."
+            : string.Join(Environment.NewLine, drafts.Select(x => $"- {x.Id} [{x.Status}] {x.Kind}: {x.Summary}"));
+
+        return new AgentToolResult(request.Name, true, content, new Dictionary<string, string> { ["count"] = drafts.Count.ToString() });
+    }
+
+    private async Task<AgentToolResult> UpdateDraft(
+        AgentToolRequest request,
+        DraftStatus status,
+        CancellationToken cancellationToken)
+    {
+        var id = request.Arguments.GetValueOrDefault("draftId") ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return new AgentToolResult(request.Name, false, "Missing required argument 'draftId'.", new Dictionary<string, string>());
+        }
+
+        var draft = await draftStore.UpdateStatus(id, status, cancellationToken);
+
+        return new AgentToolResult(request.Name, true, $"Draft {draft.Id} marked {draft.Status}.", new Dictionary<string, string> { ["draftId"] = draft.Id });
+    }
+
+    private async Task<AgentToolResult> CreateAutomation(
+        AgentToolRequest request,
+        CancellationToken cancellationToken)
+    {
+        var name = request.Arguments.GetValueOrDefault("name") ?? string.Empty;
+        var task = request.Arguments.GetValueOrDefault("task") ?? string.Empty;
+        var schedule = request.Arguments.GetValueOrDefault("schedule") ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(task) || string.IsNullOrWhiteSpace(schedule))
+        {
+            return new AgentToolResult(request.Name, false, "Missing required automation name, task, or schedule.", new Dictionary<string, string>());
+        }
+
+        if (automationScheduler.GetNextRun(schedule, DateTimeOffset.UtcNow) is null)
+        {
+            return new AgentToolResult(request.Name, false, "Schedule must be a TimeSpan, 'every <TimeSpan>', or a simple daily 5-field cron with numeric minute and hour.", new Dictionary<string, string>());
+        }
+
+        var automation = await automationStore.Create(
+            new AutomationWriteRequest(
+                name,
+                task,
+                schedule,
+                request.ConversationId,
+                request.Channel,
+                request.Arguments.GetValueOrDefault("notificationTarget"),
+                GetCapabilities(request.Arguments.GetValueOrDefault("capabilities"))),
+            cancellationToken);
+
+        return new AgentToolResult(
+            request.Name,
+            true,
+            $"Automation created: {automation.Id}. Next run: {automation.NextRunAt:O}.",
+            new Dictionary<string, string> { ["automationId"] = automation.Id });
+    }
+
+    private async Task<AgentToolResult> ListAutomations(
+        AgentToolRequest request,
+        CancellationToken cancellationToken)
+    {
+        var automations = await automationStore.List(cancellationToken);
+        var content = automations.Count == 0
+            ? "No automations found."
+            : string.Join(Environment.NewLine, automations.Select(x => $"- {x.Id} [{x.Status}] {x.Name}: {x.Schedule}, next {x.NextRunAt:O}"));
+
+        return new AgentToolResult(request.Name, true, content, new Dictionary<string, string> { ["count"] = automations.Count.ToString() });
+    }
+
+    private async Task<AgentToolResult> ToggleAutomation(
+        AgentToolRequest request,
+        CancellationToken cancellationToken)
+    {
+        var id = request.Arguments.GetValueOrDefault("automationId") ?? string.Empty;
+        var enabled = GetBool(request.Arguments.GetValueOrDefault("enabled"), true);
+
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return new AgentToolResult(request.Name, false, "Missing required argument 'automationId'.", new Dictionary<string, string>());
+        }
+
+        var automation = await automationStore.SetStatus(id, enabled ? AutomationStatus.Enabled : AutomationStatus.Disabled, cancellationToken);
+        return new AgentToolResult(request.Name, true, $"Automation {automation.Id} is {automation.Status}.", new Dictionary<string, string>());
+    }
+
+    private async Task<AgentToolResult> DeleteAutomation(
+        AgentToolRequest request,
+        CancellationToken cancellationToken)
+    {
+        var id = request.Arguments.GetValueOrDefault("automationId") ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return new AgentToolResult(request.Name, false, "Missing required argument 'automationId'.", new Dictionary<string, string>());
+        }
+
+        await automationStore.Delete(id, cancellationToken);
+        return new AgentToolResult(request.Name, true, $"Automation deleted: {id}.", new Dictionary<string, string>());
+    }
+
+    private async Task<AgentToolResult> CancelRun(
+        AgentToolRequest request,
+        CancellationToken cancellationToken)
+    {
+        var id = request.Arguments.GetValueOrDefault("runId") ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return new AgentToolResult(request.Name, false, "Missing required argument 'runId'.", new Dictionary<string, string>());
+        }
+
+        var run = await runStore.Get(id, cancellationToken);
+
+        if (run is null)
+        {
+            return new AgentToolResult(request.Name, false, $"Run '{id}' was not found.", new Dictionary<string, string>());
+        }
+
+        await runStore.Update(id, AgentRunStatus.Cancelled, run.CodexThreadId, run.FinalResponse, "Cancelled by user request.", cancellationToken);
+        return new AgentToolResult(request.Name, true, $"Run cancelled: {id}.", new Dictionary<string, string>());
+    }
+
+    private async Task<AgentToolResult> RetryRun(
+        AgentToolRequest request,
+        CancellationToken cancellationToken)
+    {
+        var id = request.Arguments.GetValueOrDefault("runId") ?? string.Empty;
+        var run = string.IsNullOrWhiteSpace(id) ? null : await runStore.Get(id, cancellationToken);
+
+        if (run is null)
+        {
+            return new AgentToolResult(request.Name, false, $"Run '{id}' was not found.", new Dictionary<string, string>());
+        }
+
+        var result = await subAgentCoordinator.CreateAndReport(
+            new SubAgentRunRequest(
+                request.ConversationId,
+                request.ParentEntryId,
+                run.Prompt,
+                request.Channel,
+                SubAgentCapabilities.ReadOnly | SubAgentCapabilities.Code,
+                IsMobileChannel(request.Channel),
+                null),
+            cancellationToken);
+
+        return new AgentToolResult(request.Name, true, result.Summary, new Dictionary<string, string> { ["runId"] = result.RunId ?? string.Empty });
     }
 
     private async Task<AgentToolResult> SearchMemory(
@@ -112,6 +340,7 @@ public sealed class AgentToolExecutor(
 
         var tier = GetEnum(request.Arguments.GetValueOrDefault("tier"), MemoryTier.Long);
         var segment = GetEnum(request.Arguments.GetValueOrDefault("segment"), MemorySegment.Context);
+        var defaults = MemorySegmentDefaults.Get(segment);
         var existingMemories = await memoryStore.Search(
             new MemorySearchRequest(
                 content,
@@ -144,10 +373,10 @@ public sealed class AgentToolExecutor(
         var memory = await memoryStore.Write(
             new MemoryWriteRequest(
                 content,
-                tier,
+                string.IsNullOrWhiteSpace(request.Arguments.GetValueOrDefault("tier")) ? defaults.Tier : tier,
                 segment,
-                GetDouble(request.Arguments.GetValueOrDefault("importance"), 0.5),
-                GetDouble(request.Arguments.GetValueOrDefault("confidence"), 0.8),
+                GetDouble(request.Arguments.GetValueOrDefault("importance"), defaults.Importance),
+                GetDouble(request.Arguments.GetValueOrDefault("confidence"), defaults.Confidence),
                 request.Arguments.GetValueOrDefault("sourceMessageId")),
             cancellationToken);
 
@@ -169,6 +398,49 @@ public sealed class AgentToolExecutor(
         return Enum.TryParse<T>(value, true, out var parsed)
             ? parsed
             : fallback;
+    }
+
+    private static T? GetNullableEnum<T>(string? value)
+        where T : struct
+    {
+        return Enum.TryParse<T>(value, true, out var parsed)
+            ? parsed
+            : null;
+    }
+
+    private static bool GetBool(string? value, bool fallback)
+    {
+        return bool.TryParse(value, out var parsed)
+            ? parsed
+            : fallback;
+    }
+
+    private static bool IsMobileChannel(string channel)
+    {
+        return string.Equals(channel, "telegram", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(channel, "imessage", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static SubAgentCapabilities GetCapabilities(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return SubAgentCapabilities.ReadOnly | SubAgentCapabilities.Code;
+        }
+
+        SubAgentCapabilities result = SubAgentCapabilities.None;
+
+        foreach (var item in value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (Enum.TryParse<SubAgentCapabilities>(item, true, out var parsed))
+            {
+                result |= parsed;
+            }
+        }
+
+        return result == SubAgentCapabilities.None
+            ? SubAgentCapabilities.ReadOnly
+            : result;
     }
 
     private static double GetDouble(string? value, double fallback)

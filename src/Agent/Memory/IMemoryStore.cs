@@ -13,5 +13,15 @@ public interface IMemoryStore
         MemoryLifecycle lifecycle,
         CancellationToken cancellationToken);
 
+    Task<MemoryRecord> Update(
+        string id,
+        string text,
+        MemoryTier tier,
+        MemorySegment segment,
+        double importance,
+        double confidence,
+        string? supersedes,
+        CancellationToken cancellationToken);
+
     Task Delete(string id, CancellationToken cancellationToken);
 }
