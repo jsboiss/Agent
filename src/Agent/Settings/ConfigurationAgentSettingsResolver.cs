@@ -13,6 +13,10 @@ public sealed class ConfigurationAgentSettingsResolver(IConfiguration configurat
         ["compaction.threshold"] = "8000",
         ["compaction.recentEntryCount"] = "8",
         ["memory.enabled"] = "true",
+        ["memory.scoutLimit"] = "5",
+        ["memory.extraction.enabled"] = "true",
+        ["memory.extraction.mode"] = "rule-and-llm",
+        ["memory.extraction.provider"] = AgentProviderType.Ollama.ToString(),
         ["channel.delivery"] = "default"
     };
 

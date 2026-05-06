@@ -1,23 +1,55 @@
 @page "/graph"
+@rendermode InteractiveServer
+@inject IMemoryGraphService GraphService
+@inject IJSRuntime JsRuntime
 
 <PageTitle>Graph</PageTitle>
 
-<MudStack Spacing="3">
-    <div>
-        <MudText Typo="Typo.overline" Color="Color.Secondary">Memory graph</MudText>
-        <MudText Typo="Typo.h4">Graph</MudText>
-    </div>
+<section class="workspace">
+    <header class="workspace-header">
+        <div>
+            <p class="eyebrow">Memory topology</p>
+            <h1>Graph</h1>
+        </div>
+        <button @onclick="RenderGraph">Refresh</button>
+    </header>
 
-    <MudPaper Class="pa-6 graph-surface" Elevation="0" Outlined="true">
-        <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Spacing="4">
-            <MudStack Row="true" Spacing="6" AlignItems="AlignItems.Center" Class="graph-nodes">
-                <MudAvatar Color="Color.Secondary" Size="Size.Large">segment</MudAvatar>
-                <MudAvatar Color="Color.Info" Size="Size.Large">memory</MudAvatar>
-                <MudAvatar Color="Color.Primary" Size="Size.Large">tier</MudAvatar>
-            </MudStack>
-            <MudText Align="Align.Center" Color="Color.Secondary">
-                Force-directed segment, tier, supersession, and source-message graph goes here.
-            </MudText>
-        </MudStack>
-    </MudPaper>
-</MudStack>
+    @if (Snapshot.Nodes.Count == 0)
+    {
+        <div class="empty-state graph-empty">
+            <h2>No graph data</h2>
+            <p>@Snapshot.EmptyReason</p>
+        </div>
+    }
+    else
+    {
+        <div id="memory-graph" class="graph-canvas"></div>
+    }
+</section>
+
+@code {
+    private MemoryGraphSnapshot Snapshot { get; set; } = new([], [], "Loading graph data.");
+
+    protected override async Task OnInitializedAsync()
+    {
+        Snapshot = await GraphService.Build(CancellationToken.None);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Snapshot.Nodes.Count > 0)
+        {
+            await RenderGraph();
+        }
+    }
+
+    private async Task RenderGraph()
+    {
+        Snapshot = await GraphService.Build(CancellationToken.None);
+
+        if (Snapshot.Nodes.Count > 0)
+        {
+            await JsRuntime.InvokeVoidAsync("agentDashboard.renderMemoryGraphFromEndpoint", "memory-graph", "/api/dashboard/graph");
+        }
+    }
+}

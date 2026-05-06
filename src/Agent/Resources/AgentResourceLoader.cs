@@ -49,7 +49,20 @@ public sealed class AgentResourceLoader(
                 "tier": {
                   "type": "string",
                   "description": "Memory tier.",
-                  "enum": ["Core", "Project", "Session"]
+                  "enum": ["Short", "Long", "Permanent"]
+                },
+                "segment": {
+                  "type": "string",
+                  "description": "Memory segment.",
+                  "enum": ["Identity", "Preference", "Correction", "Relationship", "Project", "Knowledge", "Context"]
+                },
+                "importance": {
+                  "type": "number",
+                  "description": "Importance from 0 to 1."
+                },
+                "confidence": {
+                  "type": "number",
+                  "description": "Confidence from 0 to 1."
                 }
               },
               "required": ["content"]

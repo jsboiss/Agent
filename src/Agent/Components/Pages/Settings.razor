@@ -1,51 +1,84 @@
 @page "/settings"
+@rendermode InteractiveServer
+@using Agent.Conversations
+@using Agent.Memory
+@using Agent.Settings
+@using Microsoft.Extensions.Options
+@inject IAgentSettingsResolver SettingsResolver
+@inject IOptions<SqliteMemoryOptions> MemoryOptions
 
 <PageTitle>Settings</PageTitle>
 
-<MudStack Spacing="3">
-    <div>
-        <MudText Typo="Typo.overline" Color="Color.Secondary">Local provider</MudText>
-        <MudText Typo="Typo.h4">Settings</MudText>
+<section class="workspace">
+    <header class="workspace-header">
+        <div>
+            <p class="eyebrow">Read-only configuration</p>
+            <h1>Settings</h1>
+        </div>
+    </header>
+
+    <div class="settings-grid">
+        <section class="panel">
+            <h2>Provider</h2>
+            <dl>
+                <dt>Provider</dt>
+                <dd>@GetSetting("provider")</dd>
+                <dt>Model</dt>
+                <dd>@GetSetting("model")</dd>
+                <dt>Queue behavior</dt>
+                <dd>@GetSetting("queue.behavior")</dd>
+            </dl>
+        </section>
+        <section class="panel">
+            <h2>Memory</h2>
+            <dl>
+                <dt>Enabled</dt>
+                <dd>@GetSetting("memory.enabled")</dd>
+                <dt>Scout limit</dt>
+                <dd>@GetSetting("memory.scoutLimit")</dd>
+                <dt>Extraction</dt>
+                <dd>@GetSetting("memory.extraction.mode")</dd>
+                <dt>SQLite</dt>
+                <dd>@MemoryOptions.Value.ConnectionString</dd>
+            </dl>
+        </section>
+        <section class="panel">
+            <h2>Compaction</h2>
+            <dl>
+                <dt>Threshold</dt>
+                <dd>@GetSetting("compaction.threshold")</dd>
+                <dt>Recent entries</dt>
+                <dd>@GetSetting("compaction.recentEntryCount")</dd>
+            </dl>
+        </section>
+        <section class="panel">
+            <h2>Applied Layers</h2>
+            <div class="tool-list">
+                @foreach (var layer in ResolvedSettings.AppliedLayers)
+                {
+                    <span>@layer</span>
+                }
+            </div>
+        </section>
     </div>
+</section>
 
-    <MudGrid Spacing="3">
-        <MudItem xs="12" md="6">
-            <MudPaper Class="pa-4" Elevation="0" Outlined="true">
-                <MudStack Spacing="2">
-                    <MudText Typo="Typo.h6">Claude Code</MudText>
-                    <MudTextField T="string" Label="Command" Value="@("claude")" Variant="Variant.Outlined" Disabled="true" />
-                    <MudCheckBox T="bool" Label="Strip ANTHROPIC_API_KEY" Value="true" Disabled="true" />
-                </MudStack>
-            </MudPaper>
-        </MudItem>
+@code {
+    private AgentSettings ResolvedSettings { get; set; } = new(new Dictionary<string, string>(), []);
 
-        <MudItem xs="12" md="6">
-            <MudPaper Class="pa-4" Elevation="0" Outlined="true">
-                <MudStack Spacing="2">
-                    <MudText Typo="Typo.h6">Codex</MudText>
-                    <MudTextField T="string" Label="Command" Value="@("codex")" Variant="Variant.Outlined" Disabled="true" />
-                    <MudCheckBox T="bool" Label="Strip OPENAI_API_KEY" Value="true" Disabled="true" />
-                </MudStack>
-            </MudPaper>
-        </MudItem>
+    protected override async Task OnInitializedAsync()
+    {
+        ResolvedSettings = await SettingsResolver.Resolve(
+            new AgentSettingsResolveRequest(
+                new Conversation("main", ConversationKind.Main, null, null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow),
+                "local-web",
+                Directory.GetCurrentDirectory(),
+                new Dictionary<string, string>()),
+            CancellationToken.None);
+    }
 
-        <MudItem xs="12" md="6">
-            <MudPaper Class="pa-4" Elevation="0" Outlined="true">
-                <MudStack Spacing="2">
-                    <MudText Typo="Typo.h6">Ollama</MudText>
-                    <MudTextField T="string" Label="Base URL" Value="@("http://localhost:11434/v1/")" Variant="Variant.Outlined" Disabled="true" />
-                    <MudTextField T="string" Label="Model" Value="@("qwen3.5:latest")" Variant="Variant.Outlined" Disabled="true" />
-                </MudStack>
-            </MudPaper>
-        </MudItem>
-
-        <MudItem xs="12" md="6">
-            <MudPaper Class="pa-4" Elevation="0" Outlined="true">
-                <MudStack Spacing="2">
-                    <MudText Typo="Typo.h6">Memory</MudText>
-                    <MudTextField T="string" Label="SQLite connection" Value="@("Data Source=agent.db")" Variant="Variant.Outlined" Disabled="true" />
-                </MudStack>
-            </MudPaper>
-        </MudItem>
-    </MudGrid>
-</MudStack>
+    private string GetSetting(string key)
+    {
+        return ResolvedSettings.Get(key) ?? "unset";
+    }
+}

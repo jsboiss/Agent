@@ -1,108 +1,125 @@
 @page "/"
 @rendermode InteractiveServer
-@using Agent.Messages
-@inject IMessageProcessor MessageProcessor
+@using System.Net
+@inject IChatDashboardService ChatService
+@inject DashboardUiState UiState
+@inject IJSRuntime JsRuntime
 
 <PageTitle>Chat</PageTitle>
 
-<MudStack Spacing="3">
-    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
-        <div>
-            <MudText Typo="Typo.overline" Color="Color.Secondary">Local debug channel</MudText>
-            <MudText Typo="Typo.h4">Chat</MudText>
+<section class="workspace chat-workspace">
+    <div class="pane pane-chat chat-only">
+        <header class="workspace-header">
+            <div>
+                <p class="eyebrow">Main conversation</p>
+                <h1>Chat Cockpit</h1>
+            </div>
+            <div class="status-strip">
+                <span>@Snapshot.Provider</span>
+                <strong>@Snapshot.Model</strong>
+            </div>
+        </header>
+
+        <div class="transcript" id="chat-transcript">
+            @if (VisibleMessages.Count == 0)
+            {
+                <div class="empty-state">
+                    <h2>No messages yet</h2>
+                    <p>Start the main local-web conversation. Memory injection and tool activity will appear beside the transcript.</p>
+                </div>
+            }
+            else
+            {
+                @foreach (var message in VisibleMessages)
+                {
+                    <article class="message @GetMessageClass(message.Role)">
+                        <header>
+                            <span>@message.Role</span>
+                            <time>@message.CreatedAt.ToLocalTime().ToString("HH:mm:ss")</time>
+                        </header>
+                        <div class="markdown-body" @key="message.Id">@((MarkupString)message.HtmlContent)</div>
+                    </article>
+                }
+
+                @if (IsSending)
+                {
+                    <article class="message from-agent typing-message" aria-live="polite">
+                        <header>
+                            <span>Assistant</span>
+                            <time></time>
+                        </header>
+                        <div class="typing-indicator" aria-label="Waiting for assistant response">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </div>
+                    </article>
+                }
+            }
         </div>
-        <MudChip T="string" Color="Color.Success" Variant="Variant.Outlined">Ollama: qwen3.5</MudChip>
-    </MudStack>
 
-    <MudGrid Spacing="3">
-        <MudItem xs="12" lg="8">
-            <MudPaper Class="pa-4 chat-surface" Elevation="0" Outlined="true">
-                <MudStack Spacing="2">
-                    <div class="chat-scroll">
-                        @if (Messages.Count == 0)
-                        {
-                            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
-                                Send a message to qwen3.5 through the local Ollama provider.
-                            </MudAlert>
-                        }
-                        else
-                        {
-                            @foreach (var message in Messages)
-                            {
-                                <MudPaper Class="@GetMessageClass(message)" Elevation="0" Outlined="true">
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@message.Role</MudText>
-                                    <MudText Class="message-text">@message.Content</MudText>
-                                </MudPaper>
-                            }
-                        }
-                    </div>
+        @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+        {
+            <div class="callout error">@ErrorMessage</div>
+        }
 
-                    @if (!string.IsNullOrWhiteSpace(ErrorMessage))
-                    {
-                        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">
-                            @ErrorMessage
-                        </MudAlert>
-                    }
-
-                    <MudSpacer />
-                    <MudGrid Spacing="2">
-                        <MudItem xs="12" sm="10">
-                            <MudTextField T="string"
-                                          @bind-Value="UserMessage"
-                                          Placeholder="Message qwen3.5"
-                                          Variant="Variant.Outlined"
-                                          Lines="2"
-                                          Disabled="IsSending"
-                                          OnKeyDown="HandleKeyDown" />
-                        </MudItem>
-                        <MudItem xs="12" sm="2">
-                            <MudButton Variant="Variant.Filled"
-                                       Color="Color.Primary"
-                                       FullWidth="true"
-                                       Disabled="!CanSend"
-                                       OnClick="SendMessage">
-                                @SendButtonText
-                            </MudButton>
-                        </MudItem>
-                    </MudGrid>
-                </MudStack>
-            </MudPaper>
-        </MudItem>
-
-        <MudItem xs="12" lg="4">
-            <MudPaper Class="pa-4" Elevation="0" Outlined="true">
-                <MudStack Spacing="3">
-                    <div>
-                        <MudText Typo="Typo.h6">Injected Memory</MudText>
-                        <MudText Color="Color.Secondary">No MemoryScout context has been loaded yet.</MudText>
-                    </div>
-                    <MudDivider />
-                    <div>
-                        <MudText Typo="Typo.h6">Tools</MudText>
-                        <MudChipSet T="string" Class="mt-2">
-                            <MudChip Value="@("search_memory")" Variant="Variant.Outlined">search_memory</MudChip>
-                            <MudChip Value="@("write_memory")" Variant="Variant.Outlined">write_memory</MudChip>
-                            <MudChip Value="@("spawn_agent")" Variant="Variant.Outlined">spawn_agent</MudChip>
-                        </MudChipSet>
-                    </div>
-                </MudStack>
-            </MudPaper>
-        </MudItem>
-    </MudGrid>
-</MudStack>
+        <form class="composer" @onsubmit="SendMessage" @onsubmit:preventDefault="true">
+            <textarea id="chat-composer"
+                      @bind="Prompt"
+                      @bind:event="oninput"
+                      disabled="@IsSending"
+                      placeholder="Message the agent"></textarea>
+            <button id="chat-send-button" type="submit" disabled="@(!CanSend)">
+                @(IsSending ? "Sending" : "Send")
+            </button>
+        </form>
+    </div>
+</section>
 
 @code {
-    private List<ChatMessage> Messages { get; } = [];
+    private ChatDashboardSnapshot Snapshot { get; set; } = EmptySnapshot;
 
-    private string UserMessage { get; set; } = string.Empty;
+    private string Prompt { get; set; } = string.Empty;
 
     private string? ErrorMessage { get; set; }
 
     private bool IsSending { get; set; }
 
-    private bool CanSend => !IsSending && !string.IsNullOrWhiteSpace(UserMessage);
+    private List<ChatDashboardMessage> PendingMessages { get; } = [];
 
-    private string SendButtonText => IsSending ? "Sending" : "Send";
+    private IReadOnlyList<ChatDashboardMessage> VisibleMessages => Snapshot.Messages
+        .Concat(PendingMessages)
+        .OrderBy(x => x.CreatedAt)
+        .ToArray();
+
+    private bool CanSend => !IsSending && !string.IsNullOrWhiteSpace(Prompt);
+
+    private static ChatDashboardSnapshot EmptySnapshot { get; } = new(
+        "main",
+        [],
+        [],
+        [],
+        [],
+        "Ollama",
+        "qwen3.5:latest",
+        false,
+        null);
+
+    protected override async Task OnInitializedAsync()
+    {
+        Snapshot = await ChatService.LoadMain(CancellationToken.None);
+        UiState.ConversationId = Snapshot.ConversationId;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JsRuntime.InvokeVoidAsync("agentDashboard.attachComposer", "chat-composer", "chat-send-button");
+        }
+
+        await JsRuntime.InvokeVoidAsync("agentDashboard.highlight");
+    }
 
     private async Task SendMessage()
     {
@@ -111,37 +128,25 @@
             return;
         }
 
-        var message = UserMessage.Trim();
-        UserMessage = string.Empty;
+        var prompt = Prompt;
+        Prompt = string.Empty;
         ErrorMessage = null;
         IsSending = true;
-        Messages.Add(new ChatMessage("You", message));
+        PendingMessages.Add(new ChatDashboardMessage(
+            $"pending:{Guid.NewGuid():N}",
+            "You",
+            prompt,
+            $"<p>{WebUtility.HtmlEncode(prompt).Replace("\r\n", "<br>").Replace("\n", "<br>")}</p>",
+            DateTimeOffset.UtcNow));
+        await InvokeAsync(StateHasChanged);
 
         try
         {
-            var result = await MessageProcessor.Process(
-                new MessageRequest(null, "local-web", message, DateTimeOffset.UtcNow),
-                CancellationToken.None);
-
-            if (result.Queued)
-            {
-                Messages.Add(new ChatMessage("System", $"Queued as {result.QueueKind}."));
-            }
-            else if (string.IsNullOrWhiteSpace(result.AssistantMessage))
-            {
-                ErrorMessage = result.Events
-                    .FirstOrDefault(x => x.Kind == Agent.Events.AgentEventKind.ProviderError)
-                    ?.Data
-                    .GetValueOrDefault("error");
-            }
-            else
-            {
-                Messages.Add(new ChatMessage("qwen3.5", result.AssistantMessage));
-            }
-        }
-        catch (Exception exception)
-        {
-            ErrorMessage = exception.Message;
+            var response = await ChatService.SendPrompt(new SendChatMessageRequest(prompt), CancellationToken.None);
+            Snapshot = response.Snapshot;
+            UiState.ConversationId = Snapshot.ConversationId;
+            ErrorMessage = response.ErrorMessage;
+            PendingMessages.Clear();
         }
         finally
         {
@@ -149,20 +154,8 @@
         }
     }
 
-    private async Task HandleKeyDown(KeyboardEventArgs args)
+    private static string GetMessageClass(string role)
     {
-        if (args.Key == "Enter" && !args.ShiftKey && CanSend)
-        {
-            await SendMessage();
-        }
+        return role == "You" ? "from-user" : "from-agent";
     }
-
-    private static string GetMessageClass(ChatMessage message)
-    {
-        return message.Role == "You"
-            ? "pa-3 chat-message chat-message-user"
-            : "pa-3 chat-message chat-message-assistant";
-    }
-
-    private sealed record ChatMessage(string Role, string Content);
 }
