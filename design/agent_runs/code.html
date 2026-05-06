@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=Space+Grotesk:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error": "#690005",
+                        "surface-bright": "#37393e",
+                        "inverse-surface": "#e2e2e8",
+                        "outline": "#8a919e",
+                        "tertiary-fixed": "#e6deff",
+                        "on-tertiary-fixed-variant": "#491ac6",
+                        "background": "#111317",
+                        "secondary-fixed": "#70fda7",
+                        "primary-fixed": "#d5e3ff",
+                        "on-primary": "#00315f",
+                        "on-surface-variant": "#c0c7d5",
+                        "inverse-primary": "#005fb0",
+                        "surface-container-low": "#1a1c20",
+                        "surface-container-highest": "#333539",
+                        "surface-dim": "#111317",
+                        "primary-fixed-dim": "#a6c8ff",
+                        "tertiary-fixed-dim": "#cabeff",
+                        "on-tertiary": "#320099",
+                        "error": "#ffb4ab",
+                        "on-primary-container": "#002a53",
+                        "secondary": "#51df8e",
+                        "on-background": "#e2e2e8",
+                        "primary": "#a6c8ff",
+                        "secondary-container": "#00b266",
+                        "surface-container-high": "#282a2e",
+                        "on-primary-fixed": "#001c3b",
+                        "secondary-fixed-dim": "#51df8e",
+                        "surface-variant": "#333539",
+                        "surface-container-lowest": "#0c0e12",
+                        "primary-container": "#3192fc",
+                        "surface": "#111317",
+                        "on-error-container": "#ffdad6",
+                        "outline-variant": "#404753",
+                        "on-surface": "#e2e2e8",
+                        "tertiary": "#cabeff",
+                        "on-secondary-container": "#003c1e",
+                        "on-tertiary-container": "#2b0087",
+                        "on-secondary-fixed": "#00210e",
+                        "inverse-on-surface": "#2f3035",
+                        "error-container": "#93000a",
+                        "surface-tint": "#a6c8ff",
+                        "on-secondary": "#00391d",
+                        "surface-container": "#1e2024",
+                        "tertiary-container": "#957dff",
+                        "on-primary-fixed-variant": "#004786",
+                        "on-tertiary-fixed": "#1d0061",
+                        "on-secondary-fixed-variant": "#00522c"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "unit": "4px",
+                        "panel-margin": "1px",
+                        "container-padding": "12px",
+                        "tight-stack": "4px",
+                        "component-gap": "8px"
+                    },
+                    "fontFamily": {
+                        "body-sm": ["Inter"],
+                        "h2": ["Inter"],
+                        "h1": ["Inter"],
+                        "mono-code": ["Space Grotesk"],
+                        "label-caps": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-sm": ["13px", {"lineHeight": "18px", "fontWeight": "400"}],
+                        "h2": ["14px", {"lineHeight": "20px", "letterSpacing": "0", "fontWeight": "600"}],
+                        "h1": ["18px", {"lineHeight": "24px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "mono-code": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+                        "label-caps": ["11px", {"lineHeight": "12px", "letterSpacing": "0.05em", "fontWeight": "700"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #0C0E12;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #30363D;
+        }
+    </style>
+</head>
+<body class="bg-surface-container-lowest text-on-surface font-body-sm min-h-screen flex flex-col">
+<!-- TopAppBar -->
+<header class="bg-surface-container dark:bg-surface-container w-full top-0 sticky border-b border-outline-variant dark:border-outline-variant flex justify-between items-center px-container-padding h-14 w-full z-50">
+<div class="flex items-center gap-component-gap">
+<img alt="AgentOS Logo" class="h-8 w-8" data-alt="A minimalist professional logo for an AI agent control panel featuring a geometric representation of a node in slate gray and electric blue colors. The logo is crisp and modern against a dark industrial background, emphasizing clarity and technological precision in a high-density dashboard environment." src="data:image/png;base64,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"/>
+<span class="font-h1 text-h1 font-bold text-primary dark:text-primary">AgentOS</span>
+</div>
+<div class="flex-1 max-w-xl px-12 hidden md:block">
+<div class="bg-surface-container-low border border-outline-variant rounded px-3 py-1.5 flex items-center gap-2 group focus-within:border-primary-container transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant text-[18px]">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-body-sm w-full placeholder:text-outline p-0" placeholder="Search memory or runs..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-on-surface-variant hover:bg-surface-container-high p-2 rounded cursor-pointer transition-colors">notifications</span>
+<span class="material-symbols-outlined text-on-surface-variant hover:bg-surface-container-high p-2 rounded cursor-pointer transition-colors">settings</span>
+<div class="h-8 w-8 rounded-full overflow-hidden border border-outline-variant">
+<img alt="User Avatar" class="h-full w-full object-cover" data-alt="A close-up portrait of a professional individual in a high-tech studio setting, illuminated by soft blue and slate tones that match the application's color palette. The lighting is precise and modern, creating a clinical yet sophisticated atmosphere that aligns with the industrial minimalism of the dashboard." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDl_xlCt9NsqgkdYFZTES_RuCsx99Osdg-PC6w9aV3cEcFMJZ8NJmto2Kx3qgSWfuldhqRIlNWDKDhsxYbXNpOAqphfjtnIfNf-1kZpPkZfAp6MVkUFnNzQUbhHKxm2oVebYFWOh5g6PRySsHGH9WA3MG3A_YwR0T8MILXhqduDGhXNpJTtGirXDex0CdWLJja8CnvrO0HQ6-Z5J_2LMrcdDXDJOA-og6a0B5NbghRRGjO8fkWitNsJ2nM26pB45qJridrNnoZybOw"/>
+</div>
+</div>
+</header>
+<div class="flex flex-1 overflow-hidden">
+<!-- SideNavBar -->
+<aside class="hidden md:flex bg-surface-container-low dark:bg-surface-container-low h-screen w-64 sticky left-0 top-0 border-r border-outline-variant dark:border-outline-variant flex flex-col h-full py-container-padding gap-tight-stack">
+<div class="px-container-padding mb-6">
+<div class="flex items-center gap-3 p-2 bg-surface-container-high rounded border border-outline-variant">
+<div class="w-8 h-8 bg-primary-container rounded flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-container" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+</div>
+<div>
+<div class="font-h2 text-h2 text-primary">Core Agent</div>
+<div class="font-label-caps text-[9px] uppercase tracking-wider text-secondary">Active v2.4.1</div>
+</div>
+</div>
+</div>
+<nav class="flex-1 px-2 space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-container-highest transition-all rounded duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined">chat</span>
+<span class="font-h2 text-h2">Chat</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-container-highest transition-all rounded duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined">database</span>
+<span class="font-h2 text-h2">Memories</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-secondary dark:text-secondary border-r-2 border-secondary font-semibold bg-surface-container-high transition-all rounded duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">memory</span>
+<span class="font-h2 text-h2">Runs</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-container-highest transition-all rounded duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined">account_tree</span>
+<span class="font-h2 text-h2">Memory Graph</span>
+</a>
+</nav>
+<div class="px-4 py-4">
+<button class="w-full bg-primary text-on-primary font-bold py-2 px-4 rounded border border-primary hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                    New Run
+                </button>
+</div>
+<div class="mt-auto px-2 border-t border-outline-variant pt-4">
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-container-highest transition-all rounded" href="#">
+<span class="material-symbols-outlined">terminal</span>
+<span class="font-h2 text-h2">Logs</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-container-highest transition-all rounded" href="#">
+<span class="material-symbols-outlined">code</span>
+<span class="font-h2 text-h2">Terminal</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 flex overflow-hidden bg-surface-container-lowest">
+<!-- Left Panel: Turn Timeline -->
+<section class="w-1/3 min-w-[320px] flex flex-col border-r border-outline-variant bg-surface-container-low">
+<div class="p-3 border-b border-outline-variant flex justify-between items-center bg-surface-container">
+<h2 class="font-label-caps text-label-caps uppercase text-on-surface-variant">Active Run: RUN-8294</h2>
+<span class="flex items-center gap-2">
+<span class="w-2 h-2 bg-secondary animate-pulse"></span>
+<span class="text-[10px] text-secondary font-mono-code uppercase">Processing</span>
+</span>
+</div>
+<div class="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-2">
+<!-- Turn Item (Active) -->
+<div class="p-3 bg-surface-container-high border border-primary rounded group cursor-pointer">
+<div class="flex justify-between items-start mb-2">
+<span class="font-mono-code text-[10px] text-primary">#04 · 12:45:01</span>
+<span class="material-symbols-outlined text-primary text-[16px]">expand_more</span>
+</div>
+<div class="font-h2 text-h2 mb-1">Analyze System Logs</div>
+<p class="text-on-surface-variant text-[12px] line-clamp-2">The agent is inspecting local system metrics to identify potential memory leaks in the primary cluster...</p>
+<div class="mt-3 flex gap-2">
+<span class="px-2 py-0.5 bg-secondary/10 border border-secondary text-secondary text-[10px] font-mono-code rounded">tool_call</span>
+<span class="px-2 py-0.5 bg-outline-variant/20 border border-outline-variant text-on-surface-variant text-[10px] font-mono-code rounded">exec_fs</span>
+</div>
+</div>
+<!-- Turn Item (Success) -->
+<div class="p-3 hover:bg-surface-container-high border border-outline-variant rounded group cursor-pointer transition-colors">
+<div class="flex justify-between items-start mb-2">
+<span class="font-mono-code text-[10px] text-outline">#03 · 12:44:52</span>
+<span class="material-symbols-outlined text-secondary text-[16px]">check_circle</span>
+</div>
+<div class="font-h2 text-h2 mb-1">Query Documentation</div>
+<p class="text-on-surface-variant text-[12px] line-clamp-2">RAG retrieval performed on 'cluster_v4_docs'. Successfully extracted 3 relevant passages.</p>
+</div>
+<!-- Turn Item (Error) -->
+<div class="p-3 hover:bg-surface-container-high border border-error/50 rounded group cursor-pointer transition-colors">
+<div class="flex justify-between items-start mb-2">
+<span class="font-mono-code text-[10px] text-error">#02 · 12:44:40</span>
+<span class="material-symbols-outlined text-error text-[16px]">error</span>
+</div>
+<div class="font-h2 text-h2 mb-1">Database Handshake</div>
+<p class="text-on-surface-variant text-[12px] line-clamp-2">Connection timeout while trying to reach pg_primary_0. Retrying with fallback node...</p>
+</div>
+<!-- Turn Item -->
+<div class="p-3 hover:bg-surface-container-high border border-outline-variant rounded group cursor-pointer transition-colors">
+<div class="flex justify-between items-start mb-2">
+<span class="font-mono-code text-[10px] text-outline">#01 · 12:44:35</span>
+<span class="material-symbols-outlined text-on-surface-variant text-[16px]">check_circle</span>
+</div>
+<div class="font-h2 text-h2 mb-1">Session Init</div>
+<p class="text-on-surface-variant text-[12px] line-clamp-2">Agent initialized with core context and memory snapshots loaded.</p>
+</div>
+</div>
+</section>
+<!-- Right Panel: Event Inspector -->
+<section class="flex-1 flex flex-col bg-surface-container-lowest overflow-hidden">
+<div class="p-3 border-b border-outline-variant bg-surface-container flex items-center gap-4">
+<div class="flex-1">
+<h1 class="font-h1 text-h1">Event Inspector</h1>
+<p class="text-[11px] text-outline uppercase font-label-caps">Turn #04 · analyze_logs</p>
+</div>
+<div class="flex gap-2">
+<button class="px-3 py-1 bg-surface-container-highest border border-outline-variant text-[12px] rounded hover:bg-surface-container-high transition-colors">Copy Payload</button>
+<button class="px-3 py-1 bg-primary text-on-primary text-[12px] font-bold rounded">Replay Step</button>
+</div>
+</div>
+<div class="flex-1 flex flex-col p-4 gap-4 overflow-y-auto custom-scrollbar">
+<!-- Logs Section -->
+<div class="space-y-2">
+<h3 class="font-label-caps text-label-caps text-on-surface-variant uppercase flex items-center gap-2">
+<span class="material-symbols-outlined text-[14px]">subject</span>
+                            Execution Logs
+                        </h3>
+<div class="bg-surface-container-low border border-outline-variant p-3 font-mono-code text-mono-code text-on-surface-variant space-y-1">
+<p><span class="text-secondary">[12:45:01.002]</span> INFO: Spawning worker process_pid=2938</p>
+<p><span class="text-secondary">[12:45:01.045]</span> DEBUG: fs_read path="/var/logs/cluster.log" offset=0</p>
+<p><span class="text-secondary">[12:45:01.120]</span> INFO: Regex match found "OOM_ERROR" at line 4921</p>
+<p><span class="text-primary">[12:45:01.200]</span> TRACE: Analyzing stack trace memory address 0x7ffd</p>
+</div>
+</div>
+<!-- Tool Call Section -->
+<div class="space-y-2">
+<h3 class="font-label-caps text-label-caps text-on-surface-variant uppercase flex items-center gap-2">
+<span class="material-symbols-outlined text-[14px]">build</span>
+                            Tool Call: exec_fs
+                        </h3>
+<div class="grid grid-cols-2 gap-4">
+<!-- Input -->
+<div class="bg-surface-container-low border border-outline-variant p-0 overflow-hidden">
+<div class="bg-surface-container-high px-3 py-1 text-[10px] font-mono-code border-b border-outline-variant text-outline uppercase">Arguments</div>
+<div class="p-3 font-mono-code text-mono-code text-primary">
+<pre>{
+  "path": "/var/logs/cluster.log",
+  "operation": "read_tail",
+  "lines": 500,
+  "filter": "ERROR"
+}</pre>
+</div>
+</div>
+<!-- Output -->
+<div class="bg-surface-container-low border border-outline-variant p-0 overflow-hidden">
+<div class="bg-surface-container-high px-3 py-1 text-[10px] font-mono-code border-b border-outline-variant text-outline uppercase">Output</div>
+<div class="p-3 font-mono-code text-mono-code text-secondary">
+<pre>{
+  "status": "success",
+  "matches": 12,
+  "last_match": "2023-10-27T12:44:00Z",
+  "filesize": "1.2GB"
+}</pre>
+</div>
+</div>
+</div>
+</div>
+<!-- State Changes -->
+<div class="space-y-2">
+<h3 class="font-label-caps text-label-caps text-on-surface-variant uppercase flex items-center gap-2">
+<span class="material-symbols-outlined text-[14px]">psychology</span>
+                            State Deltas
+                        </h3>
+<div class="border border-outline-variant rounded overflow-hidden">
+<table class="w-full text-left font-mono-code text-mono-code">
+<thead class="bg-surface-container-high text-outline">
+<tr>
+<th class="px-3 py-1.5 font-normal border-b border-outline-variant">Key</th>
+<th class="px-3 py-1.5 font-normal border-b border-outline-variant">Previous</th>
+<th class="px-3 py-1.5 font-normal border-b border-outline-variant">Current</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant">
+<tr class="bg-surface-container-low">
+<td class="px-3 py-2 text-primary">context.error_detected</td>
+<td class="px-3 py-2 text-on-surface-variant">false</td>
+<td class="px-3 py-2 text-secondary">true</td>
+</tr>
+<tr class="bg-surface-container-low">
+<td class="px-3 py-2 text-primary">agent.last_tool</td>
+<td class="px-3 py-2 text-on-surface-variant">"rag_query"</td>
+<td class="px-3 py-2 text-secondary">"exec_fs"</td>
+</tr>
+<tr class="bg-surface-container-low">
+<td class="px-3 py-2 text-primary">session.tokens_used</td>
+<td class="px-3 py-2 text-on-surface-variant">1,244</td>
+<td class="px-3 py-2 text-secondary">1,482</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</section>
+</main>
+</div>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-container-padding py-2 bg-surface-container dark:bg-surface-container border-t border-outline-variant dark:border-outline-variant z-50 md:hidden">
+<div class="flex flex-col items-center justify-center text-on-surface-variant p-2">
+<span class="material-symbols-outlined">chat</span>
+<span class="font-label-caps text-label-caps">Chat</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface-variant p-2">
+<span class="material-symbols-outlined">database</span>
+<span class="font-label-caps text-label-caps">Memories</span>
+</div>
+<div class="flex flex-col items-center justify-center bg-secondary-container text-on-secondary-container rounded-lg p-2 active:scale-95 transition-transform">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">memory</span>
+<span class="font-label-caps text-label-caps">Runs</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface-variant p-2">
+<span class="material-symbols-outlined">account_tree</span>
+<span class="font-label-caps text-label-caps">Graph</span>
+</div>
+</nav>
+</body></html>

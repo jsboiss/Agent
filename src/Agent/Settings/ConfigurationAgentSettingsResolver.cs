@@ -7,16 +7,20 @@ public sealed class ConfigurationAgentSettingsResolver(IConfiguration configurat
 {
     private static IReadOnlyDictionary<string, string> AppDefaults => new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     {
-        ["provider"] = AgentProviderType.Ollama.ToString(),
-        ["model"] = "qwen3.5:latest",
+        ["provider"] = AgentProviderType.Codex.ToString(),
+        ["model"] = "gpt-5.5",
         ["queue.behavior"] = "enqueue-while-busy",
         ["compaction.threshold"] = "8000",
         ["compaction.recentEntryCount"] = "8",
+        ["tokens.contextWindow"] = "200000",
         ["memory.enabled"] = "true",
         ["memory.scoutLimit"] = "5",
         ["memory.extraction.enabled"] = "true",
         ["memory.extraction.mode"] = "rule-and-llm",
-        ["memory.extraction.provider"] = AgentProviderType.Ollama.ToString(),
+        ["memory.extraction.provider"] = AgentProviderType.Codex.ToString(),
+        ["codex.sandbox"] = "danger-full-access",
+        ["codex.approvalPolicy"] = "never",
+        ["codex.mode"] = "mcp",
         ["channel.delivery"] = "default"
     };
 
@@ -30,7 +34,10 @@ public sealed class ConfigurationAgentSettingsResolver(IConfiguration configurat
         Apply(values, AppDefaults);
         appliedLayers.Add("app-defaults");
 
-        var providerModel = configuration["Providers:Ollama:Model"];
+        var configuredProvider = values.GetValueOrDefault("provider");
+        var providerModel = string.Equals(configuredProvider, AgentProviderType.Codex.ToString(), StringComparison.OrdinalIgnoreCase)
+            ? configuration["Providers:Codex:Model"]
+            : configuration["Providers:Ollama:Model"];
 
         if (!string.IsNullOrWhiteSpace(providerModel))
         {

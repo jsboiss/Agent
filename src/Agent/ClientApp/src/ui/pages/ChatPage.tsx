@@ -2,11 +2,16 @@ import { useQueryClient } from "@tanstack/react-query";
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { SendHorizontal, Terminal } from "lucide-react";
 import { getGetMainChatQueryKey, getMainChatResponse, sendMainChatMessage, useGetMainChat } from "../../api/generated";
+import type { ChatDashboardMessage } from "../../api/generated";
 import { EmptyState, ErrorState, formatLocalTime, IconButton, LoadingState, StatusChip, TopBar } from "../components";
 
 export function ChatPage() {
   const queryClient = useQueryClient();
-  const chatQuery = useGetMainChat();
+  const chatQuery = useGetMainChat({
+    query: {
+      refetchInterval: 2500
+    }
+  });
   const [prompt, setPrompt] = useState("");
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const [streamedText, setStreamedText] = useState("");
@@ -18,7 +23,7 @@ export function ChatPage() {
     const loaded = snapshot?.messages ?? [];
     const optimistic = [...loaded];
 
-    if (pendingPrompt) {
+    if (pendingPrompt && !hasLoadedPrompt(loaded, pendingPrompt)) {
       optimistic.push({
         id: `pending:user:${pendingPrompt}`,
         role: "You",
@@ -125,6 +130,8 @@ export function ChatPage() {
               <StatusChip label={snapshot.isRunning || isStreaming ? "processing" : "online"} tone={snapshot.isRunning || isStreaming ? "green" : "blue"} />
               <span>{snapshot.provider}</span>
               <strong>{snapshot.model}</strong>
+              <span>{formatTokens(snapshot.tokens.totalTokens)} tokens</span>
+              <span>{formatTokens(snapshot.tokens.remainingUntilCompactionTokens)} until compaction</span>
             </>
           )}
         />
@@ -136,13 +143,15 @@ export function ChatPage() {
             <EmptyState title="No messages yet" body="Start the main local-web conversation." />
           )}
           {messages.map((message) => (
-            <article className={`message ${message.role === "You" ? "from-user" : "from-agent"}`} key={message.id}>
+            <article className={`message ${getMessageClass(message.role)}`} key={message.id}>
               <header>
-                <span className="avatar-square">{message.role === "You" ? "Y" : "AI"}</span>
-                <strong>{message.role}</strong>
+                <span className="avatar-square">{getAvatar(message.role)}</span>
+                <strong>{getRoleLabel(message.role)}</strong>
                 <time>{formatLocalTime(message.createdAt)}</time>
               </header>
-              <MessageBody content={message.content} htmlContent={message.htmlContent} />
+              {isWorkMessage(message)
+                ? <WorkMessage content={message.content} />
+                : <MessageBody content={message.content} htmlContent={message.htmlContent} />}
             </article>
           ))}
           {isStreaming && !streamedText && (
@@ -182,10 +191,97 @@ export function ChatPage() {
   );
 }
 
+function getMessageClass(role: string) {
+  const normalizedRole = normalizeRole(role);
+
+  if (normalizedRole === "you") {
+    return "from-user";
+  }
+
+  return isSubAgentRole(normalizedRole) ? "from-tool" : "from-agent";
+}
+
+function getAvatar(role: string) {
+  const normalizedRole = normalizeRole(role);
+
+  if (normalizedRole === "you") {
+    return "Y";
+  }
+
+  return isSubAgentRole(normalizedRole) ? <Terminal size={13} /> : "AI";
+}
+
+function getRoleLabel(role: string) {
+  const normalizedRole = normalizeRole(role);
+
+  if (isSubAgentRole(normalizedRole)) {
+    return "Sub-agent";
+  }
+
+  return normalizedRole === "assistant" ? "Main agent" : role;
+}
+
+function isSubAgentRole(role: string) {
+  return role === "tool" || role === "sub-agent" || role === "subagent";
+}
+
+function isWorkMessage(message: ChatDashboardMessage) {
+  return isSubAgentRole(normalizeRole(message.role))
+    || message.content.startsWith("Sub-agent ")
+    || message.content.startsWith("Sub-agent run ");
+}
+
+function normalizeRole(role: string) {
+  return role.trim().toLowerCase().replaceAll("\u2011", "-").replaceAll("\u2013", "-").replaceAll("\u2014", "-");
+}
+
+function hasLoadedPrompt(messages: ChatDashboardMessage[], prompt: string) {
+  return messages.some((x) => x.role === "You" && x.content.trim() === prompt);
+}
+
+function WorkMessage({ content }: { content: string }) {
+  const queuedMatch = /^Sub-agent\s+(?<conversationId>[a-z0-9]+)\s+queued as background run\s+(?<runId>[a-z0-9]+):\s+(?<task>.*)$/s.exec(content);
+  const completedMatch = /^Sub-agent run\s+(?<runId>[a-z0-9]+)\s+(?:completed|finished) with status\s+(?<status>\w+):\s+(?<result>.*)$/s.exec(content);
+
+  if (queuedMatch?.groups) {
+    return (
+      <div className="work-message">
+        <div className="work-message-meta">
+          <span><span className="status-square active" />Queued</span>
+          <code>{queuedMatch.groups.runId}</code>
+        </div>
+        <p>{shorten(queuedMatch.groups.task, 280)}</p>
+      </div>
+    );
+  }
+
+  if (completedMatch?.groups) {
+    return (
+      <div className="work-message">
+        <div className="work-message-meta">
+          <span><span className={`status-square ${completedMatch.groups.status === "Completed" ? "" : "error"}`} />{completedMatch.groups.status}</span>
+          <code>{completedMatch.groups.runId}</code>
+        </div>
+        <p>{shorten(completedMatch.groups.result, 420)}</p>
+      </div>
+    );
+  }
+
+  return <p className="message-body">{content}</p>;
+}
+
 function MessageBody({ content, htmlContent }: { content: string; htmlContent: string }) {
   if (htmlContent && htmlContent !== content) {
     return <div className="message-body markdown-body" dangerouslySetInnerHTML={{ __html: htmlContent }} />;
   }
 
   return <p className="message-body">{content}</p>;
+}
+
+function shorten(value: string, length: number) {
+  return value.length <= length ? value : `${value.slice(0, length)}...`;
+}
+
+function formatTokens(value: number | string) {
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(Number(value));
 }

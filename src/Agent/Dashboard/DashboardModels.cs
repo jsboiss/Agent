@@ -13,7 +13,20 @@ public sealed record ChatDashboardSnapshot(
     string Provider,
     string Model,
     bool IsRunning,
-    string? QueuedPrompt);
+    string? QueuedPrompt,
+    WorkspaceStatus? Workspace,
+    TokenUsageSummary Tokens);
+
+public sealed record WorkspaceStatus(
+    string Id,
+    string Name,
+    string RootPath,
+    string? ChatThreadId,
+    string? WorkThreadId,
+    string? ActiveRunId,
+    bool RemoteExecutionAllowed,
+    string? ActiveRunStatus,
+    string? ActiveRunKind);
 
 public sealed record ChatDashboardMessage(
     string Id,
@@ -27,6 +40,10 @@ public sealed record SendChatMessageRequest(string Prompt);
 public sealed record SendChatMessageResponse(
     ChatDashboardSnapshot Snapshot,
     string? ErrorMessage);
+
+public sealed record DebugTranscriptExport(
+    string Path,
+    string Content);
 
 public sealed record MemorySearchFilter(
     string Query,
@@ -70,6 +87,37 @@ public sealed record RunTimelineSnapshot(
     IReadOnlyList<RunTurnGroup> Turns,
     IReadOnlyList<RunEventRow> Events);
 
+public sealed record SubAgentRunsSnapshot(
+    IReadOnlyList<SubAgentRunRow> Runs,
+    TokenUsageSummary Tokens);
+
+public sealed record SubAgentRunRow(
+    string Id,
+    string WorkspaceId,
+    string Status,
+    string Kind,
+    string Channel,
+    string Prompt,
+    string? CodexThreadId,
+    string? ParentRunId,
+    string? ParentCodexThreadId,
+    DateTimeOffset StartedAt,
+    DateTimeOffset? CompletedAt,
+    string? FinalResponse,
+    string? Error,
+    TokenUsageSummary Tokens);
+
+public sealed record TokenUsageSummary(
+    int PromptTokens,
+    int CompletionTokens,
+    int TotalTokens,
+    int MainContextTokens,
+    int ContextWindowTokens,
+    int RemainingContextTokens,
+    int CompactionThresholdTokens,
+    int RemainingUntilCompactionTokens,
+    string Source);
+
 public sealed record RunTurnGroup(
     string Title,
     DateTimeOffset StartedAt,
@@ -107,6 +155,8 @@ public interface IChatDashboardService
         SendChatMessageRequest request,
         Stream responseStream,
         CancellationToken cancellationToken);
+
+    Task<DebugTranscriptExport> ExportMainTranscript(CancellationToken cancellationToken);
 }
 
 public interface IMemoryDashboardService
@@ -133,6 +183,11 @@ public interface IRunTimelineService
         string? conversationId,
         string filter,
         CancellationToken cancellationToken);
+}
+
+public interface ISubAgentDashboardService
+{
+    Task<SubAgentRunsSnapshot> List(CancellationToken cancellationToken);
 }
 
 public interface IMemoryGraphService

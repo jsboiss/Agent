@@ -6,6 +6,8 @@ using Agent.Memory;
 using Agent.Memory.MemoryGraph;
 using Agent.Messages;
 using Agent.Settings;
+using Agent.Tokens;
+using Agent.Workspaces;
 using Markdig;
 using Microsoft.Extensions.Options;
 
@@ -16,7 +18,11 @@ public sealed class ChatDashboardService(
     IMessageProcessor messageProcessor,
     IAgentEventStore eventStore,
     IMemoryStore memoryStore,
-    IAgentSettingsResolver settingsResolver) : IChatDashboardService
+    IAgentSettingsResolver settingsResolver,
+    IAgentWorkspaceStore workspaceStore,
+    IAgentRunStore runStore,
+    IAgentTokenTracker tokenTracker,
+    IWebHostEnvironment environment) : IChatDashboardService
 {
     private static readonly MarkdownPipeline MarkdownPipeline = new MarkdownPipelineBuilder()
         .UseAdvancedExtensions()
@@ -26,6 +32,30 @@ public sealed class ChatDashboardService(
     public async Task<ChatDashboardSnapshot> LoadMain(CancellationToken cancellationToken)
     {
         return await BuildSnapshot("main", false, null, cancellationToken);
+    }
+
+    public async Task<DebugTranscriptExport> ExportMainTranscript(CancellationToken cancellationToken)
+    {
+        var entries = await conversationRepository.ListEntries("main", cancellationToken);
+        var builder = new StringBuilder();
+        builder.AppendLine("# Main Chat Transcript");
+        builder.AppendLine();
+
+        foreach (var x in entries.OrderBy(x => x.CreatedAt))
+        {
+            builder.AppendLine($"## {x.Role} - {x.Channel} - {x.CreatedAt:O}");
+            builder.AppendLine();
+            builder.AppendLine(RepairMojibake(x.Content));
+            builder.AppendLine();
+        }
+
+        var directory = Path.Combine(GetWorkspaceRootPath(environment.ContentRootPath), "App_Data", "debug");
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, "main-chat-transcript.md");
+        var content = builder.ToString().ReplaceLineEndings("\r\n");
+        await File.WriteAllTextAsync(path, content, new UTF8Encoding(false), cancellationToken);
+
+        return new DebugTranscriptExport(path, content);
     }
 
     public async Task<SendChatMessageResponse> SendPrompt(
@@ -106,6 +136,12 @@ public sealed class ChatDashboardService(
     {
         var entries = await conversationRepository.ListEntries(conversationId, cancellationToken);
         var events = await eventStore.List(conversationId, 120, cancellationToken);
+        var workspaceResolution = await workspaceStore.GetOrCreateActive(
+            GetWorkspaceRootPath(environment.ContentRootPath),
+            cancellationToken);
+        var activeRun = string.IsNullOrWhiteSpace(workspaceResolution.Workspace.ActiveRunId)
+            ? null
+            : await runStore.Get(workspaceResolution.Workspace.ActiveRunId, cancellationToken);
         var settings = await settingsResolver.Resolve(
             new AgentSettingsResolveRequest(
                 new Conversation(
@@ -116,7 +152,7 @@ public sealed class ChatDashboardService(
                     DateTimeOffset.UtcNow,
                     DateTimeOffset.UtcNow),
                 "local-web",
-                Directory.GetCurrentDirectory(),
+                workspaceResolution.Workspace.RootPath,
                 new Dictionary<string, string>()),
             cancellationToken);
         var injectedMemoryIds = events
@@ -136,6 +172,8 @@ public sealed class ChatDashboardService(
             }
         }
 
+        var tokenSummary = TokenUsageDashboardMapper.FromEvents(events, tokenTracker);
+
         return new ChatDashboardSnapshot(
             conversationId,
             entries.Select(ToMessage).ToArray(),
@@ -145,7 +183,18 @@ public sealed class ChatDashboardService(
             settings.Get("provider") ?? "Ollama",
             settings.Get("model") ?? "qwen3.5:latest",
             isRunning,
-            queuedPrompt);
+            queuedPrompt,
+            new WorkspaceStatus(
+                workspaceResolution.Workspace.Id,
+                workspaceResolution.Workspace.Name,
+                workspaceResolution.Workspace.RootPath,
+                workspaceResolution.Workspace.ChatThreadId,
+                workspaceResolution.Workspace.WorkThreadId,
+                workspaceResolution.Workspace.ActiveRunId,
+                workspaceResolution.Workspace.RemoteExecutionAllowed,
+                activeRun?.Status.ToString(),
+                activeRun?.Kind.ToString()),
+            tokenSummary);
     }
 
     private static ChatDashboardMessage ToMessage(ConversationEntry x)
@@ -155,14 +204,15 @@ public sealed class ChatDashboardService(
             ConversationEntryRole.User => "You",
             ConversationEntryRole.Assistant => "Assistant",
             ConversationEntryRole.System => "System",
+            ConversationEntryRole.Tool => "Sub-agent",
             _ => x.Role.ToString()
         };
 
         return new ChatDashboardMessage(
             x.Id,
             role,
-            x.Content,
-            Markdown.ToHtml(WebUtility.HtmlEncode(x.Content), MarkdownPipeline),
+            RepairMojibake(x.Content),
+            Markdown.ToHtml(WebUtility.HtmlEncode(RepairMojibake(x.Content)), MarkdownPipeline),
             x.CreatedAt);
     }
 
@@ -172,6 +222,29 @@ public sealed class ChatDashboardService(
         {
             yield return value.Substring(x, Math.Min(size, value.Length - x));
         }
+    }
+
+    private static string GetWorkspaceRootPath(string contentRootPath)
+    {
+        var directory = new DirectoryInfo(contentRootPath);
+
+        if (directory.Parent is not null && directory.Parent.Name.Equals("src", StringComparison.OrdinalIgnoreCase))
+        {
+            return directory.Parent.Parent?.FullName ?? directory.FullName;
+        }
+
+        return directory.FullName;
+    }
+
+    private static string RepairMojibake(string value)
+    {
+        return value
+            .Replace("ÔÇÖ", "'", StringComparison.Ordinal)
+            .Replace("ÔÇ£", "\"", StringComparison.Ordinal)
+            .Replace("ÔÇØ", "\"", StringComparison.Ordinal)
+            .Replace("ÔÇô", "-", StringComparison.Ordinal)
+            .Replace("ÔÇö", "-", StringComparison.Ordinal)
+            .Replace("ÔÇª", "...", StringComparison.Ordinal);
     }
 }
 
@@ -345,10 +418,118 @@ public sealed class RunTimelineService(IAgentEventStore eventStore) : IRunTimeli
             AgentEventKind.MemoryExtractionCompleted => $"written: {x.Data.GetValueOrDefault("writtenCount") ?? "0"}, skipped: {x.Data.GetValueOrDefault("skippedCount") ?? "0"}",
             AgentEventKind.ToolCallStarted => x.Data.GetValueOrDefault("toolName") ?? "tool started",
             AgentEventKind.ToolCallCompleted => $"succeeded: {x.Data.GetValueOrDefault("succeeded") ?? string.Empty}",
-            AgentEventKind.ProviderTurnCompleted => $"iteration: {x.Data.GetValueOrDefault("iteration") ?? "1"}, tools: {x.Data.GetValueOrDefault("toolCallCount") ?? "0"}",
+            AgentEventKind.ProviderTurnCompleted => GetProviderSummary(x),
             AgentEventKind.ProviderError => x.Data.GetValueOrDefault("error") ?? "provider error",
             _ => x.Data.GetValueOrDefault("message") ?? x.Data.GetValueOrDefault("text") ?? x.Kind.ToString()
         };
+    }
+
+    private static string GetProviderSummary(AgentEvent x)
+    {
+        var baseSummary = $"iteration: {x.Data.GetValueOrDefault("iteration") ?? "1"}, tools: {x.Data.GetValueOrDefault("toolCallCount") ?? "0"}";
+        var tokens = x.Data.GetValueOrDefault("totalTokens");
+
+        return string.IsNullOrWhiteSpace(tokens)
+            ? baseSummary
+            : $"{baseSummary}, tokens: {tokens}";
+    }
+}
+
+public sealed class SubAgentDashboardService(
+    IAgentRunStore runStore,
+    IAgentEventStore eventStore,
+    IAgentTokenTracker tokenTracker) : ISubAgentDashboardService
+{
+    public async Task<SubAgentRunsSnapshot> List(CancellationToken cancellationToken)
+    {
+        var runs = await runStore.List(AgentRunKind.SubAgent, 100, cancellationToken);
+        var events = await eventStore.List(null, 500, cancellationToken);
+
+        List<SubAgentRunRow> rows = [];
+
+        foreach (var run in runs)
+        {
+            var runEvents = events
+                .Where(x => string.Equals(x.Data.GetValueOrDefault("runId"), run.Id, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            rows.Add(new SubAgentRunRow(
+                run.Id,
+                run.WorkspaceId,
+                run.Status.ToString(),
+                run.Kind.ToString(),
+                run.Channel,
+                run.Prompt,
+                run.CodexThreadId,
+                run.ParentRunId,
+                run.ParentCodexThreadId,
+                run.StartedAt,
+                run.CompletedAt,
+                run.FinalResponse,
+                run.Error,
+                TokenUsageDashboardMapper.FromEvents(runEvents, tokenTracker)));
+        }
+
+        return new SubAgentRunsSnapshot(
+            rows,
+            TokenUsageDashboardMapper.FromSummaries(rows.Select(x => x.Tokens).ToArray()));
+    }
+}
+
+internal static class TokenUsageDashboardMapper
+{
+    public static TokenUsageSummary FromEvents(
+        IReadOnlyList<AgentEvent> events,
+        IAgentTokenTracker tokenTracker)
+    {
+        var usage = tokenTracker.Aggregate(
+            events
+                .OrderBy(x => x.CreatedAt)
+                .Where(x => x.Kind is AgentEventKind.ProviderTurnCompleted or AgentEventKind.ProviderError)
+                .Select(x => x.Data)
+                .Where(x => x.ContainsKey("totalTokens"))
+                .ToArray());
+
+        return FromUsage(usage);
+    }
+
+    public static TokenUsageSummary FromSummaries(IReadOnlyList<TokenUsageSummary> summaries)
+    {
+        if (summaries.Count == 0)
+        {
+            return Empty();
+        }
+
+        var latest = summaries.Last();
+
+        return new TokenUsageSummary(
+            summaries.Sum(x => x.PromptTokens),
+            summaries.Sum(x => x.CompletionTokens),
+            summaries.Sum(x => x.TotalTokens),
+            latest.MainContextTokens,
+            latest.ContextWindowTokens,
+            latest.RemainingContextTokens,
+            latest.CompactionThresholdTokens,
+            latest.RemainingUntilCompactionTokens,
+            summaries.Any(x => string.Equals(x.Source, "provider", StringComparison.OrdinalIgnoreCase)) ? "provider" : "estimate");
+    }
+
+    private static TokenUsageSummary FromUsage(AgentTokenUsage usage)
+    {
+        return new TokenUsageSummary(
+            usage.PromptTokens,
+            usage.CompletionTokens,
+            usage.TotalTokens,
+            usage.MainContextTokens,
+            usage.ContextWindowTokens,
+            usage.RemainingTokens,
+            usage.CompactionThresholdTokens,
+            usage.RemainingUntilCompactionTokens,
+            usage.Source);
+    }
+
+    private static TokenUsageSummary Empty()
+    {
+        return new TokenUsageSummary(0, 0, 0, 0, 0, 0, 0, 0, "estimate");
     }
 }
 

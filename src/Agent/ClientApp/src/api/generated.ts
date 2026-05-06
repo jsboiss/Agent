@@ -31,6 +31,8 @@ export interface ChatDashboardMessage {
 
 export type ChatDashboardSnapshotQueuedPrompt = null | string;
 
+export type ChatDashboardSnapshotWorkspace = null | WorkspaceStatus;
+
 export interface ChatDashboardSnapshot {
   conversationId: string;
   messages: ChatDashboardMessage[];
@@ -41,6 +43,8 @@ export interface ChatDashboardSnapshot {
   model: string;
   isRunning: boolean;
   queuedPrompt: ChatDashboardSnapshotQueuedPrompt;
+  workspace: ChatDashboardSnapshotWorkspace;
+  tokens: TokenUsageSummary;
 }
 
 export interface MemoryGraphEdge {
@@ -207,6 +211,122 @@ export interface SettingsDashboardSnapshot {
   values: SettingsDashboardSnapshotValues;
   appliedLayers: string[];
   memoryConnectionString: string;
+}
+
+export type SubAgentRunRowCodexThreadId = null | string;
+
+export type SubAgentRunRowParentRunId = null | string;
+
+export type SubAgentRunRowParentCodexThreadId = null | string;
+
+export type SubAgentRunRowCompletedAt = null | string;
+
+export type SubAgentRunRowFinalResponse = null | string;
+
+export type SubAgentRunRowError = null | string;
+
+export interface SubAgentRunRow {
+  id: string;
+  workspaceId: string;
+  status: string;
+  kind: string;
+  channel: string;
+  prompt: string;
+  codexThreadId: SubAgentRunRowCodexThreadId;
+  parentRunId: SubAgentRunRowParentRunId;
+  parentCodexThreadId: SubAgentRunRowParentCodexThreadId;
+  startedAt: string;
+  completedAt: SubAgentRunRowCompletedAt;
+  finalResponse: SubAgentRunRowFinalResponse;
+  error: SubAgentRunRowError;
+  tokens: TokenUsageSummary;
+}
+
+export interface SubAgentRunsSnapshot {
+  runs: SubAgentRunRow[];
+  tokens: TokenUsageSummary;
+}
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type TokenUsageSummaryPromptTokens = number | string;
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type TokenUsageSummaryCompletionTokens = number | string;
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type TokenUsageSummaryTotalTokens = number | string;
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type TokenUsageSummaryMainContextTokens = number | string;
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type TokenUsageSummaryContextWindowTokens = number | string;
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type TokenUsageSummaryRemainingContextTokens = number | string;
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type TokenUsageSummaryCompactionThresholdTokens = number | string;
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type TokenUsageSummaryRemainingUntilCompactionTokens = number | string;
+
+export interface TokenUsageSummary {
+  /** @pattern ^-?(?:0|[1-9]\d*)$ */
+  promptTokens: TokenUsageSummaryPromptTokens;
+  /** @pattern ^-?(?:0|[1-9]\d*)$ */
+  completionTokens: TokenUsageSummaryCompletionTokens;
+  /** @pattern ^-?(?:0|[1-9]\d*)$ */
+  totalTokens: TokenUsageSummaryTotalTokens;
+  /** @pattern ^-?(?:0|[1-9]\d*)$ */
+  mainContextTokens: TokenUsageSummaryMainContextTokens;
+  /** @pattern ^-?(?:0|[1-9]\d*)$ */
+  contextWindowTokens: TokenUsageSummaryContextWindowTokens;
+  /** @pattern ^-?(?:0|[1-9]\d*)$ */
+  remainingContextTokens: TokenUsageSummaryRemainingContextTokens;
+  /** @pattern ^-?(?:0|[1-9]\d*)$ */
+  compactionThresholdTokens: TokenUsageSummaryCompactionThresholdTokens;
+  /** @pattern ^-?(?:0|[1-9]\d*)$ */
+  remainingUntilCompactionTokens: TokenUsageSummaryRemainingUntilCompactionTokens;
+  source: string;
+}
+
+export type WorkspaceStatusChatThreadId = null | string;
+
+export type WorkspaceStatusWorkThreadId = null | string;
+
+export type WorkspaceStatusActiveRunId = null | string;
+
+export type WorkspaceStatusActiveRunStatus = null | string;
+
+export type WorkspaceStatusActiveRunKind = null | string;
+
+export interface WorkspaceStatus {
+  id: string;
+  name: string;
+  rootPath: string;
+  chatThreadId: WorkspaceStatusChatThreadId;
+  workThreadId: WorkspaceStatusWorkThreadId;
+  activeRunId: WorkspaceStatusActiveRunId;
+  remoteExecutionAllowed: boolean;
+  activeRunStatus: WorkspaceStatusActiveRunStatus;
+  activeRunKind: WorkspaceStatusActiveRunKind;
 }
 
 export type GetRunsParams = {
@@ -610,6 +730,119 @@ export function useGetRuns<TData = Awaited<ReturnType<typeof getRuns>>, TError =
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetRunsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+
+export type getSubAgentsResponse200 = {
+  data: SubAgentRunsSnapshot
+  status: 200
+}
+    
+export type getSubAgentsResponseSuccess = (getSubAgentsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getSubAgentsResponse = (getSubAgentsResponseSuccess)
+
+export const getGetSubAgentsUrl = () => {
+
+
+  
+
+  return `/api/dashboard/subagents`
+}
+
+export const getSubAgents = async ( options?: RequestInit): Promise<getSubAgentsResponse> => {
+  
+  const res = await fetch(getGetSubAgentsUrl(),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+  
+  const data: getSubAgentsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getSubAgentsResponse
+}
+
+
+
+
+
+export const getGetSubAgentsQueryKey = () => {
+    return [
+    `/api/dashboard/subagents`
+    ] as const;
+    }
+
+    
+export const getGetSubAgentsQueryOptions = <TData = Awaited<ReturnType<typeof getSubAgents>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSubAgents>>, TError, TData>>, fetch?: RequestInit}
+) => {
+
+const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSubAgentsQueryKey();
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSubAgents>>> = ({ signal }) => getSubAgents({ signal, ...fetchOptions });
+
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSubAgents>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetSubAgentsQueryResult = NonNullable<Awaited<ReturnType<typeof getSubAgents>>>
+export type GetSubAgentsQueryError = unknown
+
+
+export function useGetSubAgents<TData = Awaited<ReturnType<typeof getSubAgents>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSubAgents>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getSubAgents>>,
+          TError,
+          Awaited<ReturnType<typeof getSubAgents>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetSubAgents<TData = Awaited<ReturnType<typeof getSubAgents>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSubAgents>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getSubAgents>>,
+          TError,
+          Awaited<ReturnType<typeof getSubAgents>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetSubAgents<TData = Awaited<ReturnType<typeof getSubAgents>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSubAgents>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useGetSubAgents<TData = Awaited<ReturnType<typeof getSubAgents>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSubAgents>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetSubAgentsQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
