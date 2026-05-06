@@ -3,6 +3,7 @@ using Agent.Conversations;
 using Agent.Dashboard;
 using Agent.Endpoints;
 using Agent.Events;
+using Agent.Frontend;
 using Agent.Memory;
 using Agent.Messages;
 using Agent.Providers;
@@ -12,6 +13,7 @@ using Agent.Providers.Ollama;
 using Agent.Resources;
 using Agent.Settings;
 using Agent.SubAgents;
+using Agent.Tokens;
 using Agent.Tools;
 using Agent.Workspaces;
 using Microsoft.Extensions.Options;
@@ -20,6 +22,12 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddOpenApi();
+builder.Services.Configure<DevelopmentFrontendOptions>(
+    builder.Configuration.GetSection(DevelopmentFrontendOptions.SectionName));
+if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddHostedService<ViteDevelopmentFrontendService>();
+}
 builder.Services.Configure<OllamaProviderOptions>(
     builder.Configuration.GetSection(OllamaProviderOptions.SectionName));
 builder.Services.Configure<CodexProviderOptions>(
@@ -51,6 +59,8 @@ builder.Services.AddSingleton<IConversationPromptQueue, InMemoryConversationProm
 builder.Services.AddSingleton<IAgentSettingsResolver, ConfigurationAgentSettingsResolver>();
 builder.Services.AddSingleton<ISubAgentWorkQueue, SubAgentWorkQueue>();
 builder.Services.AddSingleton<ISubAgentCoordinator, SubAgentCoordinator>();
+builder.Services.AddSingleton<IAgentTokenTracker, AgentTokenTracker>();
+builder.Services.AddHostedService<InterruptedSubAgentRunCleanupService>();
 builder.Services.AddHostedService<SubAgentRunWorker>();
 builder.Services.AddSingleton<IAgentEventStore, SqliteAgentEventStore>();
 builder.Services.AddSingleton<IAgentEventSink>(x => x.GetRequiredService<IAgentEventStore>());
@@ -82,6 +92,11 @@ app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages:
 app.UseHttpsRedirection();
 
 app.MapOpenApi();
+if (app.Environment.IsDevelopment())
+{
+    app.MapGet("/dev", (IOptions<DevelopmentFrontendOptions> options) =>
+        Results.Redirect(options.Value.Url));
+}
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.MapDashboardEndpoints();

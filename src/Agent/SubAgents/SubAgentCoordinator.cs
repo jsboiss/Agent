@@ -32,6 +32,31 @@ public sealed class SubAgentCoordinator(
         var workspace = (await workspaceStore.GetOrCreateActive(
             GetWorkspaceRootPath(environment.ContentRootPath),
             cancellationToken)).Workspace;
+        var allowsMutation = workspace.RemoteExecutionAllowed || string.Equals(
+            request.Channel,
+            "local-web",
+            StringComparison.OrdinalIgnoreCase);
+
+        if (!allowsMutation)
+        {
+            var refusal = "Remote execution is disabled for the active workspace. Enable RemoteExecutionAllowed before starting background work from this channel.";
+            var refusalEntry = await conversationRepository.AddEntry(
+                request.ParentConversationId,
+                ConversationEntryRole.Tool,
+                request.Channel,
+                refusal,
+                request.ParentEntryId,
+                cancellationToken);
+
+            return new SubAgentRunResult(
+                childConversation.Id,
+                refusalEntry.Id,
+                refusal,
+                null,
+                null,
+                AgentRunStatus.Failed.ToString());
+        }
+
         var run = await runStore.Create(
             workspace.Id,
             request.Task,
@@ -49,7 +74,7 @@ public sealed class SubAgentCoordinator(
                 request.ParentEntryId,
                 request.Task,
                 request.Channel,
-                workspace.RemoteExecutionAllowed || string.Equals(request.Channel, "local-web", StringComparison.OrdinalIgnoreCase)),
+                allowsMutation),
             cancellationToken);
 
         var summary = $"Sub-agent {childConversation.Id} queued as background run {run.Id}: {request.Task}";
@@ -59,17 +84,9 @@ public sealed class SubAgentCoordinator(
             request.ParentEntryId,
             cancellationToken);
 
-        var resultEntry = await conversationRepository.AddEntry(
-            request.ParentConversationId,
-            ConversationEntryRole.Tool,
-            request.Channel,
-            summary,
-            request.ParentEntryId,
-            cancellationToken);
-
         return new SubAgentRunResult(
             childConversation.Id,
-            resultEntry.Id,
+            string.Empty,
             summary,
             run.Id,
             run.CodexThreadId,

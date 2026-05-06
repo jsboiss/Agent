@@ -253,6 +253,31 @@ public sealed class SqliteAgentStateStore(IOptions<SqliteAgentStateOptions> opti
         return runs;
     }
 
+    public async Task<int> FailInterruptedSubAgentRuns(CancellationToken cancellationToken)
+    {
+        await EnsureDatabase(cancellationToken);
+
+        var completedAt = DateTimeOffset.UtcNow.ToString("O");
+        await using var connection = await Open(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE AgentRuns
+            SET Status = $status,
+                CompletedAt = $completedAt,
+                Error = COALESCE(NULLIF(Error, ''), $error)
+            WHERE Kind = $kind
+              AND Status IN ($createdStatus, $runningStatus);
+            """;
+        command.Parameters.AddWithValue("$status", AgentRunStatus.Failed.ToString());
+        command.Parameters.AddWithValue("$completedAt", completedAt);
+        command.Parameters.AddWithValue("$error", "Run was interrupted because the app stopped while the sub-agent was running.");
+        command.Parameters.AddWithValue("$kind", AgentRunKind.SubAgent.ToString());
+        command.Parameters.AddWithValue("$createdStatus", AgentRunStatus.Created.ToString());
+        command.Parameters.AddWithValue("$runningStatus", AgentRunStatus.Running.ToString());
+
+        return await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     public async Task<AgentRun> Update(
         string runId,
         AgentRunStatus status,

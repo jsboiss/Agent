@@ -12,6 +12,7 @@ public sealed class ConfigurationAgentSettingsResolver(IConfiguration configurat
         ["queue.behavior"] = "enqueue-while-busy",
         ["compaction.threshold"] = "8000",
         ["compaction.recentEntryCount"] = "8",
+        ["tokens.contextWindow"] = "200000",
         ["memory.enabled"] = "true",
         ["memory.scoutLimit"] = "5",
         ["memory.extraction.enabled"] = "true",

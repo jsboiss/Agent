@@ -4,8 +4,11 @@ using Agent.Memory;
 using Agent.Providers;
 using Agent.Resources;
 using Agent.Settings;
+using Agent.Tokens;
 using Agent.Tools;
 using Agent.Workspaces;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace Agent.Messages;
 
@@ -26,7 +29,8 @@ public sealed class AgentMessageProcessor(
     IAgentWorkspaceStore workspaceStore,
     IAgentRunStore runStore,
     IConversationMirrorStore mirrorStore,
-    IAgentMessageRouter messageRouter) : IMessageProcessor
+    IAgentMessageRouter messageRouter,
+    IAgentTokenTracker tokenTracker) : IMessageProcessor
 {
     private static int MaxToolIterations => 3;
 
@@ -243,6 +247,7 @@ public sealed class AgentMessageProcessor(
                 userEntry.Id,
                 events,
                 eventCursor,
+                settings,
                 cancellationToken);
 
             if (!string.IsNullOrWhiteSpace(providerResult.AssistantMessage))
@@ -493,6 +498,7 @@ public sealed class AgentMessageProcessor(
         string userEntryId,
         List<AgentEvent> events,
         EventPublishCursor eventCursor,
+        AgentSettings settings,
         CancellationToken cancellationToken)
     {
         var providerRequest = initialRequest;
@@ -506,8 +512,33 @@ public sealed class AgentMessageProcessor(
             events.Add(GetProviderRequestStartedEvent(providerRequest, channel, userEntryId, iteration));
             await PublishPending(events, eventCursor, cancellationToken);
             providerResult = await provider.Send(providerRequest, cancellationToken);
-            AddProviderEvents(providerResult, providerRequest, userEntryId, iteration, events);
+            var mainContext = await conversationRepository.ListEntries(providerRequest.ConversationId, cancellationToken);
+            var tokenUsage = tokenTracker.Measure(providerRequest, providerResult, settings, mainContext);
+            AddProviderEvents(providerResult, providerRequest, userEntryId, iteration, tokenUsage, events);
             await PublishPending(events, eventCursor, cancellationToken);
+
+            var delegationToolCall = GetDelegationToolCall(providerResult.AssistantMessage, userEntryId);
+
+            if (providerResult.ToolCalls.Count == 0 && delegationToolCall is not null)
+            {
+                var delegationResults = await ExecuteToolCalls(
+                    [delegationToolCall],
+                    providerRequest.ConversationId,
+                    channel,
+                    userEntryId,
+                    executedToolKeys,
+                    events,
+                    eventCursor,
+                    cancellationToken);
+                var assistantMessage = StripDelegationDirective(providerResult.AssistantMessage);
+
+                return providerResult with
+                {
+                    AssistantMessage = string.IsNullOrWhiteSpace(assistantMessage)
+                        ? "Background sub-agent queued."
+                        : assistantMessage
+                };
+            }
 
             if (providerResult.ToolCalls.Count == 0)
             {
@@ -750,7 +781,8 @@ public sealed class AgentMessageProcessor(
                         toolCall.Name,
                         toolCall.Arguments,
                         conversationId,
-                        channel),
+                        channel,
+                        userEntryId),
                     cancellationToken);
             }
 
@@ -792,6 +824,88 @@ public sealed class AgentMessageProcessor(
         }
 
         return results;
+    }
+
+    private static AgentProviderToolCall? GetDelegationToolCall(string assistantMessage, string userEntryId)
+    {
+        var json = GetDelegationJson(assistantMessage);
+
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return null;
+        }
+
+        try
+        {
+            var node = JsonNode.Parse(json)?.AsObject();
+            var task = node?["task"]?.GetValue<string>();
+
+            if (string.IsNullOrWhiteSpace(task))
+            {
+                return null;
+            }
+
+            return new AgentProviderToolCall(
+                $"delegate-{Guid.NewGuid():N}",
+                "spawn_agent",
+                new Dictionary<string, string>
+                {
+                    ["task"] = task,
+                    ["parentEntryId"] = userEntryId
+                });
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
+    }
+
+    private static string StripDelegationDirective(string assistantMessage)
+    {
+        var start = assistantMessage.IndexOf(
+            "<delegate_to_sub_agent>",
+            StringComparison.OrdinalIgnoreCase);
+
+        if (start < 0)
+        {
+            return assistantMessage;
+        }
+
+        var end = assistantMessage.IndexOf(
+            "</delegate_to_sub_agent>",
+            start,
+            StringComparison.OrdinalIgnoreCase);
+
+        if (end < 0)
+        {
+            return assistantMessage[..start].Trim();
+        }
+
+        var afterEnd = end + "</delegate_to_sub_agent>".Length;
+        return (assistantMessage[..start] + assistantMessage[afterEnd..]).Trim();
+    }
+
+    private static string? GetDelegationJson(string assistantMessage)
+    {
+        var startTag = "<delegate_to_sub_agent>";
+        var endTag = "</delegate_to_sub_agent>";
+        var start = assistantMessage.IndexOf(startTag, StringComparison.OrdinalIgnoreCase);
+
+        if (start < 0)
+        {
+            return null;
+        }
+
+        var contentStart = start + startTag.Length;
+        var end = assistantMessage.IndexOf(endTag, contentStart, StringComparison.OrdinalIgnoreCase);
+
+        return end < 0
+            ? null
+            : assistantMessage[contentStart..end].Trim();
     }
 
     private static string GetToolLoopFallback(
@@ -869,11 +983,12 @@ public sealed class AgentMessageProcessor(
             });
     }
 
-    private static void AddProviderEvents(
+    private void AddProviderEvents(
         AgentProviderResult providerResult,
         AgentProviderRequest request,
         string userEntryId,
         int iteration,
+        AgentTokenUsage tokenUsage,
         List<AgentEvent> events)
     {
         if (!string.IsNullOrWhiteSpace(providerResult.AssistantMessage))
@@ -904,17 +1019,24 @@ public sealed class AgentMessageProcessor(
                 }));
         }
 
-        events.Add(GetEvent(
-            AgentEventKind.ProviderTurnCompleted,
-            request.ConversationId,
-            new Dictionary<string, string>
+        var data = new Dictionary<string, string>
             {
                 ["provider"] = request.Kind.ToString(),
                 ["ConversationEntryId"] = userEntryId,
                 ["iteration"] = iteration.ToString(),
                 ["toolCallCount"] = providerResult.ToolCalls.Count.ToString(),
                 ["hasError"] = (!string.IsNullOrWhiteSpace(providerResult.Error)).ToString()
-            }));
+            };
+
+        foreach (var x in tokenTracker.ToMetadata(tokenUsage))
+        {
+            data[x.Key] = x.Value;
+        }
+
+        events.Add(GetEvent(
+            AgentEventKind.ProviderTurnCompleted,
+            request.ConversationId,
+            data));
     }
 
     private static AgentEvent GetEvent(

@@ -2,19 +2,6 @@ namespace Agent.Workspaces;
 
 public sealed class AgentMessageRouter(IAgentRunStore runStore) : IAgentMessageRouter
 {
-    private static string[] WorkPhrases =>
-    [
-        "run test", "run tests", "write test", "write tests", "fix test", "fix tests",
-        "create file", "update file", "delete file", "rename file", "working directory",
-        "what's your working directory", "what is your working directory"
-    ];
-
-    private static string[] WorkWords =>
-    [
-        "change", "edit", "implement", "fix", "debug", "refactor", "build",
-        "commit", "review", "delete", "rename", "workspace", "subagent", "sub-agent"
-    ];
-
     public async Task<AgentRouteResolution> Resolve(
         AgentWorkspace workspace,
         string channel,
@@ -73,28 +60,6 @@ public sealed class AgentMessageRouter(IAgentRunStore runStore) : IAgentMessageR
         if (value.StartsWith("/chat", StringComparison.OrdinalIgnoreCase))
         {
             return false;
-        }
-
-        return WorkPhrases.Any(x => value.Contains(x, StringComparison.OrdinalIgnoreCase))
-            || WorkWords.Any(x => ContainsWord(value, x));
-    }
-
-    private static bool ContainsWord(string value, string word)
-    {
-        var index = value.IndexOf(word, StringComparison.OrdinalIgnoreCase);
-
-        while (index >= 0)
-        {
-            var before = index == 0 || !char.IsLetterOrDigit(value[index - 1]);
-            var afterIndex = index + word.Length;
-            var after = afterIndex >= value.Length || !char.IsLetterOrDigit(value[afterIndex]);
-
-            if (before && after)
-            {
-                return true;
-            }
-
-            index = value.IndexOf(word, index + word.Length, StringComparison.OrdinalIgnoreCase);
         }
 
         return false;

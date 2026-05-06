@@ -347,7 +347,13 @@ public sealed class CodexProviderClient(IOptions<CodexProviderOptions> options) 
 
         if (request.RouteKind == Workspaces.AgentRouteKind.Chat)
         {
-            sections.Add("Route: general chat. Do not mutate files or run commands unless the user explicitly asks to do coding work.");
+            sections.Add("""
+            Route: general chat. Do not mutate files or run commands in this chat turn.
+            If the user's request requires changing files, running builds/tests, or other coding work, delegate it to a background sub-agent instead of doing the work in the chat turn.
+            To delegate, include exactly one machine-readable directive in your response:
+            <delegate_to_sub_agent>{"task":"A self-contained task for the background agent."}</delegate_to_sub_agent>
+            You may include a brief user-facing sentence before the directive. Do not use the directive for ordinary questions or read-only explanations.
+            """);
         }
         else if (!request.AllowsMutation)
         {
@@ -355,7 +361,7 @@ public sealed class CodexProviderClient(IOptions<CodexProviderOptions> options) 
         }
         else
         {
-            sections.Add("Route: coding work. You may use the configured workspace access to complete the user's request.");
+            sections.Add("Route: coding work. Complete the user's request directly using the configured workspace access. Do not delegate this task to another sub-agent.");
         }
 
         if (!string.IsNullOrWhiteSpace(request.ChannelNotes))

@@ -29,14 +29,14 @@ public sealed class AgentToolExecutor(
         CancellationToken cancellationToken)
     {
         var task = request.Arguments.GetValueOrDefault("task") ?? string.Empty;
-        var parentEntryId = request.Arguments.GetValueOrDefault("parentEntryId") ?? string.Empty;
+        var parentEntryId = request.Arguments.GetValueOrDefault("parentEntryId") ?? request.ParentEntryId;
 
-        if (string.IsNullOrWhiteSpace(task) || string.IsNullOrWhiteSpace(parentEntryId))
+        if (string.IsNullOrWhiteSpace(task))
         {
             return new AgentToolResult(
                 request.Name,
                 false,
-                "Missing required arguments 'task' and 'parentEntryId'.",
+                "Missing required argument 'task'.",
                 new Dictionary<string, string>());
         }
 

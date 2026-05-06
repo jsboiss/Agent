@@ -3,6 +3,7 @@ using Agent.Events;
 using Agent.Providers;
 using Agent.Resources;
 using Agent.Settings;
+using Agent.Tokens;
 using Agent.Workspaces;
 
 namespace Agent.SubAgents;
@@ -17,6 +18,7 @@ public sealed class SubAgentRunWorker(
     IAgentResourceLoader resourceLoader,
     IAgentSettingsResolver settingsResolver,
     IAgentEventSink eventSink,
+    IAgentTokenTracker tokenTracker,
     ILogger<SubAgentRunWorker> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -101,6 +103,8 @@ public sealed class SubAgentRunWorker(
             resources.ChannelInstructions,
             item.AllowsMutation);
         var result = await provider.Send(request, cancellationToken);
+        var mainContext = await conversationRepository.ListEntries(item.ChildConversationId, cancellationToken);
+        var tokenUsage = tokenTracker.Measure(request, result, settings, mainContext);
         var status = string.IsNullOrWhiteSpace(result.Error)
             ? AgentRunStatus.Completed
             : AgentRunStatus.Failed;
@@ -141,18 +145,25 @@ public sealed class SubAgentRunWorker(
         }
 
         await AddConversationResult(item, result, status, cancellationToken);
+        var completedData = new Dictionary<string, string>
+        {
+            ["runId"] = item.RunId,
+            ["workspaceId"] = item.WorkspaceId,
+            ["codexThreadId"] = threadId ?? string.Empty,
+            ["status"] = status.ToString(),
+            ["error"] = result.Error ?? string.Empty,
+            ["message"] = result.AssistantMessage
+        };
+
+        foreach (var x in tokenTracker.ToMetadata(tokenUsage))
+        {
+            completedData[x.Key] = x.Value;
+        }
+
         await Publish(
             string.IsNullOrWhiteSpace(result.Error) ? AgentEventKind.ProviderTurnCompleted : AgentEventKind.ProviderError,
             item.ChildConversationId,
-            new Dictionary<string, string>
-            {
-                ["runId"] = item.RunId,
-                ["workspaceId"] = item.WorkspaceId,
-                ["codexThreadId"] = threadId ?? string.Empty,
-                ["status"] = status.ToString(),
-                ["error"] = result.Error ?? string.Empty,
-                ["message"] = result.AssistantMessage
-            },
+            completedData,
             cancellationToken);
     }
 

@@ -106,16 +106,17 @@ public sealed class AgentResourceLoader(
             DefaultTools);
 
         var recentEntryCount = GetRecentEntryCount(request.Settings.Values);
+        var compactionThreshold = GetCompactionThreshold(request.Settings.Values);
         var entries = await conversationRepository.ListEntries(request.Conversation.Id, cancellationToken);
+        var rollingSummary = await summaryStore.Get(request.Conversation.Id, cancellationToken);
 
-        if (entries.Count > recentEntryCount)
+        if (ShouldCompact(entries, rollingSummary, recentEntryCount, compactionThreshold))
         {
             await conversationCompactor.Compact(
-                new ConversationCompactionRequest(request.Conversation, recentEntryCount),
+                new ConversationCompactionRequest(request.Conversation, recentEntryCount, compactionThreshold),
                 cancellationToken);
+            rollingSummary = await summaryStore.Get(request.Conversation.Id, cancellationToken);
         }
-
-        var rollingSummary = await summaryStore.Get(request.Conversation.Id, cancellationToken);
 
         return new AgentResourceContext(
             workspace,
@@ -232,5 +233,62 @@ public sealed class AgentResourceLoader(
         return int.TryParse(settings.GetValueOrDefault("compaction.recentEntryCount"), out var recentEntryCount)
             ? Math.Max(1, recentEntryCount)
             : 8;
+    }
+
+    private static int GetCompactionThreshold(IReadOnlyDictionary<string, string> settings)
+    {
+        return int.TryParse(settings.GetValueOrDefault("compaction.threshold"), out var threshold)
+            ? Math.Max(1, threshold)
+            : 8000;
+    }
+
+    private static bool ShouldCompact(
+        IReadOnlyList<ConversationEntry> entries,
+        ConversationSummary? rollingSummary,
+        int recentEntryCount,
+        int thresholdTokens)
+    {
+        if (entries.Count <= recentEntryCount)
+        {
+            return false;
+        }
+
+        var compactableEntries = GetCompactableEntries(entries, rollingSummary, recentEntryCount);
+
+        if (compactableEntries.Count == 0)
+        {
+            return false;
+        }
+
+        return EstimateTokens(compactableEntries.Select(x => $"{x.Role}: {x.Content}")) > thresholdTokens;
+    }
+
+    private static int EstimateTokens(IEnumerable<string> values)
+    {
+        return values.Sum(x => string.IsNullOrWhiteSpace(x) ? 0 : Math.Max(1, (int)Math.Ceiling(x.Length / 4.0)));
+    }
+
+    private static IReadOnlyList<ConversationEntry> GetCompactableEntries(
+        IReadOnlyList<ConversationEntry> entries,
+        ConversationSummary? rollingSummary,
+        int recentEntryCount)
+    {
+        var olderEntries = entries
+            .Take(Math.Max(0, entries.Count - recentEntryCount))
+            .ToArray();
+
+        if (string.IsNullOrWhiteSpace(rollingSummary?.ThroughEntryId))
+        {
+            return olderEntries;
+        }
+
+        var summaryIndex = olderEntries
+            .Select((x, y) => new { Entry = x, Index = y })
+            .FirstOrDefault(x => string.Equals(x.Entry.Id, rollingSummary.ThroughEntryId, StringComparison.OrdinalIgnoreCase))
+            ?.Index;
+
+        return summaryIndex is null
+            ? olderEntries
+            : olderEntries.Skip(summaryIndex.Value + 1).ToArray();
     }
 }

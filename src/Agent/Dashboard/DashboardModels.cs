@@ -14,7 +14,8 @@ public sealed record ChatDashboardSnapshot(
     string Model,
     bool IsRunning,
     string? QueuedPrompt,
-    WorkspaceStatus? Workspace);
+    WorkspaceStatus? Workspace,
+    TokenUsageSummary Tokens);
 
 public sealed record WorkspaceStatus(
     string Id,
@@ -39,6 +40,10 @@ public sealed record SendChatMessageRequest(string Prompt);
 public sealed record SendChatMessageResponse(
     ChatDashboardSnapshot Snapshot,
     string? ErrorMessage);
+
+public sealed record DebugTranscriptExport(
+    string Path,
+    string Content);
 
 public sealed record MemorySearchFilter(
     string Query,
@@ -83,7 +88,8 @@ public sealed record RunTimelineSnapshot(
     IReadOnlyList<RunEventRow> Events);
 
 public sealed record SubAgentRunsSnapshot(
-    IReadOnlyList<SubAgentRunRow> Runs);
+    IReadOnlyList<SubAgentRunRow> Runs,
+    TokenUsageSummary Tokens);
 
 public sealed record SubAgentRunRow(
     string Id,
@@ -98,7 +104,19 @@ public sealed record SubAgentRunRow(
     DateTimeOffset StartedAt,
     DateTimeOffset? CompletedAt,
     string? FinalResponse,
-    string? Error);
+    string? Error,
+    TokenUsageSummary Tokens);
+
+public sealed record TokenUsageSummary(
+    int PromptTokens,
+    int CompletionTokens,
+    int TotalTokens,
+    int MainContextTokens,
+    int ContextWindowTokens,
+    int RemainingContextTokens,
+    int CompactionThresholdTokens,
+    int RemainingUntilCompactionTokens,
+    string Source);
 
 public sealed record RunTurnGroup(
     string Title,
@@ -137,6 +155,8 @@ public interface IChatDashboardService
         SendChatMessageRequest request,
         Stream responseStream,
         CancellationToken cancellationToken);
+
+    Task<DebugTranscriptExport> ExportMainTranscript(CancellationToken cancellationToken);
 }
 
 public interface IMemoryDashboardService

@@ -28,6 +28,11 @@ public static class DashboardEndpoints
             })
             .WithName("StreamMainChatMessage");
         group.MapGet(
+            "/debug/main-transcript",
+            async (IChatDashboardService service, CancellationToken cancellationToken) =>
+                await service.ExportMainTranscript(cancellationToken))
+            .WithName("ExportMainChatTranscript");
+        group.MapGet(
             "/runs",
             async (string? conversationId, string? filter, IRunTimelineService service, CancellationToken cancellationToken) =>
                 await service.List(conversationId, filter ?? "All", cancellationToken))
