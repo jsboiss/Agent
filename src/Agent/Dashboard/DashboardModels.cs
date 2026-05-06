@@ -36,12 +36,12 @@ public sealed record MemorySearchFilter(
 
 public sealed record MemoryWriteDto(
     string Text,
-    MemoryTier Tier,
-    MemorySegment Segment,
+    string Tier,
+    string Segment,
     double Importance,
     double Confidence);
 
-public sealed record MemoryLifecycleUpdateDto(MemoryLifecycle Lifecycle);
+public sealed record MemoryLifecycleUpdateDto(string Lifecycle);
 
 public sealed record MemoryWorkspaceSnapshot(
     IReadOnlyList<MemoryRow> Memories,
@@ -90,22 +90,10 @@ public sealed record MemoryGraphSnapshot(
     IReadOnlyList<MemoryGraphEdge> Edges,
     string EmptyReason);
 
-public sealed class DashboardUiState
-{
-    public string ConversationId { get; set; } = "main";
-
-    public string? SelectedRunEventId { get; set; }
-
-    public string? SelectedMemoryId { get; set; }
-
-    public string MemorySearchText { get; set; } = string.Empty;
-
-    public string LifecycleFilter { get; set; } = "Active";
-
-    public string SegmentFilter { get; set; } = "All";
-
-    public string TierFilter { get; set; } = "All";
-}
+public sealed record SettingsDashboardSnapshot(
+    IReadOnlyDictionary<string, string> Values,
+    IReadOnlyList<string> AppliedLayers,
+    string MemoryConnectionString);
 
 public interface IChatDashboardService
 {
@@ -113,6 +101,11 @@ public interface IChatDashboardService
 
     Task<SendChatMessageResponse> SendPrompt(
         SendChatMessageRequest request,
+        CancellationToken cancellationToken);
+
+    Task StreamPrompt(
+        SendChatMessageRequest request,
+        Stream responseStream,
         CancellationToken cancellationToken);
 }
 
@@ -145,4 +138,9 @@ public interface IRunTimelineService
 public interface IMemoryGraphService
 {
     Task<MemoryGraphSnapshot> Build(CancellationToken cancellationToken);
+}
+
+public interface ISettingsDashboardService
+{
+    Task<SettingsDashboardSnapshot> Load(CancellationToken cancellationToken);
 }

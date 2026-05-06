@@ -4,4 +4,5 @@ public sealed record MemoryGraphEdge(
     string Id,
     string SourceId,
     string TargetId,
-    string Kind);
+    string Kind,
+    string Label);

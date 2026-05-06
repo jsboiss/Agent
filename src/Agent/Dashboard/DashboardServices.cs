@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using Agent.Conversations;
 using Agent.Events;
 using Agent.Memory;
@@ -6,6 +7,7 @@ using Agent.Memory.MemoryGraph;
 using Agent.Messages;
 using Agent.Settings;
 using Markdig;
+using Microsoft.Extensions.Options;
 
 namespace Agent.Dashboard;
 
@@ -69,6 +71,31 @@ public sealed class ChatDashboardService(
         return new SendChatMessageResponse(
             await BuildSnapshot(result.ConversationId, false, null, cancellationToken),
             errorMessage);
+    }
+
+    public async Task StreamPrompt(
+        SendChatMessageRequest request,
+        Stream responseStream,
+        CancellationToken cancellationToken)
+    {
+        var response = await SendPrompt(request, cancellationToken);
+        var message = response.ErrorMessage
+            ?? response.Snapshot.Messages.LastOrDefault(x => x.Role == "Assistant")?.Content
+            ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return;
+        }
+
+        var chunks = Chunk(message, 48);
+
+        foreach (var chunk in chunks)
+        {
+            var bytes = Encoding.UTF8.GetBytes(chunk);
+            await responseStream.WriteAsync(bytes, cancellationToken);
+            await responseStream.FlushAsync(cancellationToken);
+        }
     }
 
     private async Task<ChatDashboardSnapshot> BuildSnapshot(
@@ -138,6 +165,14 @@ public sealed class ChatDashboardService(
             Markdown.ToHtml(WebUtility.HtmlEncode(x.Content), MarkdownPipeline),
             x.CreatedAt);
     }
+
+    private static IEnumerable<string> Chunk(string value, int size)
+    {
+        for (var x = 0; x < value.Length; x += size)
+        {
+            yield return value.Substring(x, Math.Min(size, value.Length - x));
+        }
+    }
 }
 
 public sealed class MemoryDashboardService(IMemoryStore memoryStore) : IMemoryDashboardService
@@ -175,8 +210,8 @@ public sealed class MemoryDashboardService(IMemoryStore memoryStore) : IMemoryDa
         var memory = await memoryStore.Write(
             new MemoryWriteRequest(
                 request.Text.Trim(),
-                request.Tier,
-                request.Segment,
+                Enum.Parse<MemoryTier>(request.Tier, true),
+                Enum.Parse<MemorySegment>(request.Segment, true),
                 request.Importance,
                 request.Confidence,
                 null),
@@ -190,7 +225,10 @@ public sealed class MemoryDashboardService(IMemoryStore memoryStore) : IMemoryDa
         MemoryLifecycleUpdateDto request,
         CancellationToken cancellationToken)
     {
-        var memory = await memoryStore.UpdateLifecycle(id, request.Lifecycle, cancellationToken);
+        var memory = await memoryStore.UpdateLifecycle(
+            id,
+            Enum.Parse<MemoryLifecycle>(request.Lifecycle, true),
+            cancellationToken);
 
         return ToRow(memory, false);
     }
@@ -337,21 +375,41 @@ public sealed class MemoryGraphService(IMemoryStore memoryStore) : IMemoryGraphS
 
         foreach (var memory in memories)
         {
-            AddNode(nodes, nodeIds, $"memory:{memory.Id}", Shorten(memory.Text, 42), "memory");
-            AddNode(nodes, nodeIds, $"segment:{memory.Segment}", memory.Segment.ToString(), "segment");
-            AddNode(nodes, nodeIds, $"tier:{memory.Tier}", memory.Tier.ToString(), "tier");
-            edges.Add(new MemoryGraphEdge($"edge:segment:{memory.Id}", $"segment:{memory.Segment}", $"memory:{memory.Id}", "segment"));
-            edges.Add(new MemoryGraphEdge($"edge:tier:{memory.Id}", $"tier:{memory.Tier}", $"memory:{memory.Id}", "tier"));
+            AddNode(
+                nodes,
+                nodeIds,
+                $"memory:{memory.Id}",
+                Shorten(memory.Text, 42),
+                "memory",
+                memory.Segment.ToString(),
+                memory.Tier.ToString(),
+                memory.Lifecycle.ToString(),
+                memory.Importance,
+                memory.Text,
+                memory.AccessCount,
+                6 + (memory.Importance * 12),
+                new Dictionary<string, string>
+                {
+                    ["confidence"] = memory.Confidence.ToString("0.###"),
+                    ["createdAt"] = memory.CreatedAt.ToString("O"),
+                    ["updatedAt"] = memory.UpdatedAt.ToString("O"),
+                    ["sourceMessageId"] = memory.SourceMessageId ?? string.Empty,
+                    ["supersedes"] = memory.Supersedes ?? string.Empty
+                });
+            AddNode(nodes, nodeIds, $"segment:{memory.Segment}", memory.Segment.ToString(), "segment", memory.Segment.ToString(), string.Empty, string.Empty, 1, memory.Segment.ToString(), 0, 18, new Dictionary<string, string>());
+            AddNode(nodes, nodeIds, $"tier:{memory.Tier}", memory.Tier.ToString(), "tier", string.Empty, memory.Tier.ToString(), string.Empty, 1, memory.Tier.ToString(), 0, 14, new Dictionary<string, string>());
+            edges.Add(new MemoryGraphEdge($"edge:segment:{memory.Id}", $"segment:{memory.Segment}", $"memory:{memory.Id}", "segment", "segment"));
+            edges.Add(new MemoryGraphEdge($"edge:tier:{memory.Id}", $"tier:{memory.Tier}", $"memory:{memory.Id}", "tier", "tier"));
 
             if (!string.IsNullOrWhiteSpace(memory.SourceMessageId))
             {
-                AddNode(nodes, nodeIds, $"source:{memory.SourceMessageId}", $"Source {Shorten(memory.SourceMessageId, 10)}", "source");
-                edges.Add(new MemoryGraphEdge($"edge:source:{memory.Id}", $"source:{memory.SourceMessageId}", $"memory:{memory.Id}", "source"));
+                AddNode(nodes, nodeIds, $"source:{memory.SourceMessageId}", $"Source {Shorten(memory.SourceMessageId, 10)}", "source", string.Empty, string.Empty, string.Empty, 1, memory.SourceMessageId, 0, 10, new Dictionary<string, string>());
+                edges.Add(new MemoryGraphEdge($"edge:source:{memory.Id}", $"source:{memory.SourceMessageId}", $"memory:{memory.Id}", "source", "source"));
             }
 
             if (!string.IsNullOrWhiteSpace(memory.Supersedes))
             {
-                edges.Add(new MemoryGraphEdge($"edge:supersedes:{memory.Id}", $"memory:{memory.Id}", $"memory:{memory.Supersedes}", "supersedes"));
+                edges.Add(new MemoryGraphEdge($"edge:supersedes:{memory.Id}", $"memory:{memory.Id}", $"memory:{memory.Supersedes}", "supersedes", "supersedes"));
             }
         }
 
@@ -363,11 +421,19 @@ public sealed class MemoryGraphService(IMemoryStore memoryStore) : IMemoryGraphS
         ISet<string> nodeIds,
         string id,
         string label,
-        string kind)
+        string kind,
+        string segment,
+        string tier,
+        string lifecycle,
+        double importance,
+        string text,
+        int count,
+        double size,
+        IReadOnlyDictionary<string, string> metadata)
     {
         if (nodeIds.Add(id))
         {
-            nodes.Add(new MemoryGraphNode(id, label, kind, new Dictionary<string, string>()));
+            nodes.Add(new MemoryGraphNode(id, label, kind, segment, tier, lifecycle, importance, text, count, size, metadata));
         }
     }
 
@@ -376,5 +442,32 @@ public sealed class MemoryGraphService(IMemoryStore memoryStore) : IMemoryGraphS
         return value.Length <= length
             ? value
             : value[..length] + "...";
+    }
+}
+
+public sealed class SettingsDashboardService(
+    IAgentSettingsResolver settingsResolver,
+    IOptions<SqliteMemoryOptions> memoryOptions) : ISettingsDashboardService
+{
+    public async Task<SettingsDashboardSnapshot> Load(CancellationToken cancellationToken)
+    {
+        var settings = await settingsResolver.Resolve(
+            new AgentSettingsResolveRequest(
+                new Conversation(
+                    "main",
+                    ConversationKind.Main,
+                    null,
+                    null,
+                    DateTimeOffset.UtcNow,
+                    DateTimeOffset.UtcNow),
+                "local-web",
+                Directory.GetCurrentDirectory(),
+                new Dictionary<string, string>()),
+            cancellationToken);
+
+        return new SettingsDashboardSnapshot(
+            settings.Values,
+            settings.AppliedLayers,
+            memoryOptions.Value.ConnectionString);
     }
 }
