@@ -8,6 +8,29 @@ public sealed class SqliteMemoryStore(IOptions<SqliteMemoryOptions> options) : I
 {
     private SqliteMemoryOptions Options { get; } = options.Value;
 
+    public async Task<MemoryRecord?> Get(string id, CancellationToken cancellationToken)
+    {
+        await EnsureDatabase(cancellationToken);
+
+        await using var connection = new SqliteConnection(Options.ConnectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT Id, Text, Tier, Segment, Lifecycle, Importance, Confidence, AccessCount,
+                   CreatedAt, UpdatedAt, LastAccessedAt, SourceMessageId, Supersedes, EmbeddingReference
+            FROM Memories
+            WHERE Id = $id;
+            """;
+        command.Parameters.AddWithValue("$id", id);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+        return await reader.ReadAsync(cancellationToken)
+            ? GetMemoryRecord(reader)
+            : null;
+    }
+
     public async Task<IReadOnlyList<MemoryRecord>> Search(
         MemorySearchRequest request,
         CancellationToken cancellationToken)
@@ -114,6 +137,55 @@ public sealed class SqliteMemoryStore(IOptions<SqliteMemoryOptions> options) : I
         await command.ExecuteNonQueryAsync(cancellationToken);
 
         return memory;
+    }
+
+    public async Task<MemoryRecord> UpdateLifecycle(
+        string id,
+        MemoryLifecycle lifecycle,
+        CancellationToken cancellationToken)
+    {
+        await EnsureDatabase(cancellationToken);
+
+        await using var connection = new SqliteConnection(Options.ConnectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE Memories
+            SET Lifecycle = $lifecycle,
+                UpdatedAt = $updatedAt
+            WHERE Id = $id;
+            """;
+        command.Parameters.AddWithValue("$id", id);
+        command.Parameters.AddWithValue("$lifecycle", lifecycle.ToString());
+        command.Parameters.AddWithValue("$updatedAt", DateTimeOffset.UtcNow.ToString("O"));
+
+        var updatedCount = await command.ExecuteNonQueryAsync(cancellationToken);
+
+        if (updatedCount == 0)
+        {
+            throw new InvalidOperationException($"Memory '{id}' was not found.");
+        }
+
+        return await Get(id, cancellationToken)
+            ?? throw new InvalidOperationException($"Memory '{id}' was not found after update.");
+    }
+
+    public async Task Delete(string id, CancellationToken cancellationToken)
+    {
+        await EnsureDatabase(cancellationToken);
+
+        await using var connection = new SqliteConnection(Options.ConnectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            DELETE FROM Memories
+            WHERE Id = $id;
+            """;
+        command.Parameters.AddWithValue("$id", id);
+
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private async Task EnsureDatabase(CancellationToken cancellationToken)

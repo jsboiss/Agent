@@ -1,7 +1,9 @@
 using Agent.Components;
 using Agent.Compaction;
 using Agent.Conversations;
+using Agent.Dashboard;
 using Agent.Endpoints;
+using Agent.Events;
 using Agent.Memory;
 using Agent.Messages;
 using Agent.Providers;
@@ -13,14 +15,12 @@ using Agent.Settings;
 using Agent.SubAgents;
 using Agent.Tools;
 using Microsoft.Extensions.Options;
-using MudBlazor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
-builder.Services.AddMudServices();
 builder.Services.Configure<OllamaProviderOptions>(
     builder.Configuration.GetSection(OllamaProviderOptions.SectionName));
 builder.Services.Configure<SqliteMemoryOptions>(
@@ -42,6 +42,8 @@ builder.Services.AddSingleton<IAgentResourceLoader, AgentResourceLoader>();
 builder.Services.AddSingleton<IConversationPromptQueue, InMemoryConversationPromptQueue>();
 builder.Services.AddSingleton<IAgentSettingsResolver, ConfigurationAgentSettingsResolver>();
 builder.Services.AddSingleton<ISubAgentCoordinator, SubAgentCoordinator>();
+builder.Services.AddSingleton<IAgentEventStore, InMemoryAgentEventStore>();
+builder.Services.AddSingleton<IAgentEventSink>(x => x.GetRequiredService<IAgentEventStore>());
 builder.Services.AddSingleton<IMemoryStore, SqliteMemoryStore>();
 builder.Services.AddSingleton<IMemoryScout, MemoryScout>();
 builder.Services.AddSingleton<RuleBasedMemoryExtractor>();
@@ -49,6 +51,11 @@ builder.Services.AddSingleton<LlmMemoryExtractor>();
 builder.Services.AddSingleton<IMemoryExtractor, CompositeMemoryExtractor>();
 builder.Services.AddSingleton<IMemoryCandidateReviewer, MemoryCandidateReviewer>();
 builder.Services.AddSingleton<IAgentToolExecutor, AgentToolExecutor>();
+builder.Services.AddScoped<IChatDashboardService, ChatDashboardService>();
+builder.Services.AddScoped<IMemoryDashboardService, MemoryDashboardService>();
+builder.Services.AddScoped<IRunTimelineService, RunTimelineService>();
+builder.Services.AddScoped<IMemoryGraphService, MemoryGraphService>();
+builder.Services.AddScoped<DashboardUiState>();
 builder.Services.AddScoped<IMessageProcessor, AgentMessageProcessor>();
 
 var app = builder.Build();

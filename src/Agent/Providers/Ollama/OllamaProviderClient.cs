@@ -86,6 +86,12 @@ public sealed class OllamaProviderClient(HttpClient httpClient, IOptions<OllamaP
             }
         }
 
+        if (request.ToolResults.Count > 0)
+        {
+            prompt.AppendLine();
+            prompt.AppendLine("Use the tool results to produce a concise final answer for the user. Do not call the same tool again unless the user provides new information that requires it.");
+        }
+
         return prompt.ToString();
     }
 

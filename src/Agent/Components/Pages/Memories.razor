@@ -1,82 +1,159 @@
 @page "/memories"
+@rendermode InteractiveServer
 @using Agent.Memory
-@inject IMemoryStore MemoryStore
+@inject IMemoryDashboardService MemoryService
+@inject DashboardUiState UiState
 
 <PageTitle>Memories</PageTitle>
 
-<MudStack Spacing="3">
-    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+<section class="workspace">
+    <header class="workspace-header">
         <div>
-            <MudText Typo="Typo.overline" Color="Color.Secondary">SQLite memory store</MudText>
-            <MudText Typo="Typo.h4">Memories</MudText>
+            <p class="eyebrow">SQLite memory store</p>
+            <h1>Memories</h1>
         </div>
-        <MudTextField T="string"
-                      @bind-Value="SearchText"
-                      Placeholder="Search memories"
-                      Variant="Variant.Outlined"
-                      Adornment="Adornment.Start"
-                      AdornmentIcon="@Icons.Material.Filled.Search"
-                      Immediate="true"
-                      TextChanged="SearchMemories" />
-    </MudStack>
+        <div class="toolbar">
+            <input @bind="UiState.MemorySearchText" @bind:event="oninput" @onkeyup="LoadMemories" placeholder="Search memories" />
+            <select @bind="UiState.LifecycleFilter" @bind:after="LoadMemories">
+                @foreach (var lifecycle in Snapshot.Lifecycles)
+                {
+                    <option value="@lifecycle">@lifecycle</option>
+                }
+            </select>
+            <select @bind="UiState.SegmentFilter" @bind:after="LoadMemories">
+                @foreach (var segment in Snapshot.Segments)
+                {
+                    <option value="@segment">@segment</option>
+                }
+            </select>
+            <select @bind="UiState.TierFilter" @bind:after="LoadMemories">
+                @foreach (var tier in Snapshot.Tiers)
+                {
+                    <option value="@tier">@tier</option>
+                }
+            </select>
+        </div>
+    </header>
 
-    <MudPaper Elevation="0" Outlined="true">
-        <MudTable Items="MemoryRows" Dense="true" Hover="true">
-            <HeaderContent>
-                <MudTh>Tier</MudTh>
-                <MudTh>Segment</MudTh>
-                <MudTh>Lifecycle</MudTh>
-                <MudTh>Memory</MudTh>
-                <MudTh>Score</MudTh>
-            </HeaderContent>
-            <RowTemplate>
-                <MudTd DataLabel="Tier">
-                    <MudChip T="string" Color="Color.Primary" Size="Size.Small">@context.Tier</MudChip>
-                </MudTd>
-                <MudTd DataLabel="Segment">@context.Segment</MudTd>
-                <MudTd DataLabel="Lifecycle">@context.Lifecycle</MudTd>
-                <MudTd DataLabel="Memory">@context.Text</MudTd>
-                <MudTd DataLabel="Score">@context.Score</MudTd>
-            </RowTemplate>
-        </MudTable>
-    </MudPaper>
-</MudStack>
+    <section class="manual-write">
+        <textarea @bind="NewMemoryText" placeholder="Manual memory"></textarea>
+        <select @bind="NewMemoryTier">
+            @foreach (var tier in Enum.GetValues<MemoryTier>())
+            {
+                <option value="@tier">@tier</option>
+            }
+        </select>
+        <select @bind="NewMemorySegment">
+            @foreach (var segment in Enum.GetValues<MemorySegment>())
+            {
+                <option value="@segment">@segment</option>
+            }
+        </select>
+        <button @onclick="WriteMemory" disabled="@string.IsNullOrWhiteSpace(NewMemoryText)">Write</button>
+    </section>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Lifecycle</th>
+                    <th>Tier</th>
+                    <th>Segment</th>
+                    <th>Memory</th>
+                    <th>Score</th>
+                    <th>Access</th>
+                    <th>Source</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Snapshot.Memories.Count == 0)
+                {
+                    <tr>
+                        <td colspan="8" class="empty-cell">No memories match the current filters.</td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var memory in Snapshot.Memories)
+                    {
+                        <tr class="@(memory.HasDuplicateText ? "has-duplicate" : null)">
+                            <td><span class="pill">@memory.Lifecycle</span></td>
+                            <td>@memory.Tier</td>
+                            <td>@memory.Segment</td>
+                            <td>
+                                <strong>@memory.Text</strong>
+                                @if (memory.HasDuplicateText)
+                                {
+                                    <small>duplicate text</small>
+                                }
+                            </td>
+                            <td>@memory.Importance.ToString("0.##") / @memory.Confidence.ToString("0.##")</td>
+                            <td>@memory.AccessCount / @(memory.LastAccessedAt?.ToLocalTime().ToString("HH:mm") ?? "never")</td>
+                            <td class="mono">@((memory.SourceMessageId ?? string.Empty))</td>
+                            <td>
+                                <div class="button-row">
+                                    <button @onclick="() => UpdateLifecycle(memory.Id, MemoryLifecycle.Archived)" disabled="@(memory.Lifecycle == MemoryLifecycle.Archived.ToString())">Archive</button>
+                                    <button @onclick="() => UpdateLifecycle(memory.Id, MemoryLifecycle.Active)" disabled="@(memory.Lifecycle == MemoryLifecycle.Active.ToString())">Restore</button>
+                                    <button class="danger" @onclick="() => DeleteMemory(memory.Id)">Delete</button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
 
 @code {
-    private IReadOnlyList<MemoryRow> MemoryRows { get; set; } = [];
+    private MemoryWorkspaceSnapshot Snapshot { get; set; } = new([], ["All", "Active", "Archived", "Pruned"], ["All"], ["All"]);
 
-    private string SearchText { get; set; } = string.Empty;
+    private string NewMemoryText { get; set; } = string.Empty;
+
+    private MemoryTier NewMemoryTier { get; set; } = MemoryTier.Long;
+
+    private MemorySegment NewMemorySegment { get; set; } = MemorySegment.Context;
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadMemories(string.Empty);
+        await LoadMemories();
     }
 
-    private async Task SearchMemories(string value)
+    private async Task LoadMemories()
     {
-        SearchText = value;
-        await LoadMemories(SearchText);
-    }
-
-    private async Task LoadMemories(string query)
-    {
-        var memories = await MemoryStore.Search(
-            new MemorySearchRequest(
-                query,
-                50,
-                new HashSet<MemoryLifecycle> { MemoryLifecycle.Active },
-                new Dictionary<string, string>()),
+        Snapshot = await MemoryService.Search(
+            new MemorySearchFilter(
+                UiState.MemorySearchText,
+                UiState.LifecycleFilter,
+                UiState.SegmentFilter,
+                UiState.TierFilter),
             CancellationToken.None);
-
-        MemoryRows = memories
-            .Select(x => new MemoryRow(
-                x.Tier.ToString(),
-                x.Segment.ToString(),
-                x.Lifecycle.ToString(),
-                x.Text,
-                $"{x.Importance:0.##}/{x.Confidence:0.##}"))
-            .ToArray();
     }
 
-    private sealed record MemoryRow(string Tier, string Segment, string Lifecycle, string Text, string Score);
+    private async Task WriteMemory()
+    {
+        if (string.IsNullOrWhiteSpace(NewMemoryText))
+        {
+            return;
+        }
+
+        await MemoryService.Write(
+            new MemoryWriteDto(NewMemoryText, NewMemoryTier, NewMemorySegment, 0.7, 0.9),
+            CancellationToken.None);
+        NewMemoryText = string.Empty;
+        await LoadMemories();
+    }
+
+    private async Task UpdateLifecycle(string id, MemoryLifecycle lifecycle)
+    {
+        await MemoryService.UpdateLifecycle(id, new MemoryLifecycleUpdateDto(lifecycle), CancellationToken.None);
+        await LoadMemories();
+    }
+
+    private async Task DeleteMemory(string id)
+    {
+        await MemoryService.Delete(id, CancellationToken.None);
+        await LoadMemories();
+    }
 }

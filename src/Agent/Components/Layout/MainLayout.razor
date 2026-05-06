@@ -1,46 +1,39 @@
 @inherits LayoutComponentBase
 
-<MudThemeProvider />
-<MudPopoverProvider />
-<MudDialogProvider />
-<MudSnackbarProvider />
+<div class="app-shell">
+    <aside class="left-rail" aria-label="Main navigation">
+        <a class="brand-mark" href="/" title="Agent">A</a>
+        <nav class="rail-nav">
+            <NavLink href="/" Match="NavLinkMatch.All" class="rail-link" title="Chat">
+                <span aria-hidden="true">C</span>
+                <span>Chat</span>
+            </NavLink>
+            <NavLink href="/memories" class="rail-link" title="Memories">
+                <span aria-hidden="true">M</span>
+                <span>Memories</span>
+            </NavLink>
+            <NavLink href="/runs" class="rail-link" title="Runs">
+                <span aria-hidden="true">R</span>
+                <span>Runs</span>
+            </NavLink>
+            <NavLink href="/graph" class="rail-link" title="Graph">
+                <span aria-hidden="true">G</span>
+                <span>Graph</span>
+            </NavLink>
+            <NavLink href="/settings" class="rail-link" title="Settings">
+                <span aria-hidden="true">S</span>
+                <span>Settings</span>
+            </NavLink>
+        </nav>
+    </aside>
 
-<MudLayout>
-    <MudAppBar Elevation="1" Dense="true">
-        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="ToggleDrawer" />
-        <MudText Typo="Typo.h6">Agent</MudText>
-        <MudSpacer />
-        <MudChip T="string" Color="Color.Warning" Variant="Variant.Outlined" Size="Size.Small">Providers offline</MudChip>
-    </MudAppBar>
-
-    <MudDrawer @bind-Open="DrawerOpen" Variant="DrawerVariant.Responsive" Elevation="1" ClipMode="DrawerClipMode.Always">
-        <MudNavMenu>
-            <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Chat">Chat</MudNavLink>
-            <MudNavLink Href="/memories" Icon="@Icons.Material.Filled.Storage">Memories</MudNavLink>
-            <MudNavLink Href="/graph" Icon="@Icons.Material.Filled.AccountTree">Graph</MudNavLink>
-            <MudNavLink Href="/events" Icon="@Icons.Material.Filled.Timeline">Events</MudNavLink>
-            <MudNavLink Href="/settings" Icon="@Icons.Material.Filled.Settings">Settings</MudNavLink>
-        </MudNavMenu>
-    </MudDrawer>
-
-    <MudMainContent>
-        <MudContainer MaxWidth="MaxWidth.False" Class="pa-4">
-            @Body
-        </MudContainer>
-    </MudMainContent>
-</MudLayout>
+    <main class="app-main">
+        @Body
+    </main>
+</div>
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
     <a href="." class="reload">Reload</a>
     <span class="dismiss">x</span>
 </div>
-
-@code {
-    private bool DrawerOpen { get; set; } = true;
-
-    private void ToggleDrawer()
-    {
-        DrawerOpen = !DrawerOpen;
-    }
-}

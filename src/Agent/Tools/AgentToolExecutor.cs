@@ -109,6 +109,35 @@ public sealed class AgentToolExecutor(
 
         var tier = GetEnum(request.Arguments.GetValueOrDefault("tier"), MemoryTier.Long);
         var segment = GetEnum(request.Arguments.GetValueOrDefault("segment"), MemorySegment.Context);
+        var existingMemories = await memoryStore.Search(
+            new MemorySearchRequest(
+                content,
+                10,
+                new HashSet<MemoryLifecycle> { MemoryLifecycle.Active },
+                new Dictionary<string, string>
+                {
+                    ["conversationId"] = request.ConversationId,
+                    ["source"] = "write-memory-dedupe"
+                }),
+            cancellationToken);
+        var existingMemory = existingMemories.FirstOrDefault(x => string.Equals(
+            Normalize(x.Text),
+            Normalize(content),
+            StringComparison.OrdinalIgnoreCase));
+
+        if (existingMemory is not null)
+        {
+            return new AgentToolResult(
+                request.Name,
+                true,
+                $"Memory already exists: {existingMemory.Id}",
+                new Dictionary<string, string>
+                {
+                    ["memoryId"] = existingMemory.Id,
+                    ["duplicate"] = "true"
+                });
+        }
+
         var memory = await memoryStore.Write(
             new MemoryWriteRequest(
                 content,
@@ -144,5 +173,14 @@ public sealed class AgentToolExecutor(
         return double.TryParse(value, out var parsed)
             ? parsed
             : fallback;
+    }
+
+    private static string Normalize(string value)
+    {
+        return string.Join(
+            " ",
+            value
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(x => x.Trim('.', ',', ';', ':', '!', '?').ToLowerInvariant()));
     }
 }

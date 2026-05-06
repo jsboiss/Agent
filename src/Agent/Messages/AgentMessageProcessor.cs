@@ -20,9 +20,15 @@ public sealed class AgentMessageProcessor(
     IMemoryScout memoryScout,
     IMemoryExtractor memoryExtractor,
     IMemoryCandidateReviewer memoryCandidateReviewer,
-    IMemoryStore memoryStore) : IMessageProcessor
+    IMemoryStore memoryStore,
+    IAgentEventSink eventSink) : IMessageProcessor
 {
     private static int MaxToolIterations => 3;
+
+    private sealed class EventPublishCursor
+    {
+        public int PublishedCount { get; set; }
+    }
 
     public async Task<MessageResult> Process(MessageRequest request, CancellationToken cancellationToken)
     {
@@ -56,6 +62,8 @@ public sealed class AgentMessageProcessor(
                     ["message"] = request.UserMessage
                 })
         ];
+        var eventCursor = new EventPublishCursor();
+        await PublishPending(events, eventCursor, cancellationToken);
 
         var userEntry = await conversationRepository.AddEntry(
             conversation.Id,
@@ -76,6 +84,7 @@ public sealed class AgentMessageProcessor(
                 ["queueKind"] = queueKind.ToString(),
                 ["message"] = request.UserMessage
             }));
+        await PublishPending(events, eventCursor, cancellationToken);
 
         if (!started)
         {
@@ -96,11 +105,14 @@ public sealed class AgentMessageProcessor(
                     ["ConversationEntryId"] = userEntry.Id,
                     ["message"] = "Message queued while conversation is active."
                 }));
+            await PublishPending(events, eventCursor, cancellationToken);
 
-            return new MessageResult(
+            return await Complete(
                 conversation.Id,
                 string.Empty,
                 events,
+                eventCursor,
+                cancellationToken,
                 queueKind,
                 true);
         }
@@ -116,6 +128,7 @@ public sealed class AgentMessageProcessor(
             userEntry.Id,
             settings,
             events,
+            eventCursor,
             cancellationToken);
 
         var providerRequest = new AgentProviderRequest(
@@ -137,6 +150,7 @@ public sealed class AgentMessageProcessor(
                 request.Channel,
                 userEntry.Id,
                 events,
+                eventCursor,
                 cancellationToken);
 
             if (!string.IsNullOrWhiteSpace(providerResult.AssistantMessage))
@@ -160,6 +174,7 @@ public sealed class AgentMessageProcessor(
                         ["ParentEntryId"] = userEntry.Id,
                         ["message"] = providerResult.AssistantMessage
                     }));
+                await PublishPending(events, eventCursor, cancellationToken);
 
                 await ExtractMemories(
                     conversation.Id,
@@ -168,18 +183,52 @@ public sealed class AgentMessageProcessor(
                     memoryScoutResult.Memories,
                     settings,
                     events,
+                    eventCursor,
                     cancellationToken);
             }
 
-            return new MessageResult(
+            return await Complete(
                 conversation.Id,
                 providerResult.AssistantMessage,
                 events,
+                eventCursor,
+                cancellationToken,
                 queueKind);
         }
         finally
         {
             promptQueue.Complete(conversation.Id);
+        }
+    }
+
+    private async Task<MessageResult> Complete(
+        string conversationId,
+        string assistantMessage,
+        IReadOnlyList<AgentEvent> events,
+        EventPublishCursor eventCursor,
+        CancellationToken cancellationToken,
+        QueuedMessageKind queueKind,
+        bool queued = false)
+    {
+        await PublishPending(events, eventCursor, cancellationToken);
+
+        return new MessageResult(
+            conversationId,
+            assistantMessage,
+            events,
+            queueKind,
+            queued);
+    }
+
+    private async Task PublishPending(
+        IReadOnlyList<AgentEvent> events,
+        EventPublishCursor eventCursor,
+        CancellationToken cancellationToken)
+    {
+        while (eventCursor.PublishedCount < events.Count)
+        {
+            await eventSink.Publish(events[eventCursor.PublishedCount], cancellationToken);
+            eventCursor.PublishedCount++;
         }
     }
 
@@ -189,22 +238,28 @@ public sealed class AgentMessageProcessor(
         string channel,
         string userEntryId,
         List<AgentEvent> events,
+        EventPublishCursor eventCursor,
         CancellationToken cancellationToken)
     {
         var providerRequest = initialRequest;
         AgentProviderResult? providerResult = null;
         List<AgentProviderToolCall> priorToolCalls = [];
         List<AgentProviderToolResult> providerToolResults = [];
+        HashSet<string> executedToolKeys = new(StringComparer.OrdinalIgnoreCase);
 
         for (var iteration = 1; iteration <= MaxToolIterations; iteration++)
         {
             events.Add(GetProviderRequestStartedEvent(providerRequest, channel, userEntryId, iteration));
+            await PublishPending(events, eventCursor, cancellationToken);
             providerResult = await provider.Send(providerRequest, cancellationToken);
             AddProviderEvents(providerResult, providerRequest, userEntryId, iteration, events);
+            await PublishPending(events, eventCursor, cancellationToken);
 
             if (providerResult.ToolCalls.Count == 0)
             {
-                return providerResult;
+                return string.IsNullOrWhiteSpace(providerResult.AssistantMessage)
+                    ? providerResult with { AssistantMessage = GetToolLoopFallback(providerToolResults) }
+                    : providerResult;
             }
 
             var toolResults = await ExecuteToolCalls(
@@ -212,7 +267,9 @@ public sealed class AgentMessageProcessor(
                 providerRequest.ConversationId,
                 channel,
                 userEntryId,
+                executedToolKeys,
                 events,
+                eventCursor,
                 cancellationToken);
 
             priorToolCalls.AddRange(providerResult.ToolCalls);
@@ -230,7 +287,7 @@ public sealed class AgentMessageProcessor(
             : providerResult with
             {
                 AssistantMessage = string.IsNullOrWhiteSpace(providerResult.AssistantMessage)
-                    ? "Tool loop stopped after the maximum number of iterations."
+                    ? GetToolLoopFallback(providerToolResults)
                     : providerResult.AssistantMessage
             };
     }
@@ -242,6 +299,7 @@ public sealed class AgentMessageProcessor(
         IReadOnlyList<MemoryRecord> injectedMemories,
         AgentSettings settings,
         List<AgentEvent> events,
+        EventPublishCursor eventCursor,
         CancellationToken cancellationToken)
     {
         if (string.Equals(settings.Get("memory.enabled"), "false", StringComparison.OrdinalIgnoreCase))
@@ -263,6 +321,7 @@ public sealed class AgentMessageProcessor(
                 ["mode"] = settings.Get("memory.extraction.mode") ?? string.Empty,
                 ["provider"] = settings.Get("memory.extraction.provider") ?? string.Empty
             }));
+        await PublishPending(events, eventCursor, cancellationToken);
         var extraction = await memoryExtractor.Extract(
             new MemoryExtractionRequest(
                 conversationId,
@@ -311,6 +370,7 @@ public sealed class AgentMessageProcessor(
                     ["reviewScore"] = review.Score.ToString("0.###"),
                     ["text"] = memory.Text
                 }));
+            await PublishPending(events, eventCursor, cancellationToken);
         }
 
         events.Add(GetEvent(
@@ -325,6 +385,7 @@ public sealed class AgentMessageProcessor(
                 ["reviewedCount"] = reviewResult.Reviews.Count.ToString(),
                 ["reviewSummary"] = string.Join("; ", reviewResult.Reviews.Select(x => $"{x.Score:0.##}:{x.Reason}"))
             }));
+        await PublishPending(events, eventCursor, cancellationToken);
     }
 
     private async Task<MemoryScoutResult> PrefetchMemory(
@@ -333,6 +394,7 @@ public sealed class AgentMessageProcessor(
         string userEntryId,
         AgentSettings settings,
         List<AgentEvent> events,
+        EventPublishCursor eventCursor,
         CancellationToken cancellationToken)
     {
         if (string.Equals(settings.Get("memory.enabled"), "false", StringComparison.OrdinalIgnoreCase))
@@ -348,6 +410,7 @@ public sealed class AgentMessageProcessor(
                 ["ConversationEntryId"] = userEntryId,
                 ["channel"] = request.Channel
             }));
+        await PublishPending(events, eventCursor, cancellationToken);
         var result = await memoryScout.Prefetch(
             new MemoryScoutRequest(
                 conversationId,
@@ -368,6 +431,7 @@ public sealed class AgentMessageProcessor(
                 ["memoryCount"] = result.Memories.Count.ToString(),
                 ["isMemoryRelevant"] = result.IsMemoryRelevant.ToString()
             }));
+        await PublishPending(events, eventCursor, cancellationToken);
 
         if (result.IsMemoryRelevant)
         {
@@ -379,6 +443,7 @@ public sealed class AgentMessageProcessor(
                     ["ConversationEntryId"] = userEntryId,
                     ["memoryIds"] = string.Join(",", result.Memories.Select(x => x.Id))
                 }));
+            await PublishPending(events, eventCursor, cancellationToken);
         }
 
         return result;
@@ -389,13 +454,17 @@ public sealed class AgentMessageProcessor(
         string conversationId,
         string channel,
         string userEntryId,
+        ISet<string> executedToolKeys,
         List<AgentEvent> events,
+        EventPublishCursor eventCursor,
         CancellationToken cancellationToken)
     {
         List<AgentProviderToolResult> results = [];
 
         foreach (var toolCall in toolCalls)
         {
+            var toolKey = GetToolKey(toolCall);
+
             events.Add(GetEvent(
                 AgentEventKind.ToolCallStarted,
                 conversationId,
@@ -405,14 +474,32 @@ public sealed class AgentMessageProcessor(
                     ["toolName"] = toolCall.Name,
                     ["ConversationEntryId"] = userEntryId
                 }));
+            await PublishPending(events, eventCursor, cancellationToken);
 
-            var toolResult = await toolExecutor.Execute(
-                new AgentToolRequest(
+            AgentToolResult toolResult;
+
+            if (!executedToolKeys.Add(toolKey))
+            {
+                toolResult = new AgentToolResult(
                     toolCall.Name,
-                    toolCall.Arguments,
-                    conversationId,
-                    channel),
-                cancellationToken);
+                    false,
+                    $"Skipped duplicate tool call '{toolCall.Name}' in the same turn.",
+                    new Dictionary<string, string>
+                    {
+                        ["duplicate"] = "true"
+                    });
+            }
+            else
+            {
+                toolResult = await toolExecutor.Execute(
+                    new AgentToolRequest(
+                        toolCall.Name,
+                        toolCall.Arguments,
+                        conversationId,
+                        channel),
+                    cancellationToken);
+            }
+
             var toolEntry = await conversationRepository.AddEntry(
                 conversationId,
                 ConversationEntryRole.Tool,
@@ -442,6 +529,7 @@ public sealed class AgentMessageProcessor(
                     ["ConversationEntryId"] = toolEntry.Id,
                     ["succeeded"] = toolResult.Succeeded.ToString()
                 }));
+            await PublishPending(events, eventCursor, cancellationToken);
 
             results.Add(new AgentProviderToolResult(
                 toolCall.Id,
@@ -450,6 +538,33 @@ public sealed class AgentMessageProcessor(
         }
 
         return results;
+    }
+
+    private static string GetToolLoopFallback(IReadOnlyList<AgentProviderToolResult> toolResults)
+    {
+        if (toolResults.Count == 0)
+        {
+            return "Ollama returned no assistant message.";
+        }
+
+        if (toolResults.All(x => string.Equals(x.Name, "write_memory", StringComparison.OrdinalIgnoreCase)))
+        {
+            return toolResults.Any(x => x.Content.StartsWith("Memory already exists", StringComparison.OrdinalIgnoreCase))
+                ? "That memory is already saved."
+                : "I've saved that to memory.";
+        }
+
+        return string.Join(Environment.NewLine, toolResults.Select(x => x.Content));
+    }
+
+    private static string GetToolKey(AgentProviderToolCall toolCall)
+    {
+        return toolCall.Name + ":"
+            + string.Join(
+                "|",
+                toolCall.Arguments
+                    .OrderBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
+                    .Select(x => $"{x.Key}={x.Value}"));
     }
 
     private static AgentEvent GetProviderRequestStartedEvent(
