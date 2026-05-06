@@ -990,6 +990,9 @@ public sealed class AgentMessageProcessor(
                 return null;
             }
 
+            var capabilities = node?["capabilities"]?.GetValue<string>();
+            var requiresConfirmation = node?["requiresConfirmation"]?.GetValue<bool?>();
+
             return new AgentProviderToolCall(
                 $"delegate-{Guid.NewGuid():N}",
                 "spawn_agent",
@@ -997,8 +1000,8 @@ public sealed class AgentMessageProcessor(
                 {
                     ["task"] = task,
                     ["parentEntryId"] = userEntryId,
-                    ["capabilities"] = "ReadOnly,Code",
-                    ["requiresConfirmation"] = "true"
+                    ["capabilities"] = string.IsNullOrWhiteSpace(capabilities) ? "ReadOnly,Code" : capabilities,
+                    ["requiresConfirmation"] = (requiresConfirmation ?? true).ToString()
                 });
         }
         catch (JsonException)

@@ -141,7 +141,10 @@ public sealed record MemoryGraphSnapshot(
 public sealed record SettingsDashboardSnapshot(
     IReadOnlyDictionary<string, string> Values,
     IReadOnlyList<string> AppliedLayers,
-    string MemoryConnectionString);
+    string MemoryConnectionString,
+    WorkspaceStatus Workspace);
+
+public sealed record WorkspacePermissionUpdateDto(bool RemoteExecutionAllowed);
 
 public sealed record ManualCompactionResponse(
     string ConversationId,
@@ -264,6 +267,10 @@ public interface IMemoryGraphService
 public interface ISettingsDashboardService
 {
     Task<SettingsDashboardSnapshot> Load(CancellationToken cancellationToken);
+
+    Task<WorkspaceStatus> UpdateWorkspacePermissions(
+        WorkspacePermissionUpdateDto request,
+        CancellationToken cancellationToken);
 }
 
 public interface ICompactionDashboardService

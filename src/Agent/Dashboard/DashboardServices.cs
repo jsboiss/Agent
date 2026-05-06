@@ -712,10 +712,15 @@ public sealed class MemoryGraphService(IMemoryStore memoryStore) : IMemoryGraphS
 
 public sealed class SettingsDashboardService(
     IAgentSettingsResolver settingsResolver,
-    IOptions<SqliteMemoryOptions> memoryOptions) : ISettingsDashboardService
+    IOptions<SqliteMemoryOptions> memoryOptions,
+    IAgentWorkspaceStore workspaceStore,
+    IWebHostEnvironment environment) : ISettingsDashboardService
 {
     public async Task<SettingsDashboardSnapshot> Load(CancellationToken cancellationToken)
     {
+        var workspaceResolution = await workspaceStore.GetOrCreateActive(
+            GetWorkspaceRootPath(environment.ContentRootPath),
+            cancellationToken);
         var settings = await settingsResolver.Resolve(
             new AgentSettingsResolveRequest(
                 new Conversation(
@@ -726,14 +731,56 @@ public sealed class SettingsDashboardService(
                     DateTimeOffset.UtcNow,
                     DateTimeOffset.UtcNow),
                 "local-web",
-                Directory.GetCurrentDirectory(),
+                workspaceResolution.Workspace.RootPath,
                 new Dictionary<string, string>()),
             cancellationToken);
 
         return new SettingsDashboardSnapshot(
             settings.Values,
             settings.AppliedLayers,
-            memoryOptions.Value.ConnectionString);
+            memoryOptions.Value.ConnectionString,
+            ToStatus(workspaceResolution.Workspace, null));
+    }
+
+    public async Task<WorkspaceStatus> UpdateWorkspacePermissions(
+        WorkspacePermissionUpdateDto request,
+        CancellationToken cancellationToken)
+    {
+        var workspaceResolution = await workspaceStore.GetOrCreateActive(
+            GetWorkspaceRootPath(environment.ContentRootPath),
+            cancellationToken);
+        var workspace = await workspaceStore.SetRemoteExecutionAllowed(
+            workspaceResolution.Workspace.Id,
+            request.RemoteExecutionAllowed,
+            cancellationToken);
+
+        return ToStatus(workspace, null);
+    }
+
+    private static WorkspaceStatus ToStatus(AgentWorkspace workspace, AgentRun? activeRun)
+    {
+        return new WorkspaceStatus(
+            workspace.Id,
+            workspace.Name,
+            workspace.RootPath,
+            workspace.ChatThreadId,
+            workspace.WorkThreadId,
+            workspace.ActiveRunId,
+            workspace.RemoteExecutionAllowed,
+            activeRun?.Status.ToString(),
+            activeRun?.Kind.ToString());
+    }
+
+    private static string GetWorkspaceRootPath(string contentRootPath)
+    {
+        var directory = new DirectoryInfo(contentRootPath);
+
+        if (directory.Parent is not null && directory.Parent.Name.Equals("src", StringComparison.OrdinalIgnoreCase))
+        {
+            return directory.Parent.Parent?.FullName ?? directory.FullName;
+        }
+
+        return directory.FullName;
     }
 }
 

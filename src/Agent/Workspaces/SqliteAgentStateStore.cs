@@ -117,6 +117,30 @@ public sealed class SqliteAgentStateStore(IOptions<SqliteAgentStateOptions> opti
             ?? throw new InvalidOperationException($"Workspace '{workspaceId}' was not found.");
     }
 
+    public async Task<AgentWorkspace> SetRemoteExecutionAllowed(
+        string workspaceId,
+        bool allowed,
+        CancellationToken cancellationToken)
+    {
+        await EnsureDatabase(cancellationToken);
+
+        await using var connection = await Open(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE AgentWorkspaces
+            SET RemoteExecutionAllowed = $allowed,
+                UpdatedAt = $updatedAt
+            WHERE Id = $workspaceId;
+            """;
+        command.Parameters.AddWithValue("$allowed", allowed ? 1 : 0);
+        command.Parameters.AddWithValue("$updatedAt", DateTimeOffset.UtcNow.ToString("O"));
+        command.Parameters.AddWithValue("$workspaceId", workspaceId);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+
+        return await GetWorkspace(connection, workspaceId, cancellationToken)
+            ?? throw new InvalidOperationException($"Workspace '{workspaceId}' was not found.");
+    }
+
     public async Task<IReadOnlyList<AgentWorkspace>> List(CancellationToken cancellationToken)
     {
         await EnsureDatabase(cancellationToken);

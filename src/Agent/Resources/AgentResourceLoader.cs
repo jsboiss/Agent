@@ -71,7 +71,7 @@ public sealed class AgentResourceLoader(
             "The stored memory record id and metadata."),
         new AgentToolDefinition(
             "spawn_agent",
-            "Create a child sub-agent conversation for delegated work. Use this for code, file, web, slow, or risky work.",
+            "Create a child sub-agent conversation for delegated work. Use this for code, file, web, shell, app/program launching, slow, or risky work.",
             """
             {
               "type": "object",
@@ -280,7 +280,8 @@ public sealed class AgentResourceLoader(
         return """
             You are the dispatcher for the MainAgent harness.
             Answer quick control, memory, status, and conversational turns directly.
-            For code changes, file changes, web research, slow work, automations, or risky actions, call send_ack first when useful, then spawn_agent with a crisp self-contained task.
+            For code changes, file changes, web research, slow work, automations, app/program launching, shell commands, or risky actions, call send_ack first when useful, then spawn_agent with a crisp self-contained task.
+            When the user asks to open, start, or launch a local app or program, treat it as an external action and delegate to a sub-agent with ExternalActions capability so it can use the shell, for example Windows Start-Process.
             Mobile-originated risky actions must be staged or proposed and require confirmation before mutation.
             Keep outputs concise unless more detail is requested.
             """;

@@ -19,6 +19,11 @@ public interface IAgentWorkspaceStore
         string threadId,
         CancellationToken cancellationToken);
 
+    Task<AgentWorkspace> SetRemoteExecutionAllowed(
+        string workspaceId,
+        bool allowed,
+        CancellationToken cancellationToken);
+
     Task<IReadOnlyList<AgentWorkspace>> List(CancellationToken cancellationToken);
 }
 

@@ -1,17 +1,31 @@
 import { useState } from "react";
-import { Copy, DatabaseZap, Sparkles, Trash2 } from "lucide-react";
+import { Copy, DatabaseZap, ShieldCheck, ShieldOff, Sparkles, Trash2 } from "lucide-react";
 import { useGetSettings } from "../../api/generated";
 import { ErrorState, IconButton, LoadingState, PageFrame, Panel } from "../components";
+
+type WorkspaceSettings = {
+  id: string;
+  name: string;
+  rootPath: string;
+  remoteExecutionAllowed: boolean;
+};
+
+type SettingsSnapshotWithWorkspace = {
+  workspace?: WorkspaceSettings;
+};
 
 export function SettingsPage() {
   const settingsQuery = useGetSettings();
   const snapshot = settingsQuery.data?.data;
+  const workspace = (snapshot as (typeof snapshot & SettingsSnapshotWithWorkspace) | undefined)?.workspace;
   const values = snapshot?.values ?? {};
   const appliedLayers = snapshot?.appliedLayers ?? [];
   const [isCompacting, setIsCompacting] = useState(false);
   const [compactionResult, setCompactionResult] = useState<string | null>(null);
   const [compactionError, setCompactionError] = useState<string | null>(null);
   const [maintenanceResult, setMaintenanceResult] = useState<string | null>(null);
+  const [workspaceError, setWorkspaceError] = useState<string | null>(null);
+  const [isUpdatingWorkspace, setIsUpdatingWorkspace] = useState(false);
 
   async function compactMain() {
     setIsCompacting(true);
@@ -72,6 +86,29 @@ export function SettingsPage() {
     setMaintenanceResult(`${result.summary} Scanned ${result.scanned}; archived ${result.archived}; pruned ${result.pruned}; merged ${result.merged}; superseded ${result.superseded}.`);
   }
 
+  async function updateWorkspacePermissions(remoteExecutionAllowed: boolean) {
+    setIsUpdatingWorkspace(true);
+    setWorkspaceError(null);
+
+    try {
+      const response = await fetch("/api/dashboard/settings/workspace-permissions", {
+        body: JSON.stringify({ remoteExecutionAllowed }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST"
+      });
+
+      if (!response.ok) {
+        throw new Error(`Workspace permission update failed: ${response.status}`);
+      }
+
+      await settingsQuery.refetch();
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsUpdatingWorkspace(false);
+    }
+  }
+
   return (
     <PageFrame
       eyebrow="Read-only configuration"
@@ -88,8 +125,39 @@ export function SettingsPage() {
       {compactionResult && <p className="muted">{compactionResult}</p>}
       {maintenanceResult && <p className="muted">{maintenanceResult}</p>}
       {compactionError && <ErrorState error={new Error(compactionError)} />}
+      {workspaceError && <ErrorState error={new Error(workspaceError)} />}
       {snapshot && (
         <div className="settings-grid">
+          {workspace && (
+            <Panel title="Workspace">
+              <dl className="settings-list">
+                <div className="settings-row">
+                  <dt>Project</dt>
+                  <dd>
+                    <code>{workspace.name}</code>
+                    <IconButton onClick={() => navigator.clipboard.writeText(workspace.rootPath)} title="Copy workspace path" type="button">
+                      <Copy size={13} />
+                    </IconButton>
+                  </dd>
+                </div>
+                <div className="settings-row">
+                  <dt>Remote execution</dt>
+                  <dd>
+                    <code>{workspace.remoteExecutionAllowed ? "enabled" : "disabled"}</code>
+                    <button
+                      className="secondary-action"
+                      disabled={isUpdatingWorkspace}
+                      onClick={() => void updateWorkspacePermissions(!workspace.remoteExecutionAllowed)}
+                      type="button"
+                    >
+                      {workspace.remoteExecutionAllowed ? <ShieldOff size={14} /> : <ShieldCheck size={14} />}
+                      {workspace.remoteExecutionAllowed ? "Disable" : "Enable"}
+                    </button>
+                  </dd>
+                </div>
+              </dl>
+            </Panel>
+          )}
           <SettingsPanel
             title="Provider"
             rows={[
