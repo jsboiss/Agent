@@ -4,7 +4,8 @@ namespace Agent.Compaction;
 
 public sealed class RollingConversationCompactor(
     IConversationRepository conversationRepository,
-    IConversationSummaryStore summaryStore) : IConversationCompactor
+    IConversationSummaryStore summaryStore,
+    ICompactionMemoryExtractor compactionMemoryExtractor) : IConversationCompactor
 {
     private static int SummaryTokenBudget => 1200;
 
@@ -23,19 +24,63 @@ public sealed class RollingConversationCompactor(
         {
             if (existingSummary is not null)
             {
-                return new ConversationCompactionResult(existingSummary, entries.Count);
+                var forcedExtractionEntries = GetForcedExtractionEntries(request, entries);
+                var forcedExtraction = await ExtractMemories(request, forcedExtractionEntries, cancellationToken);
+
+                return new ConversationCompactionResult(
+                    existingSummary,
+                    entries.Count,
+                    0,
+                    forcedExtractionEntries.Length,
+                    forcedExtraction.ProposedCount,
+                    forcedExtraction.WrittenCount,
+                    forcedExtraction.SkippedCount);
             }
         }
 
         var content = GetSummaryContent(request.Conversation, existingSummary, compactedEntries);
         var throughEntryId = compactedEntries.LastOrDefault()?.Id;
+        var extraction = await ExtractMemories(request, compactedEntries, cancellationToken);
+
         var summary = await summaryStore.Upsert(
             request.Conversation.Id,
             content,
             throughEntryId,
             cancellationToken);
 
-        return new ConversationCompactionResult(summary, entries.Count);
+        return new ConversationCompactionResult(
+            summary,
+            entries.Count,
+            compactedEntries.Length,
+            compactedEntries.Length,
+            extraction.ProposedCount,
+            extraction.WrittenCount,
+            extraction.SkippedCount);
+    }
+
+    private async Task<CompactionMemoryExtractionResult> ExtractMemories(
+        ConversationCompactionRequest request,
+        IReadOnlyList<ConversationEntry> entries,
+        CancellationToken cancellationToken)
+    {
+        if (entries.Count == 0)
+        {
+            return CompactionMemoryExtractionResult.Empty;
+        }
+
+        try
+        {
+            return await compactionMemoryExtractor.Extract(
+                request.Conversation,
+                entries,
+                request.Settings,
+                cancellationToken);
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Memory extraction is opportunistic; summary compaction must still complete.
+            return CompactionMemoryExtractionResult.Empty;
+        }
     }
 
     private static string GetSummaryContent(
@@ -77,6 +122,20 @@ public sealed class RollingConversationCompactor(
         return value.Length <= length
             ? value
             : value[..length] + "...";
+    }
+
+    private static ConversationEntry[] GetForcedExtractionEntries(
+        ConversationCompactionRequest request,
+        IReadOnlyList<ConversationEntry> entries)
+    {
+        if (!request.ForceMemoryExtraction)
+        {
+            return [];
+        }
+
+        return entries
+            .Take(Math.Max(0, entries.Count - request.RecentEntryCount))
+            .ToArray();
     }
 
     private static bool IsAfterSummary(

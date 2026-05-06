@@ -143,6 +143,17 @@ public sealed record SettingsDashboardSnapshot(
     IReadOnlyList<string> AppliedLayers,
     string MemoryConnectionString);
 
+public sealed record ManualCompactionResponse(
+    string ConversationId,
+    string? ThroughEntryId,
+    int ExactEntryCount,
+    int NewlyCompactedEntryCount,
+    int MemoryExtractionEntryCount,
+    int ProposedMemoryCount,
+    int WrittenMemoryCount,
+    int SkippedMemoryCount,
+    DateTimeOffset UpdatedAt);
+
 public interface IChatDashboardService
 {
     Task<ChatDashboardSnapshot> LoadMain(CancellationToken cancellationToken);
@@ -198,4 +209,9 @@ public interface IMemoryGraphService
 public interface ISettingsDashboardService
 {
     Task<SettingsDashboardSnapshot> Load(CancellationToken cancellationToken);
+}
+
+public interface ICompactionDashboardService
+{
+    Task<ManualCompactionResponse> CompactMain(CancellationToken cancellationToken);
 }

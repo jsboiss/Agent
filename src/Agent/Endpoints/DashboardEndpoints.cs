@@ -9,6 +9,16 @@ public static class DashboardEndpoints
         var group = endpoints.MapGroup("/api/dashboard")
             .WithTags("Dashboard");
 
+        endpoints.MapGet(
+            "/api/health",
+            () => Results.Ok(new
+            {
+                status = "ok",
+                service = "MainAgent",
+                timestamp = DateTimeOffset.UtcNow
+            }))
+            .WithName("GetApiHealth");
+
         group.MapGet(
             "/chat/main",
             async (IChatDashboardService service, CancellationToken cancellationToken) =>
@@ -82,6 +92,11 @@ public static class DashboardEndpoints
             async (ISettingsDashboardService service, CancellationToken cancellationToken) =>
                 await service.Load(cancellationToken))
             .WithName("GetSettings");
+        group.MapPost(
+            "/compaction/main",
+            async (ICompactionDashboardService service, CancellationToken cancellationToken) =>
+                await service.CompactMain(cancellationToken))
+            .WithName("CompactMainConversation");
 
         return endpoints;
     }

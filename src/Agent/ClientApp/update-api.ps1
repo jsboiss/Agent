@@ -52,7 +52,7 @@ try {
         $env:OPENAPI_URL = $openApiUrl
         npm run generate-api
         npm run typecheck
-        npm run build
+        npx vite build
     }
     finally {
         Pop-Location
