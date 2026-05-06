@@ -318,8 +318,8 @@ public sealed class SqliteMemoryStore(IOptions<SqliteMemoryOptions> options) : I
     {
         var terms = query
             .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(x => x.Trim('"', '\'', '.', ',', ';', ':', '!', '?', '(', ')', '[', ']'))
-            .Where(x => x.Length >= 2)
+            .Select(x => x.Trim('"', '\'', '.', ',', ';', ':', '!', '?', '(', ')', '[', ']', '{', '}'))
+            .Where(x => x.Length >= 3 && !MemorySearchStopWords.Contains(x))
             .Select(x => $"\"{x.Replace("\"", "\"\"")}\"")
             .ToArray();
 
@@ -327,4 +327,68 @@ public sealed class SqliteMemoryStore(IOptions<SqliteMemoryOptions> options) : I
             ? string.Empty
             : string.Join(" OR ", terms);
     }
+
+    private static ISet<string> MemorySearchStopWords { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "about",
+        "after",
+        "again",
+        "also",
+        "and",
+        "are",
+        "because",
+        "been",
+        "before",
+        "being",
+        "between",
+        "can",
+        "could",
+        "does",
+        "doing",
+        "for",
+        "explain",
+        "from",
+        "give",
+        "going",
+        "had",
+        "has",
+        "have",
+        "help",
+        "how",
+        "into",
+        "just",
+        "know",
+        "like",
+        "make",
+        "more",
+        "need",
+        "purpose",
+        "should",
+        "show",
+        "some",
+        "tell",
+        "than",
+        "that",
+        "their",
+        "there",
+        "these",
+        "they",
+        "thing",
+        "this",
+        "those",
+        "what",
+        "when",
+        "where",
+        "which",
+        "while",
+        "who",
+        "why",
+        "with",
+        "would",
+        "was",
+        "were",
+        "yeah",
+        "you",
+        "your"
+    };
 }

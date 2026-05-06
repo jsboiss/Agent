@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using Agent.Compaction;
 using Agent.Conversations;
 using Agent.Events;
 using Agent.Memory;
@@ -15,13 +16,13 @@ namespace Agent.Dashboard;
 
 public sealed class ChatDashboardService(
     IConversationRepository conversationRepository,
+    IConversationSummaryStore summaryStore,
     IMessageProcessor messageProcessor,
     IAgentEventStore eventStore,
     IMemoryStore memoryStore,
     IAgentSettingsResolver settingsResolver,
     IAgentWorkspaceStore workspaceStore,
     IAgentRunStore runStore,
-    IAgentTokenTracker tokenTracker,
     IWebHostEnvironment environment) : IChatDashboardService
 {
     private static readonly MarkdownPipeline MarkdownPipeline = new MarkdownPipelineBuilder()
@@ -172,7 +173,8 @@ public sealed class ChatDashboardService(
             }
         }
 
-        var tokenSummary = TokenUsageDashboardMapper.FromEvents(events, tokenTracker);
+        var rollingSummary = await summaryStore.Get(conversationId, cancellationToken);
+        var tokenSummary = TokenUsageDashboardMapper.FromConversation(entries, rollingSummary, settings);
 
         return new ChatDashboardSnapshot(
             conversationId,
@@ -477,6 +479,35 @@ public sealed class SubAgentDashboardService(
 
 internal static class TokenUsageDashboardMapper
 {
+    private static double CharsPerToken => 4.0;
+
+    public static TokenUsageSummary FromConversation(
+        IReadOnlyList<ConversationEntry> entries,
+        ConversationSummary? summary,
+        AgentSettings settings)
+    {
+        var recentEntryCount = GetSetting(settings, "compaction.recentEntryCount", 8);
+        var contextWindowTokens = GetSetting(settings, "tokens.contextWindow", 200000);
+        var compactionThresholdTokens = GetSetting(settings, "compaction.threshold", 8000);
+        var recentEntries = entries.TakeLast(recentEntryCount).ToArray();
+        var currentContextTokens = Estimate([
+            summary?.Content ?? string.Empty,
+            .. recentEntries.Select(x => $"{x.Role}: {x.Content}")
+        ]);
+        var compactableTokens = Estimate(GetCompactableEntries(entries, summary, recentEntryCount).Select(x => $"{x.Role}: {x.Content}"));
+
+        return new TokenUsageSummary(
+            0,
+            0,
+            currentContextTokens,
+            currentContextTokens,
+            contextWindowTokens,
+            Math.Max(0, contextWindowTokens - currentContextTokens),
+            compactionThresholdTokens,
+            Math.Max(0, compactionThresholdTokens - compactableTokens),
+            "current-context");
+    }
+
     public static TokenUsageSummary FromEvents(
         IReadOnlyList<AgentEvent> events,
         IAgentTokenTracker tokenTracker)
@@ -530,6 +561,55 @@ internal static class TokenUsageDashboardMapper
     private static TokenUsageSummary Empty()
     {
         return new TokenUsageSummary(0, 0, 0, 0, 0, 0, 0, 0, "estimate");
+    }
+
+    private static IReadOnlyList<ConversationEntry> GetCompactableEntries(
+        IReadOnlyList<ConversationEntry> entries,
+        ConversationSummary? summary,
+        int recentEntryCount)
+    {
+        if (string.IsNullOrWhiteSpace(summary?.ThroughEntryId))
+        {
+            return entries
+                .Take(Math.Max(0, entries.Count - recentEntryCount))
+                .ToArray();
+        }
+
+        var summaryIndex = entries
+            .Select((x, y) => new { Entry = x, Index = y })
+            .FirstOrDefault(x => string.Equals(x.Entry.Id, summary.ThroughEntryId, StringComparison.OrdinalIgnoreCase))
+            ?.Index;
+
+        var olderEntries = entries
+            .Select((x, y) => new { Entry = x, Index = y })
+            .Take(Math.Max(0, entries.Count - recentEntryCount))
+            .ToArray();
+
+        return summaryIndex is null
+            ? olderEntries.Select(x => x.Entry).ToArray()
+            : olderEntries
+                .Where(x => x.Index > summaryIndex.Value)
+                .Select(x => x.Entry)
+                .ToArray();
+    }
+
+    private static int Estimate(IEnumerable<string> values)
+    {
+        return values.Sum(Estimate);
+    }
+
+    private static int Estimate(string value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? 0
+            : Math.Max(1, (int)Math.Ceiling(value.Length / CharsPerToken));
+    }
+
+    private static int GetSetting(AgentSettings settings, string key, int fallback)
+    {
+        return int.TryParse(settings.Get(key), out var value) && value > 0
+            ? value
+            : fallback;
     }
 }
 
@@ -650,5 +730,104 @@ public sealed class SettingsDashboardService(
             settings.Values,
             settings.AppliedLayers,
             memoryOptions.Value.ConnectionString);
+    }
+}
+
+public sealed class CompactionDashboardService(
+    IConversationRepository conversationRepository,
+    IConversationCompactor conversationCompactor,
+    IAgentSettingsResolver settingsResolver,
+    IAgentWorkspaceStore workspaceStore,
+    IAgentEventSink eventSink,
+    IWebHostEnvironment environment) : ICompactionDashboardService
+{
+    public async Task<ManualCompactionResponse> CompactMain(CancellationToken cancellationToken)
+    {
+        var conversation = (await conversationRepository.GetOrCreateMain(cancellationToken)).Conversation;
+        var workspaceResolution = await workspaceStore.GetOrCreateActive(
+            GetWorkspaceRootPath(environment.ContentRootPath),
+            cancellationToken);
+        var settings = await settingsResolver.Resolve(
+            new AgentSettingsResolveRequest(
+                conversation,
+                "local-web",
+                workspaceResolution.Workspace.RootPath,
+                new Dictionary<string, string>()),
+            cancellationToken);
+
+        await Publish(
+            AgentEventKind.CompactionStarted,
+            conversation.Id,
+            new Dictionary<string, string>
+            {
+                ["source"] = "manual-dashboard",
+                ["recentEntryCount"] = "0",
+                ["thresholdTokens"] = "0"
+            },
+            cancellationToken);
+
+        var result = await conversationCompactor.Compact(
+            new ConversationCompactionRequest(
+                conversation,
+                0,
+                0,
+                settings.Values,
+                true),
+            cancellationToken);
+
+        await Publish(
+            AgentEventKind.CompactionCompleted,
+            conversation.Id,
+            new Dictionary<string, string>
+            {
+                ["source"] = "manual-dashboard",
+                ["throughEntryId"] = result.Summary.ThroughEntryId ?? string.Empty,
+                ["exactEntryCount"] = result.ExactEntryCount.ToString(),
+                ["newlyCompactedEntryCount"] = result.NewlyCompactedEntryCount.ToString(),
+                ["memoryExtractionEntryCount"] = result.MemoryExtractionEntryCount.ToString(),
+                ["proposedMemoryCount"] = result.ProposedMemoryCount.ToString(),
+                ["writtenMemoryCount"] = result.WrittenMemoryCount.ToString(),
+                ["skippedMemoryCount"] = result.SkippedMemoryCount.ToString()
+            },
+            cancellationToken);
+
+        return new ManualCompactionResponse(
+            result.Summary.ConversationId,
+            result.Summary.ThroughEntryId,
+            result.ExactEntryCount,
+            result.NewlyCompactedEntryCount,
+            result.MemoryExtractionEntryCount,
+            result.ProposedMemoryCount,
+            result.WrittenMemoryCount,
+            result.SkippedMemoryCount,
+            result.Summary.UpdatedAt);
+    }
+
+    private static string GetWorkspaceRootPath(string contentRootPath)
+    {
+        var directory = new DirectoryInfo(contentRootPath);
+
+        if (directory.Parent is not null && directory.Parent.Name.Equals("src", StringComparison.OrdinalIgnoreCase))
+        {
+            return directory.Parent.Parent?.FullName ?? directory.FullName;
+        }
+
+        return directory.FullName;
+    }
+
+    private async Task Publish(
+        AgentEventKind kind,
+        string conversationId,
+        IReadOnlyDictionary<string, string> data,
+        CancellationToken cancellationToken)
+    {
+        await eventSink.Publish(
+            new AgentEvent(
+                Guid.NewGuid().ToString("N"),
+                kind,
+                conversationId,
+                DateTimeOffset.UtcNow,
+                data),
+            cancellationToken);
     }
 }

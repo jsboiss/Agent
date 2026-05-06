@@ -34,10 +34,19 @@ public sealed class ViteDevelopmentFrontendService(
             return;
         }
 
+        var viteEntryPoint = Path.Combine(clientAppPath, "node_modules", "vite", "bin", "vite.js");
+
+        if (!File.Exists(viteEntryPoint))
+        {
+            logger.LogWarning("Vite entrypoint does not exist. Run npm install in {ClientAppPath}. Missing: {ViteEntryPoint}", clientAppPath, viteEntryPoint);
+
+            return;
+        }
+
         var startInfo = new ProcessStartInfo
         {
-            FileName = OperatingSystem.IsWindows() ? "npm.cmd" : "npm",
-            Arguments = "run dev",
+            FileName = "node",
+            Arguments = $"\"{viteEntryPoint}\" --host 127.0.0.1 --port 5173",
             WorkingDirectory = clientAppPath,
             UseShellExecute = false,
             CreateNoWindow = true,
@@ -105,9 +114,18 @@ public sealed class ViteDevelopmentFrontendService(
         try
         {
             using var httpClient = new HttpClient();
-            using var response = await httpClient.GetAsync(Options.Url, cancellationToken);
+            using var response = await httpClient.GetAsync(
+                new Uri(new Uri(Options.Url), "/__mainagent_vite_health"),
+                cancellationToken);
 
-            return response.IsSuccessStatusCode;
+            if (!response.IsSuccessStatusCode)
+            {
+                return false;
+            }
+
+            var contentType = response.Content.Headers.ContentType?.MediaType;
+
+            return string.Equals(contentType, "application/json", StringComparison.OrdinalIgnoreCase);
         }
         catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
         {

@@ -113,7 +113,11 @@ public sealed class AgentResourceLoader(
         if (ShouldCompact(entries, rollingSummary, recentEntryCount, compactionThreshold))
         {
             await conversationCompactor.Compact(
-                new ConversationCompactionRequest(request.Conversation, recentEntryCount, compactionThreshold),
+                new ConversationCompactionRequest(
+                    request.Conversation,
+                    recentEntryCount,
+                    compactionThreshold,
+                    request.Settings.Values),
                 cancellationToken);
             rollingSummary = await summaryStore.Get(request.Conversation.Id, cancellationToken);
         }
@@ -273,22 +277,28 @@ public sealed class AgentResourceLoader(
         ConversationSummary? rollingSummary,
         int recentEntryCount)
     {
-        var olderEntries = entries
-            .Take(Math.Max(0, entries.Count - recentEntryCount))
-            .ToArray();
-
         if (string.IsNullOrWhiteSpace(rollingSummary?.ThroughEntryId))
         {
-            return olderEntries;
+            return entries
+                .Take(Math.Max(0, entries.Count - recentEntryCount))
+                .ToArray();
         }
 
-        var summaryIndex = olderEntries
+        var summaryIndex = entries
             .Select((x, y) => new { Entry = x, Index = y })
             .FirstOrDefault(x => string.Equals(x.Entry.Id, rollingSummary.ThroughEntryId, StringComparison.OrdinalIgnoreCase))
             ?.Index;
 
+        var olderEntries = entries
+            .Select((x, y) => new { Entry = x, Index = y })
+            .Take(Math.Max(0, entries.Count - recentEntryCount))
+            .ToArray();
+
         return summaryIndex is null
-            ? olderEntries
-            : olderEntries.Skip(summaryIndex.Value + 1).ToArray();
+            ? olderEntries.Select(x => x.Entry).ToArray()
+            : olderEntries
+                .Where(x => x.Index > summaryIndex.Value)
+                .Select(x => x.Entry)
+                .ToArray();
     }
 }
