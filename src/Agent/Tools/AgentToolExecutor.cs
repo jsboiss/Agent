@@ -55,7 +55,10 @@ public sealed class AgentToolExecutor(
             new Dictionary<string, string>
             {
                 ["conversationId"] = result.ConversationId,
-                ["resultEntryId"] = result.ResultEntryId
+                ["resultEntryId"] = result.ResultEntryId,
+                ["runId"] = result.RunId ?? string.Empty,
+                ["codexThreadId"] = result.CodexThreadId ?? string.Empty,
+                ["status"] = result.Status
             });
     }
 

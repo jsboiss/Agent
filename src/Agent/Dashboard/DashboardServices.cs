@@ -6,6 +6,7 @@ using Agent.Memory;
 using Agent.Memory.MemoryGraph;
 using Agent.Messages;
 using Agent.Settings;
+using Agent.Workspaces;
 using Markdig;
 using Microsoft.Extensions.Options;
 
@@ -16,7 +17,10 @@ public sealed class ChatDashboardService(
     IMessageProcessor messageProcessor,
     IAgentEventStore eventStore,
     IMemoryStore memoryStore,
-    IAgentSettingsResolver settingsResolver) : IChatDashboardService
+    IAgentSettingsResolver settingsResolver,
+    IAgentWorkspaceStore workspaceStore,
+    IAgentRunStore runStore,
+    IWebHostEnvironment environment) : IChatDashboardService
 {
     private static readonly MarkdownPipeline MarkdownPipeline = new MarkdownPipelineBuilder()
         .UseAdvancedExtensions()
@@ -106,6 +110,12 @@ public sealed class ChatDashboardService(
     {
         var entries = await conversationRepository.ListEntries(conversationId, cancellationToken);
         var events = await eventStore.List(conversationId, 120, cancellationToken);
+        var workspaceResolution = await workspaceStore.GetOrCreateActive(
+            GetWorkspaceRootPath(environment.ContentRootPath),
+            cancellationToken);
+        var activeRun = string.IsNullOrWhiteSpace(workspaceResolution.Workspace.ActiveRunId)
+            ? null
+            : await runStore.Get(workspaceResolution.Workspace.ActiveRunId, cancellationToken);
         var settings = await settingsResolver.Resolve(
             new AgentSettingsResolveRequest(
                 new Conversation(
@@ -116,7 +126,7 @@ public sealed class ChatDashboardService(
                     DateTimeOffset.UtcNow,
                     DateTimeOffset.UtcNow),
                 "local-web",
-                Directory.GetCurrentDirectory(),
+                workspaceResolution.Workspace.RootPath,
                 new Dictionary<string, string>()),
             cancellationToken);
         var injectedMemoryIds = events
@@ -145,7 +155,17 @@ public sealed class ChatDashboardService(
             settings.Get("provider") ?? "Ollama",
             settings.Get("model") ?? "qwen3.5:latest",
             isRunning,
-            queuedPrompt);
+            queuedPrompt,
+            new WorkspaceStatus(
+                workspaceResolution.Workspace.Id,
+                workspaceResolution.Workspace.Name,
+                workspaceResolution.Workspace.RootPath,
+                workspaceResolution.Workspace.ChatThreadId,
+                workspaceResolution.Workspace.WorkThreadId,
+                workspaceResolution.Workspace.ActiveRunId,
+                workspaceResolution.Workspace.RemoteExecutionAllowed,
+                activeRun?.Status.ToString(),
+                activeRun?.Kind.ToString()));
     }
 
     private static ChatDashboardMessage ToMessage(ConversationEntry x)
@@ -161,8 +181,8 @@ public sealed class ChatDashboardService(
         return new ChatDashboardMessage(
             x.Id,
             role,
-            x.Content,
-            Markdown.ToHtml(WebUtility.HtmlEncode(x.Content), MarkdownPipeline),
+            RepairMojibake(x.Content),
+            Markdown.ToHtml(WebUtility.HtmlEncode(RepairMojibake(x.Content)), MarkdownPipeline),
             x.CreatedAt);
     }
 
@@ -172,6 +192,29 @@ public sealed class ChatDashboardService(
         {
             yield return value.Substring(x, Math.Min(size, value.Length - x));
         }
+    }
+
+    private static string GetWorkspaceRootPath(string contentRootPath)
+    {
+        var directory = new DirectoryInfo(contentRootPath);
+
+        if (directory.Parent is not null && directory.Parent.Name.Equals("src", StringComparison.OrdinalIgnoreCase))
+        {
+            return directory.Parent.Parent?.FullName ?? directory.FullName;
+        }
+
+        return directory.FullName;
+    }
+
+    private static string RepairMojibake(string value)
+    {
+        return value
+            .Replace("ÔÇÖ", "'", StringComparison.Ordinal)
+            .Replace("ÔÇ£", "\"", StringComparison.Ordinal)
+            .Replace("ÔÇØ", "\"", StringComparison.Ordinal)
+            .Replace("ÔÇô", "-", StringComparison.Ordinal)
+            .Replace("ÔÇö", "-", StringComparison.Ordinal)
+            .Replace("ÔÇª", "...", StringComparison.Ordinal);
     }
 }
 
@@ -349,6 +392,30 @@ public sealed class RunTimelineService(IAgentEventStore eventStore) : IRunTimeli
             AgentEventKind.ProviderError => x.Data.GetValueOrDefault("error") ?? "provider error",
             _ => x.Data.GetValueOrDefault("message") ?? x.Data.GetValueOrDefault("text") ?? x.Kind.ToString()
         };
+    }
+}
+
+public sealed class SubAgentDashboardService(IAgentRunStore runStore) : ISubAgentDashboardService
+{
+    public async Task<SubAgentRunsSnapshot> List(CancellationToken cancellationToken)
+    {
+        var runs = await runStore.List(AgentRunKind.SubAgent, 100, cancellationToken);
+
+        return new SubAgentRunsSnapshot(
+            runs.Select(x => new SubAgentRunRow(
+                x.Id,
+                x.WorkspaceId,
+                x.Status.ToString(),
+                x.Kind.ToString(),
+                x.Channel,
+                x.Prompt,
+                x.CodexThreadId,
+                x.ParentRunId,
+                x.ParentCodexThreadId,
+                x.StartedAt,
+                x.CompletedAt,
+                x.FinalResponse,
+                x.Error)).ToArray());
     }
 }
 

@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=Space+Grotesk:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-error": "#690005",
+                    "surface-bright": "#37393e",
+                    "inverse-surface": "#e2e2e8",
+                    "outline": "#8a919e",
+                    "tertiary-fixed": "#e6deff",
+                    "on-tertiary-fixed-variant": "#491ac6",
+                    "background": "#111317",
+                    "secondary-fixed": "#70fda7",
+                    "primary-fixed": "#d5e3ff",
+                    "on-primary": "#00315f",
+                    "on-surface-variant": "#c0c7d5",
+                    "inverse-primary": "#005fb0",
+                    "surface-container-low": "#1a1c20",
+                    "surface-container-highest": "#333539",
+                    "surface-dim": "#111317",
+                    "primary-fixed-dim": "#a6c8ff",
+                    "tertiary-fixed-dim": "#cabeff",
+                    "on-tertiary": "#320099",
+                    "error": "#ffb4ab",
+                    "on-primary-container": "#002a53",
+                    "secondary": "#51df8e",
+                    "on-background": "#e2e2e8",
+                    "primary": "#a6c8ff",
+                    "secondary-container": "#00b266",
+                    "surface-container-high": "#282a2e",
+                    "on-primary-fixed": "#001c3b",
+                    "secondary-fixed-dim": "#51df8e",
+                    "surface-variant": "#333539",
+                    "surface-container-lowest": "#0c0e12",
+                    "primary-container": "#3192fc",
+                    "surface": "#111317",
+                    "on-error-container": "#ffdad6",
+                    "outline-variant": "#404753",
+                    "on-surface": "#e2e2e8",
+                    "tertiary": "#cabeff",
+                    "on-secondary-container": "#003c1e",
+                    "on-tertiary-container": "#2b0087",
+                    "on-secondary-fixed": "#00210e",
+                    "inverse-on-surface": "#2f3035",
+                    "error-container": "#93000a",
+                    "surface-tint": "#a6c8ff",
+                    "on-secondary": "#00391d",
+                    "surface-container": "#1e2024",
+                    "tertiary-container": "#957dff",
+                    "on-primary-fixed-variant": "#004786",
+                    "on-tertiary-fixed": "#1d0061",
+                    "on-secondary-fixed-variant": "#00522c"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "unit": "4px",
+                    "panel-margin": "1px",
+                    "container-padding": "12px",
+                    "tight-stack": "4px",
+                    "component-gap": "8px"
+            },
+            "fontFamily": {
+                    "body-sm": ["Inter"],
+                    "h2": ["Inter"],
+                    "h1": ["Inter"],
+                    "mono-code": ["Space Grotesk"],
+                    "label-caps": ["Inter"]
+            },
+            "fontSize": {
+                    "body-sm": ["13px", {"lineHeight": "18px", "fontWeight": "400"}],
+                    "h2": ["14px", {"lineHeight": "20px", "letterSpacing": "0", "fontWeight": "600"}],
+                    "h1": ["18px", {"lineHeight": "24px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "mono-code": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+                    "label-caps": ["11px", {"lineHeight": "12px", "letterSpacing": "0.05em", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            font-size: 18px;
+        }
+        body {
+            background-color: #0C0E12;
+            color: #e2e2e8;
+        }
+        /* Custom scrollbar for terminal look */
+        ::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #111317;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #404753;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #8a919e;
+        }
+    </style>
+</head>
+<body class="flex min-h-screen overflow-hidden">
+<!-- SideNavBar (Shared Component) -->
+<aside class="hidden md:flex flex-col h-screen w-64 sticky left-0 top-0 bg-surface-container-low dark:bg-surface-container-low border-r border-outline-variant dark:border-outline-variant py-container-padding gap-tight-stack">
+<!-- Header Info -->
+<div class="px-container-padding mb-4 flex items-center gap-3">
+<img alt="Agent Identifier" class="w-8 h-8" data-alt="A professional high-tech brand logo for an artificial intelligence company. The logo features a geometric node structure with clean lines in slate gray and vibrant electric blue, set against a dark, minimalist background. The visual style is clinical, utilitarian, and sophisticated, reflecting a mission-critical developer environment with high precision." src="data:image/png;base64,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"/>
+<div>
+<h2 class="font-label-caps text-label-caps uppercase tracking-wider text-primary">Core Agent</h2>
+<p class="font-mono-code text-[10px] text-on-surface-variant">Active v2.4.1</p>
+</div>
+</div>
+<!-- CTA -->
+<div class="px-container-padding mb-4">
+<button class="w-full py-2 bg-primary text-on-primary font-h2 text-h2 rounded border border-outline-variant hover:bg-surface-container-high transition-all">New Run</button>
+</div>
+<!-- Navigation Tabs -->
+<nav class="flex-1 space-y-1">
+<a class="flex items-center px-container-padding py-2 text-secondary dark:text-secondary border-r-2 border-secondary font-semibold bg-surface-container-high duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined mr-3">chat</span>
+<span class="font-h2 text-h2">Chat</span>
+</a>
+<a class="flex items-center px-container-padding py-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-highest transition-all duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined mr-3">database</span>
+<span class="font-h2 text-h2">Memories</span>
+</a>
+<a class="flex items-center px-container-padding py-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-highest transition-all duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined mr-3">memory</span>
+<span class="font-h2 text-h2">Runs</span>
+</a>
+<a class="flex items-center px-container-padding py-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-highest transition-all duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined mr-3">account_tree</span>
+<span class="font-h2 text-h2">Memory Graph</span>
+</a>
+</nav>
+<!-- Footer Tabs -->
+<div class="mt-auto border-t border-outline-variant pt-2 space-y-1">
+<a class="flex items-center px-container-padding py-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-highest transition-all duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined mr-3">terminal</span>
+<span class="font-h2 text-h2">Logs</span>
+</a>
+<a class="flex items-center px-container-padding py-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-highest transition-all duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined mr-3">code</span>
+<span class="font-h2 text-h2">Terminal</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col min-w-0 bg-surface-container-lowest">
+<!-- TopAppBar (Shared Component) -->
+<header class="w-full top-0 sticky bg-surface-container dark:bg-surface-container border-b border-outline-variant dark:border-outline-variant flex justify-between items-center px-container-padding h-14 z-40">
+<div class="flex items-center gap-4">
+<span class="font-h1 text-h1 font-bold text-primary dark:text-primary">AgentOS</span>
+<div class="hidden md:flex items-center gap-1 px-2 py-0.5 bg-surface-container-high border border-outline-variant rounded">
+<div class="w-2 h-2 bg-secondary shadow-[0_0_8px_rgba(81,223,142,0.6)]"></div>
+<span class="font-mono-code text-[10px] text-secondary">SYSTEM_LIVE</span>
+</div>
+</div>
+<div class="flex items-center gap-component-gap">
+<div class="relative flex items-center bg-surface-container-low border border-outline-variant px-3 py-1.5 rounded w-64 mr-2">
+<span class="material-symbols-outlined text-outline mr-2 text-sm">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-body-sm font-body-sm text-on-surface w-full p-0" placeholder="Search transcript..." type="text"/>
+</div>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer active:opacity-80">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer active:opacity-80">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer active:opacity-80">
+<span class="material-symbols-outlined">help</span>
+</button>
+<div class="w-8 h-8 rounded-full border border-outline-variant overflow-hidden ml-2 cursor-pointer">
+<img alt="User Avatar" class="w-full h-full object-cover" data-alt="A close-up professional headshot of a software engineer in a modern workspace. The lighting is cool-toned and cinematic, reflecting off minimalist glass partitions. The individual has a focused, professional expression, fitting for a senior operator of complex AI agentic workflows in a high-stakes technical environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBGCsXGmGBTQAEKrwlKeXmFaNnPnEO4mlfj-c3QJCYuRh6rSuqf3Qv81qAmoFItAU4YyJe2nEoQyVxACbf7H_3ep6yH79KkeYCgUcCOAccycw__1bZQ9uhybiBixmGNxPI9Slm7gAdoLGb292GILixkIOmFbJREgJg5167Ar2h8Y_l-PH9QHjs8Vsl47Sr-Nlwssxz8ThdLV5bBgV5yn7oOsmTmCNCZ5XqsDGGIJ0zkpeTPZscUHSpVsodTUCaoZbyQJoO3y8RTuRI"/>
+</div>
+</div>
+</header>
+<!-- Chat Transcript Area -->
+<div class="flex-1 overflow-y-auto p-container-padding space-y-6">
+<!-- System Initialization -->
+<div class="flex justify-center py-4">
+<span class="font-label-caps text-label-caps text-outline uppercase px-3 py-1 border border-outline-variant bg-surface-container-low">Session Started: 2023-11-24T09:41:02Z</span>
+</div>
+<!-- Agent Message -->
+<div class="flex gap-4 max-w-4xl">
+<div class="w-8 h-8 shrink-0 bg-primary-container border border-outline-variant flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-container" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+</div>
+<div class="flex-1 space-y-2">
+<div class="flex items-center gap-2">
+<span class="font-h2 text-h2 text-primary">Core Agent</span>
+<span class="font-mono-code text-[10px] text-outline">v2.4.1</span>
+</div>
+<div class="bg-surface-container border border-outline-variant p-3 space-y-3">
+<p class="font-body-sm text-body-sm text-on-surface">Initialization complete. All neural pathways are synchronized. I am ready to assist with memory indexing or sequence execution. How shall we proceed with the current stack?</p>
+<div class="flex gap-2">
+<span class="px-2 py-0.5 bg-surface-container-high border border-outline-variant font-mono-code text-[10px] text-tertiary">#status:ready</span>
+<span class="px-2 py-0.5 bg-surface-container-high border border-outline-variant font-mono-code text-[10px] text-tertiary">#mem_usage:14%</span>
+</div>
+</div>
+</div>
+</div>
+<!-- User Message -->
+<div class="flex gap-4 max-w-4xl ml-auto flex-row-reverse">
+<div class="w-8 h-8 shrink-0 bg-surface-container-highest border border-outline-variant flex items-center justify-center">
+<span class="material-symbols-outlined text-on-surface" style="font-variation-settings: 'FILL' 1;">person</span>
+</div>
+<div class="flex-1 space-y-2 text-right">
+<div class="flex items-center gap-2 justify-end">
+<span class="font-mono-code text-[11px] text-outline">usr_0x71fc99b...</span>
+<span class="font-h2 text-h2 text-on-surface">Operator</span>
+</div>
+<div class="bg-surface-container-high border border-outline-variant p-3 inline-block text-left">
+<p class="font-body-sm text-body-sm text-on-surface">Execute sequence <code class="font-mono-code text-secondary bg-surface-container-lowest px-1">MEM_RECOVERY_ALPHA</code> and report on any anomalies in the secondary vector database.</p>
+</div>
+</div>
+</div>
+<!-- Agent Message (Processing) -->
+<div class="flex gap-4 max-w-4xl">
+<div class="w-8 h-8 shrink-0 bg-primary-container border border-outline-variant flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-container" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+</div>
+<div class="flex-1 space-y-2">
+<div class="flex items-center gap-2">
+<span class="font-h2 text-h2 text-primary">Core Agent</span>
+<div class="flex items-center gap-1 ml-2">
+<div class="w-1.5 h-1.5 bg-secondary animate-pulse"></div>
+<span class="font-label-caps text-[10px] text-secondary">THINKING</span>
+</div>
+</div>
+<div class="bg-surface-container border border-outline-variant p-3 space-y-3">
+<div class="font-mono-code text-body-sm text-on-surface-variant border-l-2 border-outline-variant pl-3 space-y-1">
+<div><span class="text-secondary">&gt;</span> loading module_mem_alpha.so...</div>
+<div><span class="text-secondary">&gt;</span> connecting to vector_db_secondary...</div>
+<div><span class="text-secondary">&gt;</span> initializing scan sequence...</div>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface">Sequence started. I am currently traversing the high-dimensional space in the secondary vector database. Initial telemetry suggests 4 clusters with outlier drift exceeding 15%.</p>
+<!-- Bento Grid Data Nodes -->
+<div class="grid grid-cols-2 gap-2 mt-4">
+<div class="bg-surface-container-low border border-outline-variant p-2">
+<div class="flex justify-between items-start mb-2">
+<span class="font-label-caps text-label-caps text-outline">NODE_ID</span>
+<span class="font-mono-code text-[10px] text-primary">A-402</span>
+</div>
+<div class="h-1 bg-surface-container-highest w-full mb-1">
+<div class="h-full bg-secondary w-3/4"></div>
+</div>
+<span class="font-mono-code text-[10px] text-on-surface">INTEGRITY: 88%</span>
+</div>
+<div class="bg-surface-container-low border border-outline-variant p-2">
+<div class="flex justify-between items-start mb-2">
+<span class="font-label-caps text-label-caps text-outline">NODE_ID</span>
+<span class="font-mono-code text-[10px] text-primary">A-409</span>
+</div>
+<div class="h-1 bg-surface-container-highest w-full mb-1">
+<div class="h-full bg-error w-1/4"></div>
+</div>
+<span class="font-mono-code text-[10px] text-on-surface">DRIFT ALERT</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Agent Message (Terminal View style) -->
+<div class="flex gap-4 max-w-4xl">
+<div class="w-8 h-8 shrink-0 bg-primary-container border border-outline-variant flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-container" style="font-variation-settings: 'FILL' 1;">terminal</span>
+</div>
+<div class="flex-1 space-y-2">
+<div class="flex items-center gap-2">
+<span class="font-h2 text-h2 text-tertiary">System Logs</span>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant p-3 font-mono-code text-body-sm text-on-surface-variant overflow-x-auto whitespace-pre">
+<span class="text-outline">10:14:02</span> <span class="text-primary">[INFO]</span> Vector scan initialized
+<span class="text-outline">10:14:05</span> <span class="text-secondary">[SUCCESS]</span> 14,029 nodes indexed
+<span class="text-outline">10:14:06</span> <span class="text-error">[WARN]</span> Cluster 0x098 showing high entropy (0.84)
+<span class="text-outline">10:14:08</span> <span class="text-primary">[INFO]</span> Commencing pruning cycle...</div>
+</div>
+</div>
+</div>
+<!-- Sticky Bottom Composer -->
+<footer class="p-container-padding bg-surface-container border-t border-outline-variant">
+<div class="max-w-5xl mx-auto space-y-3">
+<!-- Quick Actions -->
+<div class="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+<button class="flex items-center gap-2 px-3 py-1.5 bg-surface-container-low border border-outline-variant hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-primary">play_arrow</span>
+<span class="font-label-caps text-label-caps uppercase text-on-surface">Execute Sequence</span>
+</button>
+<button class="flex items-center gap-2 px-3 py-1.5 bg-surface-container-low border border-outline-variant hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-tertiary">visibility</span>
+<span class="font-label-caps text-label-caps uppercase text-on-surface">Inspect Memory</span>
+</button>
+<button class="flex items-center gap-2 px-3 py-1.5 bg-surface-container-low border border-outline-variant hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-secondary">history</span>
+<span class="font-label-caps text-label-caps uppercase text-on-surface">Rollback State</span>
+</button>
+<button class="flex items-center gap-2 px-3 py-1.5 bg-surface-container-low border border-outline-variant hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-error">stop</span>
+<span class="font-label-caps text-label-caps uppercase text-on-surface">Halt All</span>
+</button>
+</div>
+<!-- Input Area -->
+<div class="relative group">
+<div class="absolute left-3 top-3 text-secondary font-mono-code">$</div>
+<textarea class="w-full bg-surface-container-lowest border border-outline-variant focus:border-primary focus:ring-0 rounded-none p-3 pl-8 min-h-[80px] font-mono-code text-body-sm text-on-surface resize-none placeholder:text-outline" placeholder="Enter command or natural language instruction..."></textarea>
+<div class="absolute right-3 bottom-3 flex items-center gap-2">
+<span class="font-mono-code text-[10px] text-outline mr-2 hidden sm:inline">⌘ + ↵ TO SEND</span>
+<button class="p-2 bg-primary text-on-primary hover:bg-primary-container transition-colors border border-outline-variant">
+<span class="material-symbols-outlined">send</span>
+</button>
+</div>
+</div>
+<div class="flex justify-between items-center px-1">
+<div class="flex gap-4">
+<button class="flex items-center gap-1 text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-sm">attach_file</span>
+<span class="font-mono-code text-[11px]">context.json</span>
+</button>
+<button class="flex items-center gap-1 text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-sm">settings_input_component</span>
+<span class="font-mono-code text-[11px]">gpt-4o-v2</span>
+</button>
+</div>
+<div class="flex items-center gap-2 text-outline">
+<span class="material-symbols-outlined text-sm">bolt</span>
+<span class="font-mono-code text-[11px]">Latency: 142ms</span>
+</div>
+</div>
+</div>
+</footer>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-container-padding py-2 md:hidden bg-surface-container dark:bg-surface-container border-t border-outline-variant dark:border-outline-variant z-50">
+<a class="flex flex-col items-center justify-center bg-secondary-container text-on-secondary-container rounded-lg p-2 active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined">chat</span>
+<span class="font-label-caps text-label-caps">Chat</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant p-2 active:scale-95 transition-transform hover:bg-surface-container-high" href="#">
+<span class="material-symbols-outlined">database</span>
+<span class="font-label-caps text-label-caps">Memories</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant p-2 active:scale-95 transition-transform hover:bg-surface-container-high" href="#">
+<span class="material-symbols-outlined">memory</span>
+<span class="font-label-caps text-label-caps">Runs</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant p-2 active:scale-95 transition-transform hover:bg-surface-container-high" href="#">
+<span class="material-symbols-outlined">account_tree</span>
+<span class="font-label-caps text-label-caps">Graph</span>
+</a>
+</nav>
+</main>
+<!-- Context Sidebar (Right) -->
+<aside class="hidden xl:flex flex-col w-72 bg-surface-container-low border-l border-outline-variant p-container-padding gap-4">
+<div class="space-y-4">
+<h3 class="font-label-caps text-label-caps text-outline uppercase border-b border-outline-variant pb-1">Agent Parameters</h3>
+<div class="space-y-3">
+<div class="flex justify-between items-center">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Temperature</span>
+<span class="font-mono-code text-body-sm text-primary">0.7</span>
+</div>
+<div class="h-1 bg-surface-container-highest w-full rounded-full">
+<div class="h-full bg-primary w-[70%]"></div>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Top-P</span>
+<span class="font-mono-code text-body-sm text-primary">0.95</span>
+</div>
+<div class="h-1 bg-surface-container-highest w-full rounded-full">
+<div class="h-full bg-primary w-[95%]"></div>
+</div>
+</div>
+</div>
+<div class="space-y-4 mt-4">
+<h3 class="font-label-caps text-label-caps text-outline uppercase border-b border-outline-variant pb-1">Recent Runs</h3>
+<div class="space-y-2">
+<div class="p-2 bg-surface-container border border-outline-variant flex justify-between items-center">
+<div class="flex items-center gap-2">
+<div class="w-1.5 h-1.5 bg-secondary"></div>
+<span class="font-mono-code text-[11px] text-on-surface">RUN_#4291</span>
+</div>
+<span class="font-mono-code text-[10px] text-outline">2m ago</span>
+</div>
+<div class="p-2 bg-surface-container border border-outline-variant flex justify-between items-center opacity-60">
+<div class="flex items-center gap-2">
+<div class="w-1.5 h-1.5 bg-outline"></div>
+<span class="font-mono-code text-[11px] text-on-surface">RUN_#4288</span>
+</div>
+<span class="font-mono-code text-[10px] text-outline">1h ago</span>
+</div>
+</div>
+</div>
+<div class="mt-auto bg-surface-container p-3 border border-outline-variant">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-secondary" style="font-variation-settings: 'FILL' 1;">security</span>
+<span class="font-label-caps text-label-caps text-on-surface">Safe Mode Enabled</span>
+</div>
+<p class="font-body-sm text-[11px] text-outline leading-tight">All external tool execution requires manual confirmation via the prompt interface.</p>
+</div>
+</aside>
+</body></html>

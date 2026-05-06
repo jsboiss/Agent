@@ -13,6 +13,7 @@ using Agent.Resources;
 using Agent.Settings;
 using Agent.SubAgents;
 using Agent.Tools;
+using Agent.Workspaces;
 using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -21,8 +22,12 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
 builder.Services.Configure<OllamaProviderOptions>(
     builder.Configuration.GetSection(OllamaProviderOptions.SectionName));
+builder.Services.Configure<CodexProviderOptions>(
+    builder.Configuration.GetSection("Providers:Codex"));
 builder.Services.Configure<SqliteMemoryOptions>(
     builder.Configuration.GetSection("Memory:Sqlite"));
+builder.Services.Configure<SqliteAgentStateOptions>(
+    builder.Configuration.GetSection("Agent:Sqlite"));
 builder.Services.AddHttpClient<OllamaProviderClient>((services, httpClient) =>
 {
     var options = services.GetRequiredService<IOptions<OllamaProviderOptions>>().Value;
@@ -32,15 +37,22 @@ builder.Services.AddSingleton<IAgentProviderClient, ClaudeCodeProviderClient>();
 builder.Services.AddSingleton<IAgentProviderClient, CodexProviderClient>();
 builder.Services.AddSingleton<IAgentProviderClient>(x => x.GetRequiredService<OllamaProviderClient>());
 builder.Services.AddSingleton<IAgentProviderSelector, AgentProviderSelector>();
-builder.Services.AddSingleton<IConversationRepository, InMemoryConversationRepository>();
+builder.Services.AddSingleton<IConversationRepository, SqliteConversationRepository>();
 builder.Services.AddSingleton<IConversationResolver, ConversationResolver>();
-builder.Services.AddSingleton<IConversationSummaryStore, InMemoryConversationSummaryStore>();
+builder.Services.AddSingleton<IConversationSummaryStore, SqliteConversationSummaryStore>();
 builder.Services.AddSingleton<IConversationCompactor, RollingConversationCompactor>();
+builder.Services.AddSingleton<SqliteAgentStateStore>();
+builder.Services.AddSingleton<IAgentWorkspaceStore>(x => x.GetRequiredService<SqliteAgentStateStore>());
+builder.Services.AddSingleton<IAgentRunStore>(x => x.GetRequiredService<SqliteAgentStateStore>());
+builder.Services.AddSingleton<IConversationMirrorStore>(x => x.GetRequiredService<SqliteAgentStateStore>());
+builder.Services.AddSingleton<IAgentMessageRouter, AgentMessageRouter>();
 builder.Services.AddSingleton<IAgentResourceLoader, AgentResourceLoader>();
 builder.Services.AddSingleton<IConversationPromptQueue, InMemoryConversationPromptQueue>();
 builder.Services.AddSingleton<IAgentSettingsResolver, ConfigurationAgentSettingsResolver>();
+builder.Services.AddSingleton<ISubAgentWorkQueue, SubAgentWorkQueue>();
 builder.Services.AddSingleton<ISubAgentCoordinator, SubAgentCoordinator>();
-builder.Services.AddSingleton<IAgentEventStore, InMemoryAgentEventStore>();
+builder.Services.AddHostedService<SubAgentRunWorker>();
+builder.Services.AddSingleton<IAgentEventStore, SqliteAgentEventStore>();
 builder.Services.AddSingleton<IAgentEventSink>(x => x.GetRequiredService<IAgentEventStore>());
 builder.Services.AddSingleton<IMemoryStore, SqliteMemoryStore>();
 builder.Services.AddSingleton<IMemoryScout, MemoryScout>();
@@ -52,6 +64,7 @@ builder.Services.AddSingleton<IAgentToolExecutor, AgentToolExecutor>();
 builder.Services.AddScoped<IChatDashboardService, ChatDashboardService>();
 builder.Services.AddScoped<IMemoryDashboardService, MemoryDashboardService>();
 builder.Services.AddScoped<IRunTimelineService, RunTimelineService>();
+builder.Services.AddScoped<ISubAgentDashboardService, SubAgentDashboardService>();
 builder.Services.AddScoped<IMemoryGraphService, MemoryGraphService>();
 builder.Services.AddScoped<ISettingsDashboardService, SettingsDashboardService>();
 builder.Services.AddScoped<IMessageProcessor, AgentMessageProcessor>();

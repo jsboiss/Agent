@@ -33,6 +33,11 @@ public static class DashboardEndpoints
                 await service.List(conversationId, filter ?? "All", cancellationToken))
             .WithName("GetRuns");
         group.MapGet(
+            "/subagents",
+            async (ISubAgentDashboardService service, CancellationToken cancellationToken) =>
+                await service.List(cancellationToken))
+            .WithName("GetSubAgents");
+        group.MapGet(
             "/memories",
             async (string? query, string? lifecycle, string? segment, string? tier, IMemoryDashboardService service, CancellationToken cancellationToken) =>
                 await service.Search(

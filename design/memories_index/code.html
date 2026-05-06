@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=Space+Grotesk:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+                  "on-error": "#690005",
+                  "surface-bright": "#37393e",
+                  "inverse-surface": "#e2e2e8",
+                  "outline": "#8a919e",
+                  "tertiary-fixed": "#e6deff",
+                  "on-tertiary-fixed-variant": "#491ac6",
+                  "background": "#111317",
+                  "secondary-fixed": "#70fda7",
+                  "primary-fixed": "#d5e3ff",
+                  "on-primary": "#00315f",
+                  "on-surface-variant": "#c0c7d5",
+                  "inverse-primary": "#005fb0",
+                  "surface-container-low": "#1a1c20",
+                  "surface-container-highest": "#333539",
+                  "surface-dim": "#111317",
+                  "primary-fixed-dim": "#a6c8ff",
+                  "tertiary-fixed-dim": "#cabeff",
+                  "on-tertiary": "#320099",
+                  "error": "#ffb4ab",
+                  "on-primary-container": "#002a53",
+                  "secondary": "#51df8e",
+                  "on-background": "#e2e2e8",
+                  "primary": "#a6c8ff",
+                  "secondary-container": "#00b266",
+                  "surface-container-high": "#282a2e",
+                  "on-primary-fixed": "#001c3b",
+                  "secondary-fixed-dim": "#51df8e",
+                  "surface-variant": "#333539",
+                  "surface-container-lowest": "#0c0e12",
+                  "primary-container": "#3192fc",
+                  "surface": "#111317",
+                  "on-error-container": "#ffdad6",
+                  "outline-variant": "#404753",
+                  "on-surface": "#e2e2e8",
+                  "tertiary": "#cabeff",
+                  "on-secondary-container": "#003c1e",
+                  "on-tertiary-container": "#2b0087",
+                  "on-secondary-fixed": "#00210e",
+                  "inverse-on-surface": "#2f3035",
+                  "error-container": "#93000a",
+                  "surface-tint": "#a6c8ff",
+                  "on-secondary": "#00391d",
+                  "surface-container": "#1e2024",
+                  "tertiary-container": "#957dff",
+                  "on-primary-fixed-variant": "#004786",
+                  "on-tertiary-fixed": "#1d0061",
+                  "on-secondary-fixed-variant": "#00522c"
+          },
+          "borderRadius": {
+                  "DEFAULT": "0.25rem",
+                  "lg": "0.5rem",
+                  "xl": "0.75rem",
+                  "full": "9999px"
+          },
+          "spacing": {
+                  "unit": "4px",
+                  "panel-margin": "1px",
+                  "container-padding": "12px",
+                  "tight-stack": "4px",
+                  "component-gap": "8px"
+          },
+          "fontFamily": {
+                  "body-sm": ["Inter"],
+                  "h2": ["Inter"],
+                  "h1": ["Inter"],
+                  "mono-code": ["Space Grotesk"],
+                  "label-caps": ["Inter"]
+          },
+          "fontSize": {
+                  "body-sm": ["13px", {"lineHeight": "18px", "fontWeight": "400"}],
+                  "h2": ["14px", {"lineHeight": "20px", "letterSpacing": "0", "fontWeight": "600"}],
+                  "h1": ["18px", {"lineHeight": "24px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                  "mono-code": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+                  "label-caps": ["11px", {"lineHeight": "12px", "letterSpacing": "0.05em", "fontWeight": "700"}]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      font-size: 18px;
+    }
+    body {
+      background-color: #0c0e12;
+      color: #e2e2e8;
+    }
+    /* Industrial Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #1a1c20; }
+    ::-webkit-scrollbar-thumb { background: #30363d; }
+    ::-webkit-scrollbar-thumb:hover { background: #404753; }
+  </style>
+</head>
+<body class="font-body-sm text-body-sm min-h-screen flex overflow-hidden">
+<!-- SideNavBar -->
+<aside class="h-screen w-64 sticky left-0 top-0 bg-surface-container-low dark:bg-surface-container-low border-r border-outline-variant dark:border-outline-variant flex flex-col py-container-padding gap-tight-stack hidden md:flex">
+<div class="px-container-padding mb-4">
+<div class="flex items-center gap-2 mb-1">
+<img alt="AgentOS Logo" class="w-6 h-6" data-alt="A minimalist, professional logo for an AI agent control panel. A geometric representation of a node or brain in slate gray and electric blue colors, rendered with sharp lines and high contrast on a dark tech-focused background." src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMgAAADICAYAAACtWK6eAAAQAElEQVR4AeydfZAcxXnG357T6aQFESkWSFRkHINAF6WSsuM/AhykKrYEJwg2iS1I9HFOyqk4AZ1CXK4KQpZ0EiDsSiUVo8MpKqUkPn2EkogJkEQiUuyU4xPIVaQSf2DOljDGuJAssGQj7iTd7bb7mb057c3uzszOzszuzDxbOzsz3W93v/17+9npnb3ts4QPEiCBugQokLpomEECIhQIRwEJeBCgQDzgMIsEKBCOARLwIBCjQDxaZRYJpIQABZKSQNHN1hCgQFrDna2mhAAFkpJA0c3WEKBAWsOdraaEQDoFkhK4dDP9BCiQ9MeQPYiRAAUSI1xWnX4CFEj6Y8gexEiAAokRLqtOPwEKxBVDnpJAJQEKpJIGj0nARYACcQHhKQlUEqBAKmnwmARcBCgQFxCekkAlAQqkkka8x6w9hQQokBQGjS4nR4ACSY41W0ohAQokhUGjy8kRoECSY82WUkiAAklh0KpdZkpcBCiQuMiy3kwQoEAyEUZ2Ii4CFEhcZFlvJghQIJkIIzsRFwEKJC6yWak35/2gQHI+ANh9bwIUiDcf5uacAAWS8wHA7nsToEC8+TA35wQokJwPgFZ2Pw1tUyBtEKWeB88tuXHb6OfN9urk9nmktYFruXeBAmnhEIAIeraO7tal0ktKZL3Z3jO5rUca8mDTQhdz3zQF0oIhgEGPwQ8RiJLVSlX/r0g7zeTBBrYoI3wkToACSRA5BjkGOwZ9PWG43aFQ3ESSPadAEuAdRhhutygUNxHP88gyKZDIUFZXFIUw3LVSKG4i8Z5TIDHwjUMYbjcpFDeReM4pkAi52sLYNrpHdOnloJ8xmm3eEQra7DFtw4dm62T5iwQokIssQh9hUGJwYpCaSlaZLdRTizyBLVThcqFV8AG+wKdyEl+bIUCBNEEPg3DqrpRIKGFoLSXRskeU1X1kc+EPsOEYaXZeOP9W4U4ZfIOP4apgKRCoFghSuXkSwKDD4MMgDDuVsge/EYayrKXDWwprhjfNGnEaxTHSkBdWKEqJBd/gI3yFz8JHwwSshkvkuAAGGQYbBh0Gnz0IG+ThJQx3VRSKm0jy5xRIAOZJC8PtEoXiJpLcOQXiwbrVwnC7RqG4icR/ToHUYNxuwnC7SKG4icR3nqhA4utGNDW3uzDcvaRQ3ESiP6dADNO0CcO4PO1JoUzDEelJrgWSdmG4RwKF4ibS/HkuBZI1YbiHAYXiJhL+PFcCybow3MOAQnETafw8KwLx7HnehOGGQaG4iQQ/z7RA0iKMx/7x3xcODh0c2rHr4AlsOEZa8DAGs6RQgnGqtMqkQNIiDCcQpY6OvxUla5XIAmw4ttMcg4j3FEpwoJkSSNqE4YRJKbndOXb2RijLnOO49hSKP9lMCCStwqgIz6UVx+VDJe8qH8T/SqHUZ5xqgSQjjPrwspZDoVRHNJUCoTCqAxllCoVykWaqBEJhXAxcEkcUikgqBEJhJCGH+m3kWShtLRAKo/6gbUVOHoXSlgLp+Zyeg5+2YoUO851AzbVrAw6QvarGb74Dlo3fLKUtTBOKyN4w3TC3ti3EFjG+cdvorqUDuvpOXpiKIy5jRVxf09V9YEDPl/Ojz9vwQtTm/OZblNU9vLmwGsEMUQ2LBCAAtmAM1mEXl0AzSmTNXGv0qzdv15fjvJ22thNIlzX6sIj6VWnw4QiDV4wGwUVgbgtlS2EN2IcVihL1/tLE2OYI3Im0irYTiGh1WyM9pDAaoRWvbdNC0XJLvB42XnvbCUQpWdRAN/gZowFYSZlOE0ojn1GUXJeUj0HbaTuB+DnuXDGEnzE8UbVDpi0U8zkQsRIte+zYtYNjDfiQOoFgnotVBwG/gX7StIUEECvEDLFroRuhmk6dQAA7VE9ZqOUE0hi71Amk5VGmA7kiQIHkKtzsbKMEci2QR//pP655bN9X2vIb3EYDGYc92ICRq+5cneZWIIO7Duy3Oqxj+tz5U4O7Dj78+LPPFnIVeY/OgsXg0HPbwQaMdgwdfMLDPNNZuRQIBCGiPiZ4KJlldg9cONN57LHdz5XTTEJen2AAFqL0BimzEaXk7h27Dm7LI5NcCsQEer3Zpj2VyJVa6/3m3fLQ4BcPt90XVtOcjeEEfUbfwQAsqprQ0l+VloOE3AnkC3v+bZ6J66Vmq/k075bLxJoYwRQDU42aRhlKRB/RV/TZ7nudvpm8uTt3fm1OnezMJudOIPes/p3TIvop34iaKcaFMzNGdgwdWOlrm1ID9A19tKdT/n3Y94lP3PS2v1kzFu1XNncCQQjWrV3xe2a/3WyeTyVqkVJqn/nM8p+YgngapygTfcF0Cn1DHwO4vn3d2t67A9hlziSXAkEUTcA3WtaMa8yc+8s499mWa2v8m4Pmzg6mJD62bZsN33cMHXgEfVFKfNfdAhswAqu27VTMjuVWIOB6z+plr/T3rfiQUmqlaPkh0upt5p12JqYi46c7XzZ3dD5azy5o+uJHdVfPg+98GL+mu1DsKLrLIQ151299544PPK473fmNnsNn+G76er/dF68KDAst8jGwASMv06zn5VogTnDvXXPrk53zxrvNue+0S5S8W4k8iWnXo+aLRlOmoedNj+h5PdtG/2rB6bE3RaunTV1r3hj7xQ53JUhDXodSz3SdHD2FMijrtvM7h4/w1dT1JHz3szf528Gif23vv5jj3D8pkMkh8Mk77hhdt7Z3o5RmLNFaDk8me+2W40u0wYDTrqUDeqa5InxKj48eN5V+2gzWqTtp//vW1fL9s1fIuWKnjBVnyitnF8iLP7nGmJWfStQvmKNPo2zP1tG/QF3m3POJ6RR8g4/GcLnZPJ92n03fwQAsPI3TmBnSZwrEBW7dx5d9t7+vd7kKMO2yi5q7XZi6YApjn9d4+c0Bfdlca+yAEvlrEYXbzFL5OFfqkhdOdctTr90g//ra9XL01BI5b4RSaVM+NmWV/M1cNbYPdZbTql/hC3zClLA615Wi5Yfl6VTvcvTdlZv7UwqkzhBwpl3mg+pntegLdczKyUrsadeOoQP/9YU9h68uJ5ZfsXTRDGvs60YcHyynNP+qlHykQ40dvWHgPKaFUxWibfhg2vKdTtl90uqRTjO15HRqCmHVAQVSheRiAqYa/X0rNuiiXmpPQS5m1TxSSn2wVJo4bm6hPgQDrNCidelZc7zEbJE+lZJuSxWfdlYCQZtoWxkfAjR0CH1a13frA+hjAPvcmlAgAUK//g9vO95vpl1a67vMdOQNvyJKyUYzYJ/ossaeMe/m1/rZh85Xcl1pYuwp09ZTaNOvHviuzNTRfM64BX3ys2e+CAXSwCjo71uxf+bc8cWmiO/dLqXk7pmqeIOxjfXZZY33mLbuDNDIdviOqWMAW5pMEggikElT7kAAUxLzDryxVCwt9pt2Fc2tKpSJcytq5Vf9IfgKn+G7nzHzpxOgQKbzCHyGKUq/mXYpM2XB1MVd8Funr5KSjh/vhJ4hL515t7t5gU/wzQiD06kqOsET4o9gcF9SaYkpC6YuYu4IiZZz6MSrb19R+uaZX8ZhItv/n36vvHZ2fslurOwDp1M2jOZfKJDmGQqmLrgjVLJKC/7nx7/yp8+/2Z041+FTS62vnlzyZ2pW1+XmqrERPkXQtdxXkXggs0x8/Zrbfvb62Sve36o+/uidhe+7967fPtuq9rPYbosFkkGkSr+vZb1qZdst63S8DVMgEfPVIgsjrjJwda1sO7CTKTOkQCIOmLnp2jKBtLLtiDG2TXUUSNuEgo60IwEKJOKomGnOiYirDFxdK9sO7GTKDLMrkBYFwkxzWiaQVrbdItyxN0uBRI1Yq/+LusrA9bWy7cBOpsuQAokwXljL9pcuOdEygSwqnDgKHyLsUu6rokAiGAL4eeuOoYMPYS3b31ow8nc3zv9O+c8+Iqg7aBU9l3+ndPPCkX+AD4O7DzwIn4KWpV19AhRIfTaBcpy1bJWSjaIE6/zKe+acsn5t7g8ClY/C6NfnvSpXXXqqHEv4oNVnLnCt4SjQ8vcgYSiizOAXD19nrhqHtNb7lciVSKvcrr3s9crTWI+vu+xHVfXDJ/gGH+FrlQETAhEov+sEMqURCGDqMjj03HaxJkbMVaPu4mtdHUXpVEUUiXWbaY1Lp1W/HdtH4yt8hu+xOpPByimQBoK6Y+jAygtnZowEWS2kpK0vjZesbzRQfSjTC8XOF0panvYtrPQG+I4++NrSYIoABTKFov4BFl/DVEUptU+JWlTfspyjtTy8vu+Wj05odbs5jm2uZeo+dk7PvmN9X++d5vjhcuv1X+E7+oCF5NCn+pbMcQhQIA6JGntMScw77iOqQ72kVPC1bPv7ej+D6o4OFF4v6g4jEv0znEe6af2m1taKFwfUm6gXbVoNrDWMPg2aqSL6iPLcahOgQGpzEWfxNaXU/eadd2Yds3Ly1OJrKz50z+plr5QTy69HB7q+MdFZuNq8wx8pp3i+BszUh8c7C93PD8w6VlkAbfe3aK3hSj+ydEyBuKKJOz72dErEd/E1u6hWvouvff0B9dYRPftm0eqPteiTdrmKl1nWebl+/ojcedUL9oZjpFWY2IfmrtSPtVZ/Mlwq3Io67cQaL/dOrjVs7D9bI3t6knIWvTuYy/+sNR1G9RkFMskEUw1MOfzuTk2ai8b6vVjLNujiawOqNLxl9k7VVbjWlP2caJn65d9vvOsVee+ckzK744K94RhpU22J/inKqFmFxUe2zP57MXWJzwM/uTVXkw1B1xpWmELyblcVVQrEIHGmU0HuTpmB3dRatsN/qd4+sqVw/8l5s+cXtf6wFtm96JK3qu7TXjn7J0XkGZ8+cn5B4XKUQVnjbkPPdTGsNdyQAyk3zrVAWrmW7bH16vwLWy559sjmwtoOVar69wczO4odyBvedMkzL35SjTc7ziqnXWaaF3qt4Wb9SFv53AoEf69UKk0cV7lZy1bs1Vcw7cK6vGbK5vsvHsAGjMwVdlvaBnZU/uZSIIO7DnxJtLJvxXqBNFOcN8wgWblubW+mFl9zFr0zH+KDrTUssmlw6MA/e7HKal7uBPL43q/MF1G/K/6PzC++Zq4mgdcaFqV+f+fOr83xx5Yti9wJ5HxpzHv+LZKrtWxxt8tcIQOtNfzTOdZEtoa/f29yJxAs7mamFlXfD5gPrq8rpTI3nfIfAmULZ9oFBmBRTq14VfqhT91141hFSi4OcycQRNVMLTYYkezHsUytZTuxBHd67LQcv4DBzLkTS8R8ASplNvjOZ++6NSs21cWS4YxcCgTxNCK5q1QsLeZatqAxfbOnXeYLUKw1jL/v6u/rXT3dIj9nuRUIQoxpBdeyBYnaG6aj97j+tqy2ZXZTcy2Q7IaVPYuKAAUSFUnWk0kCqRPITQPnpv2b5UxGJaOdChO7VqNInUBKqvS9nq2ju3sePLek1fDYfjACiBVihtgFK9E+VqkTiFJiiZLVulR6CdABX/hoSwKIDWKEWCFmduza0tP6LRwbQwAABP1JREFUTln1s1qUo2XaL/LqeWHDNkIRXXq5Z9voHgSjni3TkyWAWCAmiE0jwtAix5P11L+1thOIVvq//d2usliFdym8WyE4VblMSIQA2CMGiIVpcJXZGntq/eXGCsRv3XYCKXYUHhDR3260684VBcFBkBCsRuugfTgCYA3mYN/IFWN6a/rbxRmFJL+tn958nbO2E8jRjeqkdBVuEC176vjsmewIBZd3XOYRPM8CzAxNAGzBGKzDC8M0j1ibmNuxN6ft9Gw7gQAOflo6vKWwRpTVDaFoLSWkh9g49QoBza+ILQxzJ9G+Yog0PpUyDdgxhTBMjBFrxNwkt92zLQXiUBreNGsE8JRlLQ0rFKXEwrsbgolpAIIrfIQiAHZgCJZgarNtsCZHGMrEFLFFjBusIlFzK9HWQjYGiIAJqBRKSIhNFMujMBxcqRCI4yyF4pBIZp9nYTiEwwnEKd2iPYUSL3gK4yLfVArEcZ9CcUhEs6cwqjmmWiBOd1IvFC1vOX2Z2tdKm8qM9oDCqM8zEwJxupdWoWiRGmtU6UNOv+LaUxj+ZDMlEKe7aROKVSzeZ25/7tVanzJiOWm2oYkZnfc5/Yl6T2EEJ9p2Agnuur9lWoRy7x/dfgK/++7vW3FF/9rehWb7+H2rllWtAu/fY28LCsObT63cTAvE6XBahOL4G/WewghPNBcCcfDkTSgUhhP58PtcCcTBlHWhUBhOpJvf51IgDrasCYXCcCIb3T5PAqlLLe1CoTDqhrbpDAqkAmHahEJhVAQvpkMKpAbYdhcKhVEjaDElUSAeYNtNKBSGR7BiyqJAAoBttVAojABBismEAmkAbH2hBK/E/hWeCrauF4URnGtclhRICLJxC4XCCBGUmIpQIE2AnSYUkb1hqnKuKFgZpGfr6D5sOA77m+9JH/bi58n4mTJ8nEzjLgQBCiQENHcRDMLhzYXVoqxukxdKKKacGFGstDcJ/dgLH+ALfApdCwtOEaBAplA0f4BBicGJQRp2cYlGvdBYEslZPseIFD40Wgft6xOgQOqzCZ2DQYrpDaY5TQuljheOMNAG2kKbdUyZ3AQBCqQJeH5FMWgxeDGIje1es0X15GeMqEj61EOB+ACKItsWipn+NDP1cq4YqAPTONQZhW+sw5sABeLNJ9JcDOqpK4r53GAPep8WbBtji6sQyqIOnyLMjpAABRIhzKBVYZBjsGPQ1/uMQmEEpRmvHQUSL1/P2iuFokUeNcbfN9sIjlUCa9eatvj0IUCB+ABKIhtCObK58Ofms8XVZuu2jzfNGkmibbbhTYAC8ebD3JwToEByPgDYfW8CFIg3H+bmnAAFkvMBEFP3M1MtBZKZULIjcRCgQOKgyjozQ4ACyUwo2ZE4CFAgcVBlnZkhQIFkJpR56Uiy/aRAkuXN1lJGgAJJWcDobrIEKJBkebO1lBGgQFIWMLqbLAEKJFnebK2dCdTwjQKpAYVJJOAQoEAcEtyTQA0CFEgNKEwiAYcABeKQ4J4EahCgQGpAYRIJOASiEohTH/ckkCkCFEimwsnORE2AAomaKOvLFAEKJFPhZGeiJkCBRE2U9WWKQAoEkine7EzKCFAgKQsY3U2WAAWSLG+2ljICFEjKAkZ3kyVAgSTLm62ljEC+BZKyYNHd5AlQIMkzZ4spIkCBpChYdDV5AhRI8szZYooIUCApChZdTZ4ABRITc1abDQI/BwAA//9RzGvIAAAABklEQVQDAIKwKUV2nME6AAAAAElFTkSuQmCC"/>
+<span class="font-label-caps text-label-caps uppercase tracking-wider text-primary">AgentOS</span>
+</div>
+<div class="p-2 rounded bg-surface-container-high border border-outline-variant">
+<div class="font-h2 text-h2 text-secondary">Core Agent</div>
+<div class="text-[10px] text-on-surface-variant opacity-70">Active v2.4.1</div>
+</div>
+</div>
+<nav class="flex-1 space-y-1">
+<div class="px-container-padding py-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-highest transition-all cursor-pointer flex items-center gap-3">
+<span class="material-symbols-outlined">chat</span>
+<span class="font-h2 text-h2">Chat</span>
+</div>
+<div class="px-container-padding py-2 text-secondary dark:text-secondary border-r-2 border-secondary font-semibold bg-surface-container-high cursor-pointer flex items-center gap-3">
+<span class="material-symbols-outlined">database</span>
+<span class="font-h2 text-h2">Memories</span>
+</div>
+<div class="px-container-padding py-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-highest transition-all cursor-pointer flex items-center gap-3">
+<span class="material-symbols-outlined">memory</span>
+<span class="font-h2 text-h2">Runs</span>
+</div>
+<div class="px-container-padding py-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-highest transition-all cursor-pointer flex items-center gap-3">
+<span class="material-symbols-outlined">account_tree</span>
+<span class="font-h2 text-h2">Memory Graph</span>
+</div>
+</nav>
+<div class="mt-auto border-t border-outline-variant pt-2">
+<div class="px-container-padding py-2 text-on-surface-variant hover:bg-surface-container-highest transition-all cursor-pointer flex items-center gap-3">
+<span class="material-symbols-outlined">terminal</span>
+<span class="font-h2 text-h2 text-[12px]">Logs</span>
+</div>
+<div class="px-container-padding py-2 text-on-surface-variant hover:bg-surface-container-highest transition-all cursor-pointer flex items-center gap-3">
+<span class="material-symbols-outlined">code</span>
+<span class="font-h2 text-h2 text-[12px]">Terminal</span>
+</div>
+</div>
+</aside>
+<div class="flex-1 flex flex-col h-screen relative">
+<!-- TopAppBar -->
+<header class="bg-surface-container dark:bg-surface-container flex justify-between items-center px-container-padding h-14 w-full border-b border-outline-variant dark:border-outline-variant sticky top-0 z-40">
+<div class="flex items-center gap-4">
+<h1 class="font-h1 text-h1 font-bold text-primary dark:text-primary">Memories</h1>
+<div class="hidden lg:flex items-center gap-2 bg-surface-container-lowest px-3 py-1.5 border border-outline-variant rounded">
+<span class="material-symbols-outlined text-on-surface-variant text-sm">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-body-sm w-64 text-on-surface" placeholder="Search vectors, IDs, or content..." type="text"/>
+<span class="text-[10px] text-outline font-mono-code px-1 bg-surface-container-high rounded">⌘K</span>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<button class="material-symbols-outlined text-on-surface-variant hover:bg-surface-container-high p-2 transition-colors cursor-pointer active:opacity-80">notifications</button>
+<button class="material-symbols-outlined text-on-surface-variant hover:bg-surface-container-high p-2 transition-colors cursor-pointer active:opacity-80">settings</button>
+<button class="material-symbols-outlined text-on-surface-variant hover:bg-surface-container-high p-2 transition-colors cursor-pointer active:opacity-80">help</button>
+<div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container font-bold overflow-hidden border border-outline-variant">
+<img alt="User Avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDIySJIuoCh0jmvJa8dxpSLU-ugBa1-6w7kbHgmKiH_hAo0SCb_pWW00GalzvdOUdarZwLA3d34MMHEUBePRqZset7USDzJXlZqnLNMso_8UmhxqWTtoF_2brSTumtWACEtllAfTAKtysOncgQyKEy7MIbsaRNo5uinKWInaMsVmE60sX3ZgvIVmxAg9sHH6BXBMXMbVJtEp5knwx-xUmkLXVi59tqfPRjdmDBaOxmpw25U6L4p_7BgzAdF63HQuxLONnvI0BJhk-0"/>
+</div>
+</div>
+</header>
+<!-- Main Content -->
+<main class="flex-1 overflow-y-auto bg-surface-container-lowest p-container-padding">
+<!-- Statistics Dashboard Row (Bento Style) -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-panel-margin mb-container-padding bg-outline-variant p-px">
+<div class="bg-surface-container-low p-3 flex flex-col justify-between">
+<div class="text-label-caps text-on-surface-variant opacity-70 mb-1">TOTAL VECTORS</div>
+<div class="flex items-end justify-between">
+<span class="text-h1 font-mono-code text-primary">1,204,592</span>
+<span class="text-secondary text-[10px]">+12.4%</span>
+</div>
+</div>
+<div class="bg-surface-container-low p-3 flex flex-col justify-between">
+<div class="text-label-caps text-on-surface-variant opacity-70 mb-1">AVG RECALL LATENCY</div>
+<div class="flex items-end justify-between">
+<span class="text-h1 font-mono-code text-tertiary">42ms</span>
+<span class="w-2 h-2 bg-secondary animate-pulse shadow-[0_0_8px_rgba(81,223,142,0.6)]"></span>
+</div>
+</div>
+<div class="bg-surface-container-low p-3 flex flex-col justify-between">
+<div class="text-label-caps text-on-surface-variant opacity-70 mb-1">DIMENSIONALITY</div>
+<div class="flex items-end justify-between">
+<span class="text-h1 font-mono-code text-on-surface">1536</span>
+<span class="text-[10px] text-outline">text-embedding-3</span>
+</div>
+</div>
+<div class="bg-surface-container-low p-3 flex flex-col justify-between">
+<div class="text-label-caps text-on-surface-variant opacity-70 mb-1">SYSTEM HEALTH</div>
+<div class="flex items-end justify-between">
+<span class="text-h1 font-mono-code text-secondary">OPTIMAL</span>
+<span class="material-symbols-outlined text-secondary text-sm">check_circle</span>
+</div>
+</div>
+</div>
+<!-- Advanced Filters Bar -->
+<div class="bg-surface-container flex flex-wrap items-center gap-component-gap p-2 border border-outline-variant mb-panel-margin">
+<div class="flex items-center gap-1 bg-surface-container-high px-2 py-1 border border-outline-variant cursor-pointer hover:bg-surface-container-highest">
+<span class="material-symbols-outlined text-[16px]">filter_list</span>
+<span class="font-label-caps uppercase text-[10px]">Filter Type</span>
+</div>
+<div class="h-4 w-px bg-outline-variant mx-1"></div>
+<button class="px-3 py-1 border border-secondary bg-secondary/10 text-secondary text-[11px] font-semibold">ALL</button>
+<button class="px-3 py-1 border border-outline-variant text-on-surface-variant hover:border-on-surface hover:text-on-surface text-[11px] font-semibold transition-colors">LONG-TERM</button>
+<button class="px-3 py-1 border border-outline-variant text-on-surface-variant hover:border-on-surface hover:text-on-surface text-[11px] font-semibold transition-colors">SHORT-TERM</button>
+<button class="px-3 py-1 border border-outline-variant text-on-surface-variant hover:border-on-surface hover:text-on-surface text-[11px] font-semibold transition-colors">EPISODIC</button>
+<div class="ml-auto flex items-center gap-2">
+<span class="text-[11px] text-outline">Viewing 50 of 2,410</span>
+<div class="flex border border-outline-variant">
+<button class="p-1 border-r border-outline-variant hover:bg-surface-container-high"><span class="material-symbols-outlined text-[16px]">chevron_left</span></button>
+<button class="p-1 hover:bg-surface-container-high"><span class="material-symbols-outlined text-[16px]">chevron_right</span></button>
+</div>
+</div>
+</div>
+<!-- Data Grid -->
+<div class="bg-surface-container-low border border-outline-variant overflow-x-auto">
+<table class="w-full text-left border-collapse min-w-[800px]">
+<thead class="bg-surface-container border-b border-outline-variant font-label-caps text-on-surface-variant">
+<tr>
+<th class="px-4 py-2 w-8"><input class="bg-transparent border-outline-variant focus:ring-0 text-primary" type="checkbox"/></th>
+<th class="px-4 py-2 font-semibold">ID / KEY</th>
+<th class="px-4 py-2 font-semibold">TYPE</th>
+<th class="px-4 py-2 font-semibold">CREATED AT</th>
+<th class="px-4 py-2 font-semibold">STATUS</th>
+<th class="px-4 py-2 font-semibold text-right">ACTIONS</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-container-high transition-colors group">
+<td class="px-4 py-3"><input class="bg-transparent border-outline-variant focus:ring-0 text-primary" type="checkbox"/></td>
+<td class="px-4 py-3">
+<div class="flex flex-col">
+<span class="font-mono-code text-primary break-all max-w-xs">mem_a9f2_10827_84bb_0192e</span>
+<span class="text-[11px] text-outline truncate max-w-xs">User preference: Dark mode interface preference with high density logs.</span>
+</div>
+</td>
+<td class="px-4 py-3">
+<span class="px-2 py-0.5 border border-tertiary/40 bg-tertiary/10 text-tertiary text-[10px] font-bold uppercase tracking-wider">Long-Term</span>
+</td>
+<td class="px-4 py-3 text-on-surface-variant font-mono-code text-[11px]">2023-11-24 14:02:11</td>
+<td class="px-4 py-3">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 bg-secondary"></span>
+<span class="text-on-surface text-[12px]">Persisted</span>
+</div>
+</td>
+<td class="px-4 py-3 text-right">
+<button class="material-symbols-outlined text-outline hover:text-primary transition-colors">unfold_more</button>
+</td>
+</tr>
+<!-- Expansion Content for Row 1 -->
+<tr class="bg-surface-container-lowest">
+<td class="p-0 border-b border-outline-variant" colspan="6">
+<div class="px-12 py-4 bg-surface-container-lowest/50 border-l-4 border-primary">
+<div class="grid grid-cols-2 gap-4">
+<div class="flex flex-col gap-2">
+<h4 class="text-label-caps text-on-surface-variant">Metadata</h4>
+<div class="font-mono-code text-[11px] bg-surface-container-low p-2 border border-outline-variant">
+<div class="flex justify-between py-1 border-b border-outline-variant/30"><span class="text-outline">Origin:</span> <span>interaction_handler.py</span></div>
+<div class="flex justify-between py-1 border-b border-outline-variant/30"><span class="text-outline">Confidence:</span> <span>0.982</span></div>
+<div class="flex justify-between py-1"><span class="text-outline">TTL:</span> <span>Infinite</span></div>
+</div>
+</div>
+<div class="flex flex-col gap-2">
+<h4 class="text-label-caps text-on-surface-variant">Raw JSON Payload</h4>
+<pre class="font-mono-code text-[10px] bg-surface-container-low p-2 border border-outline-variant text-secondary overflow-x-auto">
+{
+  "uuid": "mem_a9f2_10827_84bb_0192e",
+  "vector_id": "v_90221",
+  "content": "User preference: Dark mode...",
+  "embedding_model": "text-embedding-3",
+  "associations": ["user_settings", "ui_config"]
+}</pre>
+</div>
+</div>
+</div>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container-high transition-colors">
+<td class="px-4 py-3"><input class="bg-transparent border-outline-variant focus:ring-0 text-primary" type="checkbox"/></td>
+<td class="px-4 py-3">
+<div class="flex flex-col">
+<span class="font-mono-code text-primary break-all max-w-xs">mem_b821_9921_11cc_72d1f</span>
+<span class="text-[11px] text-outline truncate max-w-xs">Current session buffer: API key validation pending for secondary node.</span>
+</div>
+</td>
+<td class="px-4 py-3">
+<span class="px-2 py-0.5 border border-primary/40 bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider">Short-Term</span>
+</td>
+<td class="px-4 py-3 text-on-surface-variant font-mono-code text-[11px]">2023-11-24 14:05:42</td>
+<td class="px-4 py-3">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 bg-error"></span>
+<span class="text-on-surface text-[12px]">Transient</span>
+</div>
+</td>
+<td class="px-4 py-3 text-right">
+<button class="material-symbols-outlined text-outline hover:text-primary transition-colors">unfold_more</button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-container-high transition-colors">
+<td class="px-4 py-3"><input class="bg-transparent border-outline-variant focus:ring-0 text-primary" type="checkbox"/></td>
+<td class="px-4 py-3">
+<div class="flex flex-col">
+<span class="font-mono-code text-primary break-all max-w-xs">mem_c104_5528_ab33_33100</span>
+<span class="text-[11px] text-outline truncate max-w-xs">Episode 41: Analysis of market volatility parameters for Q4.</span>
+</div>
+</td>
+<td class="px-4 py-3">
+<span class="px-2 py-0.5 border border-secondary/40 bg-secondary/10 text-secondary text-[10px] font-bold uppercase tracking-wider">Episodic</span>
+</td>
+<td class="px-4 py-3 text-on-surface-variant font-mono-code text-[11px]">2023-11-24 13:58:04</td>
+<td class="px-4 py-3">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 bg-secondary"></span>
+<span class="text-on-surface text-[12px]">Persisted</span>
+</div>
+</td>
+<td class="px-4 py-3 text-right">
+<button class="material-symbols-outlined text-outline hover:text-primary transition-colors">unfold_more</button>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-surface-container-high transition-colors">
+<td class="px-4 py-3"><input class="bg-transparent border-outline-variant focus:ring-0 text-primary" type="checkbox"/></td>
+<td class="px-4 py-3">
+<div class="flex flex-col">
+<span class="font-mono-code text-primary break-all max-w-xs">mem_d443_2209_ff11_99211</span>
+<span class="text-[11px] text-outline truncate max-w-xs">Shared context: User requested terminal font size change to 12px.</span>
+</div>
+</td>
+<td class="px-4 py-3">
+<span class="px-2 py-0.5 border border-tertiary/40 bg-tertiary/10 text-tertiary text-[10px] font-bold uppercase tracking-wider">Long-Term</span>
+</td>
+<td class="px-4 py-3 text-on-surface-variant font-mono-code text-[11px]">2023-11-23 21:12:55</td>
+<td class="px-4 py-3">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 bg-secondary"></span>
+<span class="text-on-surface text-[12px]">Persisted</span>
+</div>
+</td>
+<td class="px-4 py-3 text-right">
+<button class="material-symbols-outlined text-outline hover:text-primary transition-colors">unfold_more</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination Footer -->
+<div class="mt-container-padding flex items-center justify-between px-2">
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2">
+<span class="text-[11px] text-on-surface-variant">ROWS PER PAGE:</span>
+<select class="bg-surface-container-low border border-outline-variant text-[11px] py-0.5 px-2 focus:ring-0 text-on-surface">
+<option>50</option>
+<option>100</option>
+<option>500</option>
+</select>
+</div>
+</div>
+<div class="flex items-center gap-2 font-mono-code text-[12px]">
+<span class="text-primary font-bold">1</span>
+<span class="text-on-surface-variant cursor-pointer hover:text-primary">2</span>
+<span class="text-on-surface-variant cursor-pointer hover:text-primary">3</span>
+<span class="text-on-surface-variant">...</span>
+<span class="text-on-surface-variant cursor-pointer hover:text-primary">48</span>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-container-padding py-2 bg-surface-container dark:bg-surface-container border-t border-outline-variant dark:border-outline-variant md:hidden z-50">
+<div class="flex flex-col items-center justify-center text-on-surface-variant p-2 active:scale-95 transition-transform">
+<span class="material-symbols-outlined">chat</span>
+<span class="font-label-caps text-label-caps">Chat</span>
+</div>
+<div class="flex flex-col items-center justify-center bg-secondary-container text-on-secondary-container rounded-lg p-2 active:scale-95 transition-transform">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">database</span>
+<span class="font-label-caps text-label-caps">Memories</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface-variant p-2 active:scale-95 transition-transform">
+<span class="material-symbols-outlined">memory</span>
+<span class="font-label-caps text-label-caps">Runs</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface-variant p-2 active:scale-95 transition-transform">
+<span class="material-symbols-outlined">account_tree</span>
+<span class="font-label-caps text-label-caps">Graph</span>
+</div>
+</nav>
+</div>
+<!-- Floating Action Button - Only on appropriate screens (Hidden here by logic) -->
+<!-- Contextual FAB Suppression logic applied: suppress on Details/Grid screens where focused exploration is priority. -->
+</body></html>

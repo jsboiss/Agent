@@ -31,6 +31,8 @@ export interface ChatDashboardMessage {
 
 export type ChatDashboardSnapshotQueuedPrompt = null | string;
 
+export type ChatDashboardSnapshotWorkspace = null | WorkspaceStatus;
+
 export interface ChatDashboardSnapshot {
   conversationId: string;
   messages: ChatDashboardMessage[];
@@ -41,6 +43,7 @@ export interface ChatDashboardSnapshot {
   model: string;
   isRunning: boolean;
   queuedPrompt: ChatDashboardSnapshotQueuedPrompt;
+  workspace: ChatDashboardSnapshotWorkspace;
 }
 
 export interface MemoryGraphEdge {
@@ -207,6 +210,28 @@ export interface SettingsDashboardSnapshot {
   values: SettingsDashboardSnapshotValues;
   appliedLayers: string[];
   memoryConnectionString: string;
+}
+
+export type WorkspaceStatusChatThreadId = null | string;
+
+export type WorkspaceStatusWorkThreadId = null | string;
+
+export type WorkspaceStatusActiveRunId = null | string;
+
+export type WorkspaceStatusActiveRunStatus = null | string;
+
+export type WorkspaceStatusActiveRunKind = null | string;
+
+export interface WorkspaceStatus {
+  id: string;
+  name: string;
+  rootPath: string;
+  chatThreadId: WorkspaceStatusChatThreadId;
+  workThreadId: WorkspaceStatusWorkThreadId;
+  activeRunId: WorkspaceStatusActiveRunId;
+  remoteExecutionAllowed: boolean;
+  activeRunStatus: WorkspaceStatusActiveRunStatus;
+  activeRunKind: WorkspaceStatusActiveRunKind;
 }
 
 export type GetRunsParams = {

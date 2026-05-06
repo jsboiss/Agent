@@ -5,6 +5,7 @@ using Agent.Providers;
 using Agent.Resources;
 using Agent.Settings;
 using Agent.Tools;
+using Agent.Workspaces;
 
 namespace Agent.Messages;
 
@@ -21,7 +22,11 @@ public sealed class AgentMessageProcessor(
     IMemoryExtractor memoryExtractor,
     IMemoryCandidateReviewer memoryCandidateReviewer,
     IMemoryStore memoryStore,
-    IAgentEventSink eventSink) : IMessageProcessor
+    IAgentEventSink eventSink,
+    IAgentWorkspaceStore workspaceStore,
+    IAgentRunStore runStore,
+    IConversationMirrorStore mirrorStore,
+    IAgentMessageRouter messageRouter) : IMessageProcessor
 {
     private static int MaxToolIterations => 3;
 
@@ -36,13 +41,23 @@ public sealed class AgentMessageProcessor(
             new ConversationResolveRequest(request.Channel, request.ConversationId),
             cancellationToken);
         var conversation = resolution.Conversation;
+        var rootPath = GetWorkspaceRootPath(environment.ContentRootPath);
+        var workspaceResolution = await workspaceStore.GetOrCreateActive(rootPath, cancellationToken);
+        var workspace = workspaceResolution.Workspace;
+        workspace = await ClearStaleActiveRun(workspace, cancellationToken);
         var settings = await settingsResolver.Resolve(
             new AgentSettingsResolveRequest(
                 conversation,
                 request.Channel,
-                GetWorkspaceRootPath(environment.ContentRootPath),
+                workspace.RootPath,
                 request.Overrides ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)),
             cancellationToken);
+        var route = await messageRouter.Resolve(
+            workspace,
+            request.Channel,
+            request.UserMessage,
+            cancellationToken);
+        var trustedChannel = IsTrustedChannel(request);
         var started = promptQueue.TryStart(conversation.Id);
         var queueKind = promptQueue.Classify(request.UserMessage, !started);
         List<AgentEvent> events =
@@ -55,6 +70,11 @@ public sealed class AgentMessageProcessor(
                     ["channel"] = request.Channel,
                     ["conversationCreated"] = resolution.Created.ToString(),
                     ["conversationKind"] = conversation.Kind.ToString(),
+                    ["workspaceId"] = workspace.Id,
+                    ["workspaceCreated"] = workspaceResolution.Created.ToString(),
+                    ["routeKind"] = route.RouteKind.ToString(),
+                    ["remoteExecutionAllowed"] = workspace.RemoteExecutionAllowed.ToString(),
+                    ["trustedChannel"] = trustedChannel.ToString(),
                     ["queueKind"] = queueKind.ToString(),
                     ["queueBehavior"] = settings.Get("queue.behavior") ?? string.Empty,
                     ["queued"] = (!started).ToString(),
@@ -85,6 +105,32 @@ public sealed class AgentMessageProcessor(
                 ["message"] = request.UserMessage
             }));
         await PublishPending(events, eventCursor, cancellationToken);
+
+        if (!trustedChannel)
+        {
+            return await Refuse(
+                conversation.Id,
+                request.Channel,
+                userEntry.Id,
+                "This remote sender is not trusted, so the message was rejected before reaching Codex.",
+                events,
+                eventCursor,
+                cancellationToken,
+                queueKind);
+        }
+
+        if (route.RouteKind != AgentRouteKind.Chat && !route.AllowsMutation)
+        {
+            return await Refuse(
+                conversation.Id,
+                request.Channel,
+                userEntry.Id,
+                "Remote execution is disabled for the active workspace. Set RemoteExecutionAllowed = true for this workspace before sending code-changing or command-running requests from this channel.",
+                events,
+                eventCursor,
+                cancellationToken,
+                queueKind);
+        }
 
         if (!started)
         {
@@ -117,6 +163,25 @@ public sealed class AgentMessageProcessor(
                 true);
         }
 
+        AgentRun? activeRun = null;
+
+        if (route.RouteKind == AgentRouteKind.Work)
+        {
+            activeRun = await runStore.Create(
+                workspace.Id,
+                request.UserMessage,
+                AgentRunKind.Work,
+                request.Channel,
+                null,
+                workspace.WorkThreadId,
+                cancellationToken);
+            workspace = await workspaceStore.SetActiveRun(workspace.Id, activeRun.Id, cancellationToken);
+        }
+        else if (!string.IsNullOrWhiteSpace(route.RunId))
+        {
+            activeRun = await runStore.Get(route.RunId, cancellationToken);
+        }
+
         var providerType = GetProviderType(settings);
         var provider = providerSelector.Get(providerType);
         var resources = await resourceLoader.Load(
@@ -131,6 +196,13 @@ public sealed class AgentMessageProcessor(
             eventCursor,
             cancellationToken);
 
+        var recentMirrors = string.IsNullOrWhiteSpace(route.CodexThreadId)
+            ? []
+            : await mirrorStore.ListRecent(
+                workspace.Id,
+                route.CodexThreadId,
+                8,
+                cancellationToken);
         var providerRequest = new AgentProviderRequest(
             providerType,
             conversation.Id,
@@ -140,10 +212,30 @@ public sealed class AgentMessageProcessor(
             memoryScoutResult.Memories,
             resources.Workspace.AvailableTools,
             [],
-            []);
+            [],
+            workspace.RootPath,
+            route.CodexThreadId,
+            route.RouteKind,
+            activeRun?.Id,
+            settings.Get("codex.sandbox") ?? "danger-full-access",
+            settings.Get("codex.approvalPolicy") ?? "never",
+            GetMirrorContext(recentMirrors),
+            resources.ChannelInstructions,
+            route.AllowsMutation);
 
         try
         {
+            if (activeRun is not null)
+            {
+                await runStore.Update(
+                    activeRun.Id,
+                    AgentRunStatus.Running,
+                    route.CodexThreadId,
+                    null,
+                    null,
+                    cancellationToken);
+            }
+
             var providerResult = await RunProviderToolLoop(
                 provider,
                 providerRequest,
@@ -176,6 +268,16 @@ public sealed class AgentMessageProcessor(
                     }));
                 await PublishPending(events, eventCursor, cancellationToken);
 
+                await PersistCodexState(
+                    workspace,
+                    activeRun,
+                    route,
+                    providerResult,
+                    request.Channel,
+                    request.UserMessage,
+                    providerResult.AssistantMessage,
+                    cancellationToken);
+
                 await ExtractMemories(
                     conversation.Id,
                     userEntry,
@@ -197,8 +299,122 @@ public sealed class AgentMessageProcessor(
         }
         finally
         {
+            if (activeRun is not null)
+            {
+                await workspaceStore.SetActiveRun(workspace.Id, null, cancellationToken);
+            }
+
             promptQueue.Complete(conversation.Id);
         }
+    }
+
+    private async Task PersistCodexState(
+        AgentWorkspace workspace,
+        AgentRun? run,
+        AgentRouteResolution route,
+        AgentProviderResult providerResult,
+        string channel,
+        string userMessage,
+        string assistantMessage,
+        CancellationToken cancellationToken)
+    {
+        var threadId = providerResult.CodexThreadId
+            ?? providerResult.UsageMetadata.GetValueOrDefault("codexThreadId")
+            ?? route.CodexThreadId;
+
+        if (string.IsNullOrWhiteSpace(threadId))
+        {
+            if (run is not null)
+            {
+                await runStore.Update(
+                    run.Id,
+                    AgentRunStatus.Failed,
+                    null,
+                    null,
+                    providerResult.Error ?? "Codex did not return a thread id.",
+                    cancellationToken);
+            }
+
+            return;
+        }
+
+        if (route.RouteKind is AgentRouteKind.Chat or AgentRouteKind.Work)
+        {
+            await workspaceStore.SetThreadId(
+                workspace.Id,
+                route.RouteKind,
+                threadId,
+                cancellationToken);
+        }
+
+        if (run is not null)
+        {
+            await runStore.Update(
+                run.Id,
+                string.IsNullOrWhiteSpace(providerResult.Error) ? AgentRunStatus.Completed : AgentRunStatus.Failed,
+                threadId,
+                assistantMessage,
+                providerResult.Error,
+                cancellationToken);
+        }
+
+        await mirrorStore.Add(
+            workspace.Id,
+            run?.Id,
+            threadId,
+            channel,
+            ConversationEntryRole.User,
+            userMessage,
+            cancellationToken);
+
+        if (!string.IsNullOrWhiteSpace(assistantMessage))
+        {
+            await mirrorStore.Add(
+                workspace.Id,
+                run?.Id,
+                threadId,
+                channel,
+                ConversationEntryRole.Assistant,
+                assistantMessage,
+                cancellationToken);
+        }
+    }
+
+    private async Task<AgentWorkspace> ClearStaleActiveRun(
+        AgentWorkspace workspace,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(workspace.ActiveRunId))
+        {
+            return workspace;
+        }
+
+        var activeRun = await runStore.Get(workspace.ActiveRunId, cancellationToken);
+
+        if (activeRun is null)
+        {
+            return await workspaceStore.SetActiveRun(workspace.Id, null, cancellationToken);
+        }
+
+        if (activeRun.Status is not (AgentRunStatus.Created or AgentRunStatus.Running))
+        {
+            return await workspaceStore.SetActiveRun(workspace.Id, null, cancellationToken);
+        }
+
+        if (activeRun.StartedAt > DateTimeOffset.UtcNow.AddMinutes(-2))
+        {
+            return workspace;
+        }
+
+        await runStore.Update(
+            activeRun.Id,
+            AgentRunStatus.Failed,
+            activeRun.CodexThreadId,
+            activeRun.FinalResponse,
+            "Run was marked stale after 2 minutes without completion.",
+            cancellationToken);
+
+        return await workspaceStore.SetActiveRun(workspace.Id, null, cancellationToken);
     }
 
     private async Task<MessageResult> Complete(
@@ -218,6 +434,44 @@ public sealed class AgentMessageProcessor(
             events,
             queueKind,
             queued);
+    }
+
+    private async Task<MessageResult> Refuse(
+        string conversationId,
+        string channel,
+        string userEntryId,
+        string refusal,
+        List<AgentEvent> events,
+        EventPublishCursor eventCursor,
+        CancellationToken cancellationToken,
+        QueuedMessageKind queueKind)
+    {
+        var assistantEntry = await conversationRepository.AddEntry(
+            conversationId,
+            ConversationEntryRole.Assistant,
+            channel,
+            refusal,
+            userEntryId,
+            cancellationToken);
+
+        events.Add(GetEvent(
+            AgentEventKind.ProviderError,
+            conversationId,
+            new Dictionary<string, string>
+            {
+                ["channel"] = channel,
+                ["ConversationEntryId"] = assistantEntry.Id,
+                ["ParentEntryId"] = userEntryId,
+                ["error"] = refusal
+            }));
+
+        return await Complete(
+            conversationId,
+            refusal,
+            events,
+            eventCursor,
+            cancellationToken,
+            queueKind);
     }
 
     private async Task PublishPending(
@@ -258,7 +512,7 @@ public sealed class AgentMessageProcessor(
             if (providerResult.ToolCalls.Count == 0)
             {
                 return string.IsNullOrWhiteSpace(providerResult.AssistantMessage)
-                    ? providerResult with { AssistantMessage = GetToolLoopFallback(providerToolResults) }
+                    ? providerResult with { AssistantMessage = GetToolLoopFallback(providerResult, providerToolResults) }
                     : providerResult;
             }
 
@@ -287,7 +541,7 @@ public sealed class AgentMessageProcessor(
             : providerResult with
             {
                 AssistantMessage = string.IsNullOrWhiteSpace(providerResult.AssistantMessage)
-                    ? GetToolLoopFallback(providerToolResults)
+                    ? GetToolLoopFallback(providerResult, providerToolResults)
                     : providerResult.AssistantMessage
             };
     }
@@ -540,11 +794,18 @@ public sealed class AgentMessageProcessor(
         return results;
     }
 
-    private static string GetToolLoopFallback(IReadOnlyList<AgentProviderToolResult> toolResults)
+    private static string GetToolLoopFallback(
+        AgentProviderResult providerResult,
+        IReadOnlyList<AgentProviderToolResult> toolResults)
     {
+        if (!string.IsNullOrWhiteSpace(providerResult.Error))
+        {
+            return providerResult.Error;
+        }
+
         if (toolResults.Count == 0)
         {
-            return "Ollama returned no assistant message.";
+            return "The provider returned no assistant message.";
         }
 
         if (toolResults.All(x => string.Equals(x.Name, "write_memory", StringComparison.OrdinalIgnoreCase)))
@@ -555,6 +816,29 @@ public sealed class AgentMessageProcessor(
         }
 
         return string.Join(Environment.NewLine, toolResults.Select(x => x.Content));
+    }
+
+    private static bool IsTrustedChannel(MessageRequest request)
+    {
+        if (string.Equals(request.Channel, "local-web", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return request.Overrides?.TryGetValue("trustedSender", out var trustedSender) == true
+            && string.Equals(trustedSender, "true", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string GetMirrorContext(IReadOnlyList<ConversationMirrorEntry> entries)
+    {
+        if (entries.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        return string.Join(
+            Environment.NewLine,
+            entries.Select(x => $"- {x.Role}: {x.Content}"));
     }
 
     private static string GetToolKey(AgentProviderToolCall toolCall)

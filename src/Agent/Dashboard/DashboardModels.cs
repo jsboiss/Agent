@@ -13,7 +13,19 @@ public sealed record ChatDashboardSnapshot(
     string Provider,
     string Model,
     bool IsRunning,
-    string? QueuedPrompt);
+    string? QueuedPrompt,
+    WorkspaceStatus? Workspace);
+
+public sealed record WorkspaceStatus(
+    string Id,
+    string Name,
+    string RootPath,
+    string? ChatThreadId,
+    string? WorkThreadId,
+    string? ActiveRunId,
+    bool RemoteExecutionAllowed,
+    string? ActiveRunStatus,
+    string? ActiveRunKind);
 
 public sealed record ChatDashboardMessage(
     string Id,
@@ -69,6 +81,24 @@ public sealed record RunTimelineSnapshot(
     string? ConversationId,
     IReadOnlyList<RunTurnGroup> Turns,
     IReadOnlyList<RunEventRow> Events);
+
+public sealed record SubAgentRunsSnapshot(
+    IReadOnlyList<SubAgentRunRow> Runs);
+
+public sealed record SubAgentRunRow(
+    string Id,
+    string WorkspaceId,
+    string Status,
+    string Kind,
+    string Channel,
+    string Prompt,
+    string? CodexThreadId,
+    string? ParentRunId,
+    string? ParentCodexThreadId,
+    DateTimeOffset StartedAt,
+    DateTimeOffset? CompletedAt,
+    string? FinalResponse,
+    string? Error);
 
 public sealed record RunTurnGroup(
     string Title,
@@ -133,6 +163,11 @@ public interface IRunTimelineService
         string? conversationId,
         string filter,
         CancellationToken cancellationToken);
+}
+
+public interface ISubAgentDashboardService
+{
+    Task<SubAgentRunsSnapshot> List(CancellationToken cancellationToken);
 }
 
 public interface IMemoryGraphService
