@@ -1,5 +1,6 @@
 using Agent.Memory;
 using Agent.Automations;
+using Agent.Calendar;
 using Agent.Drafts;
 using Agent.Notifications;
 using Agent.SubAgents;
@@ -14,6 +15,7 @@ public sealed class AgentToolExecutor(
     IAgentDraftStore draftStore,
     IAutomationStore automationStore,
     IAutomationScheduler automationScheduler,
+    ICalendarProvider calendarProvider,
     IAgentRunStore runStore) : IAgentToolExecutor
 {
     public async Task<AgentToolResult> Execute(
@@ -34,6 +36,9 @@ public sealed class AgentToolExecutor(
             "list_automations" => await ListAutomations(request, cancellationToken),
             "toggle_automation" => await ToggleAutomation(request, cancellationToken),
             "delete_automation" => await DeleteAutomation(request, cancellationToken),
+            "calendar_list_events" => await ListCalendarEvents(request, false, cancellationToken),
+            "calendar_search_events" => await ListCalendarEvents(request, true, cancellationToken),
+            "calendar_get_availability" => await GetCalendarAvailability(request, cancellationToken),
             "cancel_run" => await CancelRun(request, cancellationToken),
             "retry_run" => await RetryRun(request, cancellationToken),
             _ => new AgentToolResult(
@@ -42,6 +47,151 @@ public sealed class AgentToolExecutor(
                 $"Unknown tool '{request.Name}'.",
                 new Dictionary<string, string>())
         };
+    }
+
+    private async Task<AgentToolResult> ListCalendarEvents(
+        AgentToolRequest request,
+        bool requiresQuery,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetRange(request, !requiresQuery, out var start, out var end, out var error))
+        {
+            return new AgentToolResult(request.Name, false, error, new Dictionary<string, string>());
+        }
+
+        var query = request.Arguments.GetValueOrDefault("query");
+
+        if (requiresQuery && string.IsNullOrWhiteSpace(query))
+        {
+            return new AgentToolResult(request.Name, false, "Missing required argument 'query'.", new Dictionary<string, string>());
+        }
+
+        try
+        {
+            var events = await calendarProvider.ListEvents(
+                new GoogleCalendarEventQuery(
+                    start,
+                    end,
+                    query,
+                    GetCalendarId(request),
+                    GetInt(request.Arguments.GetValueOrDefault("limit"), 20)),
+                cancellationToken);
+            var content = events.Count == 0
+                ? "No calendar events found."
+                : string.Join(Environment.NewLine, events.Select(FormatEvent));
+
+            return new AgentToolResult(
+                request.Name,
+                true,
+                content,
+                new Dictionary<string, string> { ["count"] = events.Count.ToString() });
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException)
+        {
+            return new AgentToolResult(request.Name, false, exception.Message, new Dictionary<string, string>());
+        }
+    }
+
+    private async Task<AgentToolResult> GetCalendarAvailability(
+        AgentToolRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetRange(request, true, out var start, out var end, out var error))
+        {
+            return new AgentToolResult(request.Name, false, error, new Dictionary<string, string>());
+        }
+
+        try
+        {
+            var windows = await calendarProvider.GetAvailability(
+                new GoogleCalendarAvailabilityQuery(start, end, GetCalendarId(request)),
+                cancellationToken);
+            var content = windows.Count == 0
+                ? "No availability windows found."
+                : string.Join(Environment.NewLine, windows.Select(x =>
+                    $"- {(x.Busy ? "Busy" : "Free")}: {x.Start:O} to {x.End:O}{(string.IsNullOrWhiteSpace(x.Title) ? string.Empty : $" - {x.Title}")}"));
+
+            return new AgentToolResult(
+                request.Name,
+                true,
+                content,
+                new Dictionary<string, string> { ["count"] = windows.Count.ToString() });
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException)
+        {
+            return new AgentToolResult(request.Name, false, exception.Message, new Dictionary<string, string>());
+        }
+    }
+
+    private static bool TryGetRange(
+        AgentToolRequest request,
+        bool required,
+        out DateTimeOffset start,
+        out DateTimeOffset end,
+        out string error)
+    {
+        start = default;
+        end = default;
+        error = string.Empty;
+
+        var startValue = request.Arguments.GetValueOrDefault("start");
+        var endValue = request.Arguments.GetValueOrDefault("end");
+
+        if (!required && string.IsNullOrWhiteSpace(startValue) && string.IsNullOrWhiteSpace(endValue))
+        {
+            start = DateTimeOffset.Now.AddYears(-1);
+            end = DateTimeOffset.Now.AddYears(1);
+            return true;
+        }
+
+        if (!DateTimeOffset.TryParse(startValue, out start))
+        {
+            error = "Missing or invalid required argument 'start'. Use ISO 8601 date/time.";
+            return false;
+        }
+
+        if (!DateTimeOffset.TryParse(endValue, out end))
+        {
+            error = "Missing or invalid required argument 'end'. Use ISO 8601 date/time.";
+            return false;
+        }
+
+        if (end <= start)
+        {
+            error = "Calendar end time must be after start time.";
+            return false;
+        }
+
+        return true;
+    }
+
+    private static string GetCalendarId(AgentToolRequest request)
+    {
+        var calendarId = request.Arguments.GetValueOrDefault("calendarId");
+
+        return string.IsNullOrWhiteSpace(calendarId) ? "primary" : calendarId;
+    }
+
+    private static int GetInt(string? value, int fallback)
+    {
+        return int.TryParse(value, out var parsed)
+            ? parsed
+            : fallback;
+    }
+
+    private static string FormatEvent(GoogleCalendarEvent calendarEvent)
+    {
+        var attendees = calendarEvent.Attendees.Count == 0
+            ? string.Empty
+            : $" attendees={string.Join(", ", calendarEvent.Attendees)}";
+        var location = string.IsNullOrWhiteSpace(calendarEvent.Location)
+            ? string.Empty
+            : $" location={calendarEvent.Location}";
+        var link = string.IsNullOrWhiteSpace(calendarEvent.MeetingLink)
+            ? string.Empty
+            : $" link={calendarEvent.MeetingLink}";
+
+        return $"- {calendarEvent.Title}: {calendarEvent.Start:O} to {calendarEvent.End:O} timezone={calendarEvent.TimeZone} id={calendarEvent.Id} calendar={calendarEvent.CalendarId}{location}{attendees}{link}";
     }
 
     private async Task<AgentToolResult> SpawnAgent(

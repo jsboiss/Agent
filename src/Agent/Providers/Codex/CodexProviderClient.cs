@@ -358,6 +358,7 @@ public sealed class CodexProviderClient(IOptions<CodexProviderOptions> options) 
             To delegate, include exactly one machine-readable directive in your response:
             <delegate_to_sub_agent>{"task":"A self-contained task for the background agent.","capabilities":"ReadOnly,Code","requiresConfirmation":true}</delegate_to_sub_agent>
             Set capabilities to include ExternalActions when the task needs shell commands, app/program launching, or other local external actions.
+            For any Google Calendar, schedule, availability, or event lookup request, delegate with capabilities ReadOnly,Calendar,Memory and requiresConfirmation false.
             For explicit, non-destructive app launch requests, such as opening Notepad with Start-Process, set requiresConfirmation to false because the user's request is the authorization.
             You may include a brief user-facing sentence before the directive. Do not use the directive for ordinary questions or read-only explanations.
             """);

@@ -1,6 +1,7 @@
 using Agent.Conversations;
 using Agent.Providers;
 using Agent.Settings;
+using Agent.SubAgents;
 
 namespace Agent.Resources;
 
@@ -9,4 +10,5 @@ public sealed record AgentResourceLoadRequest(
     string Channel,
     AgentProviderType ProviderType,
     AgentSettings Settings,
-    string WorkspaceRootPath);
+    string WorkspaceRootPath,
+    SubAgentCapabilities Capabilities = SubAgentCapabilities.None);

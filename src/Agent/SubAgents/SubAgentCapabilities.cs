@@ -8,5 +8,6 @@ public enum SubAgentCapabilities
     Code = 2,
     Web = 4,
     Memory = 8,
-    ExternalActions = 16
+    ExternalActions = 16,
+    Calendar = 32
 }

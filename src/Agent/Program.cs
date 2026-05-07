@@ -1,5 +1,6 @@
 using Agent.Compaction;
 using Agent.Automations;
+using Agent.Calendar;
 using Agent.Channels.Telegram;
 using Agent.Conversations;
 using Agent.Dashboard;
@@ -42,6 +43,12 @@ builder.Services.Configure<SqliteAgentStateOptions>(
     builder.Configuration.GetSection("Agent:Sqlite"));
 builder.Services.Configure<TelegramChannelOptions>(
     builder.Configuration.GetSection(TelegramChannelOptions.SectionName));
+builder.Services.Configure<GoogleCalendarOptions>(
+    builder.Configuration.GetSection(GoogleCalendarOptions.SectionName));
+builder.Services.AddDataProtection();
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession();
+builder.Services.AddHttpClient<IGoogleCalendarClient, GoogleCalendarClient>();
 builder.Services.AddHttpClient<OllamaProviderClient>((services, httpClient) =>
 {
     var options = services.GetRequiredService<IOptions<OllamaProviderOptions>>().Value;
@@ -51,6 +58,7 @@ builder.Services.AddSingleton<IAgentProviderClient, ClaudeCodeProviderClient>();
 builder.Services.AddSingleton<IAgentProviderClient, CodexProviderClient>();
 builder.Services.AddSingleton<IAgentProviderClient>(x => x.GetRequiredService<OllamaProviderClient>());
 builder.Services.AddSingleton<IAgentProviderSelector, AgentProviderSelector>();
+builder.Services.AddSingleton<IAgentProviderToolLoop, AgentProviderToolLoop>();
 builder.Services.AddSingleton<IConversationRepository, SqliteConversationRepository>();
 builder.Services.AddSingleton<IConversationResolver, ConversationResolver>();
 builder.Services.AddSingleton<IConversationSummaryStore, SqliteConversationSummaryStore>();
@@ -78,6 +86,9 @@ builder.Services.AddSingleton<IAgentDraftStore, SqliteAgentDraftStore>();
 builder.Services.AddSingleton<IAutomationScheduler, SimpleAutomationScheduler>();
 builder.Services.AddSingleton<IAutomationStore, SqliteAutomationStore>();
 builder.Services.AddHostedService<AutomationWorker>();
+builder.Services.AddSingleton<IGoogleCalendarAuthStore, SqliteGoogleCalendarAuthStore>();
+builder.Services.AddSingleton<ICalendarProvider, GoogleCalendarProvider>();
+builder.Services.AddSingleton<ICalendarScout, CalendarScout>();
 builder.Services.AddSingleton<IMemoryStore, SqliteMemoryStore>();
 builder.Services.AddSingleton<IMemoryScout, MemoryScout>();
 builder.Services.AddSingleton<RuleBasedMemoryExtractor>();
@@ -96,6 +107,7 @@ builder.Services.AddScoped<IMemoryGraphService, MemoryGraphService>();
 builder.Services.AddScoped<ISettingsDashboardService, SettingsDashboardService>();
 builder.Services.AddScoped<ICompactionDashboardService, CompactionDashboardService>();
 builder.Services.AddScoped<IOperationsDashboardService, OperationsDashboardService>();
+builder.Services.AddScoped<ICalendarDashboardService, CalendarDashboardService>();
 builder.Services.AddScoped<IMessageProcessor, AgentMessageProcessor>();
 
 var app = builder.Build();
@@ -118,6 +130,7 @@ if (app.Environment.IsDevelopment())
 }
 app.UseDefaultFiles();
 app.UseStaticFiles();
+app.UseSession();
 app.MapDashboardEndpoints();
 app.MapFallback(async context =>
 {

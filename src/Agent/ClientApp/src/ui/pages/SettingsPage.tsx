@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from "react";
-import { Copy, DatabaseZap, FolderInput, ShieldCheck, ShieldOff, Sparkles, Trash2 } from "lucide-react";
+import { CalendarDays, Copy, DatabaseZap, FolderInput, ShieldCheck, ShieldOff, Sparkles, Trash2 } from "lucide-react";
 import { useGetSettings } from "../../api/generated";
 import { ErrorState, IconButton, LoadingState, PageFrame, Panel } from "../components";
 
@@ -12,12 +12,21 @@ type WorkspaceSettings = {
 
 type SettingsSnapshotWithWorkspace = {
   workspace?: WorkspaceSettings;
+  calendar?: CalendarSettings;
+};
+
+type CalendarSettings = {
+  configured: boolean;
+  connected: boolean;
+  accountEmail?: string | null;
+  updatedAt?: string | null;
 };
 
 export function SettingsPage() {
   const settingsQuery = useGetSettings();
   const snapshot = settingsQuery.data?.data;
   const workspace = (snapshot as (typeof snapshot & SettingsSnapshotWithWorkspace) | undefined)?.workspace;
+  const calendar = (snapshot as (typeof snapshot & SettingsSnapshotWithWorkspace) | undefined)?.calendar;
   const values = snapshot?.values ?? {};
   const appliedLayers = snapshot?.appliedLayers ?? [];
   const [isCompacting, setIsCompacting] = useState(false);
@@ -27,6 +36,8 @@ export function SettingsPage() {
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [isUpdatingWorkspace, setIsUpdatingWorkspace] = useState(false);
   const [workspaceRootPath, setWorkspaceRootPath] = useState("");
+  const [calendarError, setCalendarError] = useState<string | null>(null);
+  const [isUpdatingCalendar, setIsUpdatingCalendar] = useState(false);
 
   async function compactMain() {
     setIsCompacting(true);
@@ -143,6 +154,25 @@ export function SettingsPage() {
     }
   }
 
+  async function disconnectCalendar() {
+    setIsUpdatingCalendar(true);
+    setCalendarError(null);
+
+    try {
+      const response = await fetch("/api/dashboard/calendar/disconnect", { method: "POST" });
+
+      if (!response.ok) {
+        throw new Error(`Calendar disconnect failed: ${response.status}`);
+      }
+
+      await settingsQuery.refetch();
+    } catch (error) {
+      setCalendarError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsUpdatingCalendar(false);
+    }
+  }
+
   return (
     <PageFrame
       eyebrow="Read-only configuration"
@@ -160,6 +190,7 @@ export function SettingsPage() {
       {maintenanceResult && <p className="muted">{maintenanceResult}</p>}
       {compactionError && <ErrorState error={new Error(compactionError)} />}
       {workspaceError && <ErrorState error={new Error(workspaceError)} />}
+      {calendarError && <ErrorState error={new Error(calendarError)} />}
       {snapshot && (
         <div className="settings-grid">
           {workspace && (
@@ -221,6 +252,43 @@ export function SettingsPage() {
               ["SQLite", snapshot.memoryConnectionString]
             ]}
           />
+          {calendar && (
+            <Panel title="Google Calendar">
+              <dl className="settings-list">
+                <div className="settings-row">
+                  <dt>Status</dt>
+                  <dd>
+                    <code>{calendar.connected ? "connected" : calendar.configured ? "not connected" : "not configured"}</code>
+                    {calendar.connected ? (
+                      <button className="secondary-action" disabled={isUpdatingCalendar} onClick={() => void disconnectCalendar()} type="button">
+                        <ShieldOff size={14} />
+                        Disconnect
+                      </button>
+                    ) : !calendar.configured ? (
+                      <button className="secondary-action" disabled type="button">
+                        <CalendarDays size={14} />
+                        Connect
+                      </button>
+                    ) : (
+                      <a className="secondary-action" href="/api/dashboard/calendar/connect">
+                        <CalendarDays size={14} />
+                        Connect
+                      </a>
+                    )}
+                  </dd>
+                </div>
+                <div className="settings-row">
+                  <dt>Account</dt>
+                  <dd>
+                    <code>{calendar.accountEmail ?? "unset"}</code>
+                    <IconButton onClick={() => navigator.clipboard.writeText(calendar.accountEmail ?? "")} title="Copy calendar account" type="button">
+                      <Copy size={13} />
+                    </IconButton>
+                  </dd>
+                </div>
+              </dl>
+            </Panel>
+          )}
           <Panel title="Memory Maintenance">
             <div className="row-actions">
               <button className="secondary-action" onClick={() => void runMemoryMaintenance("/api/dashboard/memory/cleanup")} type="button">

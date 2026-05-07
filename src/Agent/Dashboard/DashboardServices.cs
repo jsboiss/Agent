@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using Agent.Automations;
+using Agent.Calendar;
 using Agent.Compaction;
 using Agent.Conversations;
 using Agent.Channels.Telegram;
@@ -702,6 +703,7 @@ public sealed class SettingsDashboardService(
     IAgentSettingsResolver settingsResolver,
     IOptions<SqliteMemoryOptions> memoryOptions,
     IAgentWorkspaceStore workspaceStore,
+    IGoogleCalendarClient googleCalendarClient,
     IWebHostEnvironment environment) : ISettingsDashboardService
 {
     public async Task<SettingsDashboardSnapshot> Load(CancellationToken cancellationToken)
@@ -727,7 +729,8 @@ public sealed class SettingsDashboardService(
             settings.Values,
             settings.AppliedLayers,
             memoryOptions.Value.ConnectionString,
-            ToStatus(workspaceResolution.Workspace, null));
+            ToStatus(workspaceResolution.Workspace, null),
+            ToCalendarStatus(await googleCalendarClient.GetStatus(cancellationToken)));
     }
 
     public async Task<WorkspaceStatus> UpdateWorkspacePermissions(
@@ -775,6 +778,47 @@ public sealed class SettingsDashboardService(
             activeRun?.Kind.ToString());
     }
 
+    private static CalendarStatusResponse ToCalendarStatus(GoogleCalendarConnectionStatus status)
+    {
+        return new CalendarStatusResponse(
+            status.Configured,
+            status.Connected,
+            status.AccountEmail,
+            status.UpdatedAt);
+    }
+
+}
+
+public sealed class CalendarDashboardService(IGoogleCalendarClient googleCalendarClient) : ICalendarDashboardService
+{
+    public async Task<CalendarStatusResponse> GetStatus(CancellationToken cancellationToken)
+    {
+        var status = await googleCalendarClient.GetStatus(cancellationToken);
+
+        return new CalendarStatusResponse(
+            status.Configured,
+            status.Connected,
+            status.AccountEmail,
+            status.UpdatedAt);
+    }
+
+    public string GetConnectUrl(HttpContext httpContext)
+    {
+        var state = Guid.NewGuid().ToString("N");
+        httpContext.Session.SetString("google-calendar-oauth-state", state);
+
+        return googleCalendarClient.GetAuthorizationUrl(state);
+    }
+
+    public async Task CompleteConnect(string code, CancellationToken cancellationToken)
+    {
+        await googleCalendarClient.Connect(code, cancellationToken);
+    }
+
+    public async Task Disconnect(CancellationToken cancellationToken)
+    {
+        await googleCalendarClient.Disconnect(cancellationToken);
+    }
 }
 
 public sealed class CompactionDashboardService(

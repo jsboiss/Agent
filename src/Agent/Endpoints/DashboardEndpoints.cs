@@ -92,6 +92,44 @@ public static class DashboardEndpoints
             async (ISettingsDashboardService service, CancellationToken cancellationToken) =>
                 await service.Load(cancellationToken))
             .WithName("GetSettings");
+        group.MapGet(
+            "/calendar/status",
+            async (ICalendarDashboardService service, CancellationToken cancellationToken) =>
+                await service.GetStatus(cancellationToken))
+            .WithName("GetCalendarStatus");
+        group.MapGet(
+            "/calendar/connect",
+            (ICalendarDashboardService service, HttpContext context) =>
+                Results.Redirect(service.GetConnectUrl(context)))
+            .WithName("ConnectCalendar");
+        group.MapGet(
+            "/calendar/oauth-callback",
+            async (string? code, string? state, ICalendarDashboardService service, HttpContext context, CancellationToken cancellationToken) =>
+            {
+                var expectedState = context.Session.GetString("google-calendar-oauth-state");
+
+                if (string.IsNullOrWhiteSpace(code)
+                    || string.IsNullOrWhiteSpace(state)
+                    || !string.Equals(expectedState, state, StringComparison.Ordinal))
+                {
+                    return Results.BadRequest("Invalid Google Calendar OAuth callback.");
+                }
+
+                await service.CompleteConnect(code, cancellationToken);
+                context.Session.Remove("google-calendar-oauth-state");
+
+                return Results.Redirect("/settings");
+            })
+            .WithName("CompleteCalendarOAuth");
+        group.MapPost(
+            "/calendar/disconnect",
+            async (ICalendarDashboardService service, CancellationToken cancellationToken) =>
+            {
+                await service.Disconnect(cancellationToken);
+
+                return Results.NoContent();
+            })
+            .WithName("DisconnectCalendar");
         group.MapPost(
             "/settings/workspace-permissions",
             async (WorkspacePermissionUpdateDto request, ISettingsDashboardService service, CancellationToken cancellationToken) =>

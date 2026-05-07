@@ -1,6 +1,7 @@
 using Agent.Conversations;
 using Agent.Compaction;
 using Agent.Providers;
+using Agent.SubAgents;
 using Agent.Tools;
 using Agent.Workspaces;
 
@@ -87,7 +88,7 @@ public sealed class AgentResourceLoader(
                 },
                 "capabilities": {
                   "type": "string",
-                  "description": "Comma-separated capabilities: ReadOnly, Code, Web, Memory, ExternalActions."
+                  "description": "Comma-separated capabilities: ReadOnly, Code, Web, Memory, ExternalActions, Calendar."
                 },
                 "requiresConfirmation": {
                   "type": "boolean",
@@ -204,19 +205,72 @@ public sealed class AgentResourceLoader(
             "New run id.")
     ];
 
+    private static IReadOnlyList<AgentToolDefinition> CalendarTools =>
+    [
+        new AgentToolDefinition(
+            "calendar_list_events",
+            "List Google Calendar events within an explicit time range. Read-only.",
+            """
+            {
+              "type": "object",
+              "properties": {
+                "start": { "type": "string", "description": "Inclusive ISO 8601 start date/time." },
+                "end": { "type": "string", "description": "Exclusive ISO 8601 end date/time." },
+                "calendarId": { "type": "string", "description": "Google Calendar id. Use primary unless the user names another calendar." },
+                "limit": { "type": "integer", "minimum": 1, "maximum": 50 }
+              },
+              "required": ["start", "end"]
+            }
+            """,
+            "Concise matching calendar events."),
+        new AgentToolDefinition(
+            "calendar_search_events",
+            "Search Google Calendar events by text and optional explicit time range. Read-only.",
+            """
+            {
+              "type": "object",
+              "properties": {
+                "query": { "type": "string", "description": "Search text." },
+                "start": { "type": "string", "description": "Inclusive ISO 8601 start date/time." },
+                "end": { "type": "string", "description": "Exclusive ISO 8601 end date/time." },
+                "calendarId": { "type": "string", "description": "Google Calendar id. Use primary unless the user names another calendar." },
+                "limit": { "type": "integer", "minimum": 1, "maximum": 50 }
+              },
+              "required": ["query"]
+            }
+            """,
+            "Concise matching calendar events."),
+        new AgentToolDefinition(
+            "calendar_get_availability",
+            "Return busy and free windows for a Google Calendar within an explicit time range. Read-only.",
+            """
+            {
+              "type": "object",
+              "properties": {
+                "start": { "type": "string", "description": "Inclusive ISO 8601 start date/time." },
+                "end": { "type": "string", "description": "Exclusive ISO 8601 end date/time." },
+                "calendarId": { "type": "string", "description": "Google Calendar id. Use primary unless the user names another calendar." }
+              },
+              "required": ["start", "end"]
+            }
+            """,
+            "Busy and free windows for the requested calendar range.")
+    ];
+
     public async Task<AgentResourceContext> Load(
         AgentResourceLoadRequest request,
         CancellationToken cancellationToken)
     {
         var rootPath = WorkspacePathResolver.NormalizeRootPath(request.WorkspaceRootPath, environment.ContentRootPath);
         var workspaceInstructions = await ReadInstructions(rootPath, cancellationToken);
+        var availableTools = GetAvailableTools(request.Capabilities);
         var workspace = new WorkspaceContext(
             rootPath,
             environment.ContentRootPath,
             Path.GetFileName(rootPath),
             string.IsNullOrWhiteSpace(workspaceInstructions) ? [] : [workspaceInstructions],
             request.Settings.Values,
-            DefaultTools);
+            availableTools);
 
         var recentEntryCount = GetRecentEntryCount(request.Settings.Values);
         var compactionThreshold = GetCompactionThreshold(request.Settings.Values);
@@ -242,9 +296,19 @@ public sealed class AgentResourceLoader(
             GetChannelInstructions(request.Channel),
             GetProviderConstraints(request.ProviderType),
             GetPromptTemplate(workspace),
-            GetToolContext(DefaultTools),
+            GetToolContext(availableTools),
             string.Empty,
             GetConversationSummary(rollingSummary, entries, recentEntryCount));
+    }
+
+    private static IReadOnlyList<AgentToolDefinition> GetAvailableTools(SubAgentCapabilities capabilities)
+    {
+        if (!capabilities.HasFlag(SubAgentCapabilities.Calendar))
+        {
+            return DefaultTools;
+        }
+
+        return [.. DefaultTools, .. CalendarTools];
     }
 
     private static async Task<string> ReadInstructions(string rootPath, CancellationToken cancellationToken)
@@ -265,6 +329,7 @@ public sealed class AgentResourceLoader(
             You are the dispatcher for the MainAgent harness.
             Answer quick control, memory, status, and conversational turns directly.
             For code changes, file changes, web research, slow work, automations, app/program launching, shell commands, or risky actions, call send_ack first when useful, then spawn_agent with a crisp self-contained task.
+            For all Google Calendar or schedule questions, delegate to a sub-agent with capabilities ReadOnly,Calendar,Memory. Do not answer calendar questions from memory or guess current events.
             When the user asks to open, start, or launch a local app or program, treat it as an external action and delegate to a sub-agent with ExternalActions capability so it can use the shell, for example Windows Start-Process.
             Mobile-originated risky actions must be staged or proposed and require confirmation before mutation.
             Keep outputs concise unless more detail is requested.

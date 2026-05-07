@@ -142,7 +142,14 @@ public sealed record SettingsDashboardSnapshot(
     IReadOnlyDictionary<string, string> Values,
     IReadOnlyList<string> AppliedLayers,
     string MemoryConnectionString,
-    WorkspaceStatus Workspace);
+    WorkspaceStatus Workspace,
+    CalendarStatusResponse Calendar);
+
+public sealed record CalendarStatusResponse(
+    bool Configured,
+    bool Connected,
+    string? AccountEmail,
+    DateTimeOffset? UpdatedAt);
 
 public sealed record WorkspacePermissionUpdateDto(bool RemoteExecutionAllowed);
 
@@ -277,6 +284,17 @@ public interface ISettingsDashboardService
     Task<WorkspaceStatus> UpdateWorkspaceRootPath(
         WorkspaceRootPathUpdateDto request,
         CancellationToken cancellationToken);
+}
+
+public interface ICalendarDashboardService
+{
+    Task<CalendarStatusResponse> GetStatus(CancellationToken cancellationToken);
+
+    string GetConnectUrl(HttpContext httpContext);
+
+    Task CompleteConnect(string code, CancellationToken cancellationToken);
+
+    Task Disconnect(CancellationToken cancellationToken);
 }
 
 public interface ICompactionDashboardService

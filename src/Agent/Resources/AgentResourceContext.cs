@@ -9,7 +9,8 @@ public sealed record AgentResourceContext(
     string PromptTemplate,
     string ToolContext,
     string CompactMemoryContext,
-    string ConversationSummary)
+    string ConversationSummary,
+    string CalendarContext = "")
 {
     public string BuildSystemPrompt()
     {
@@ -21,6 +22,7 @@ public sealed record AgentResourceContext(
             ProviderConstraints,
             PromptTemplate,
             ToolContext,
+            CalendarContext,
             CompactMemoryContext,
             ConversationSummary
         };

@@ -1,4 +1,5 @@
 using Agent.Conversations;
+using Agent.Calendar;
 using Agent.Events;
 using Agent.Memory;
 using Agent.Notifications;
@@ -22,7 +23,9 @@ public sealed class AgentMessageProcessor(
     IAgentSettingsResolver settingsResolver,
     IWebHostEnvironment environment,
     IAgentToolExecutor toolExecutor,
+    IAgentProviderToolLoop providerToolLoop,
     IMemoryScout memoryScout,
+    ICalendarScout calendarScout,
     IMemoryExtractor memoryExtractor,
     IMemoryCandidateReviewer memoryCandidateReviewer,
     IMemoryStore memoryStore,
@@ -218,6 +221,17 @@ public sealed class AgentMessageProcessor(
             events,
             eventCursor,
             cancellationToken);
+        var calendarScoutResult = await PrefetchCalendar(
+            conversation.Id,
+            request,
+            userEntry.Id,
+            events,
+            eventCursor,
+            cancellationToken);
+        resources = resources with
+        {
+            CalendarContext = calendarScoutResult.CompactContext
+        };
 
         var recentMirrors = string.IsNullOrWhiteSpace(route.CodexThreadId)
             ? []
@@ -259,13 +273,11 @@ public sealed class AgentMessageProcessor(
                     cancellationToken);
             }
 
-            var providerResult = await RunProviderToolLoop(
+            var providerResult = await providerToolLoop.Run(
                 provider,
                 providerRequest,
                 request.Channel,
                 userEntry.Id,
-                events,
-                eventCursor,
                 settings,
                 notificationTarget,
                 cancellationToken);
@@ -751,6 +763,66 @@ public sealed class AgentMessageProcessor(
                 {
                     ["ConversationEntryId"] = userEntryId,
                     ["memoryIds"] = string.Join(",", result.Memories.Select(x => x.Id))
+                }));
+            await PublishPending(events, eventCursor, cancellationToken);
+        }
+
+        return result;
+    }
+
+    private async Task<CalendarScoutResult> PrefetchCalendar(
+        string conversationId,
+        MessageRequest request,
+        string userEntryId,
+        List<AgentEvent> events,
+        EventPublishCursor eventCursor,
+        CancellationToken cancellationToken)
+    {
+        events.Add(GetEvent(
+            AgentEventKind.CalendarScoutStarted,
+            conversationId,
+            new Dictionary<string, string>
+            {
+                ["ConversationEntryId"] = userEntryId,
+                ["channel"] = request.Channel
+            }));
+        await PublishPending(events, eventCursor, cancellationToken);
+
+        var result = await calendarScout.Prefetch(
+            new CalendarScoutRequest(
+                conversationId,
+                request.UserMessage,
+                new Dictionary<string, string>
+                {
+                    ["channel"] = request.Channel,
+                    ["ConversationEntryId"] = userEntryId
+                }),
+            cancellationToken);
+
+        events.Add(GetEvent(
+            AgentEventKind.CalendarScoutCompleted,
+            conversationId,
+            new Dictionary<string, string>
+            {
+                ["ConversationEntryId"] = userEntryId,
+                ["isCalendarRelevant"] = result.IsCalendarRelevant.ToString(),
+                ["isExplicitCalendarRequest"] = result.IsExplicitCalendarRequest.ToString(),
+                ["start"] = result.Start?.ToString("O") ?? string.Empty,
+                ["end"] = result.End?.ToString("O") ?? string.Empty,
+                ["error"] = result.Error ?? string.Empty
+            }));
+        await PublishPending(events, eventCursor, cancellationToken);
+
+        if (result.IsCalendarRelevant && !string.IsNullOrWhiteSpace(result.CompactContext))
+        {
+            events.Add(GetEvent(
+                AgentEventKind.CalendarInjected,
+                conversationId,
+                new Dictionary<string, string>
+                {
+                    ["ConversationEntryId"] = userEntryId,
+                    ["start"] = result.Start?.ToString("O") ?? string.Empty,
+                    ["end"] = result.End?.ToString("O") ?? string.Empty
                 }));
             await PublishPending(events, eventCursor, cancellationToken);
         }

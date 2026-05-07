@@ -1,11 +1,14 @@
 using Agent.Conversations;
 using Agent.Events;
+using Agent.Calendar;
 using Agent.Notifications;
 using Agent.Providers;
 using Agent.Resources;
 using Agent.Settings;
 using Agent.Tokens;
 using Agent.Workspaces;
+using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace Agent.SubAgents;
 
@@ -16,6 +19,8 @@ public sealed class SubAgentRunWorker(
     IConversationRepository conversationRepository,
     IConversationMirrorStore mirrorStore,
     IAgentProviderSelector providerSelector,
+    IAgentProviderToolLoop providerToolLoop,
+    ICalendarProvider calendarProvider,
     IAgentResourceLoader resourceLoader,
     IAgentSettingsResolver settingsResolver,
     IAgentEventSink eventSink,
@@ -51,12 +56,23 @@ public sealed class SubAgentRunWorker(
         {
             return;
         }
+
+        if (item.Capabilities.HasFlag(SubAgentCapabilities.Calendar)
+            && TryGetSingleDayCalendarRange(item.Task, out var start, out var end))
+        {
+            await ExecuteCalendarRead(item, run, start, end, cancellationToken);
+            return;
+        }
+
         var workspace = (await workspaceStore.List(cancellationToken))
             .FirstOrDefault(x => string.Equals(x.Id, item.WorkspaceId, StringComparison.OrdinalIgnoreCase))
             ?? throw new InvalidOperationException($"Workspace '{item.WorkspaceId}' was not found.");
         Directory.CreateDirectory(workspace.RootPath);
         var conversation = await conversationRepository.Get(item.ChildConversationId, cancellationToken)
             ?? throw new InvalidOperationException($"Sub-agent conversation '{item.ChildConversationId}' was not found.");
+        var providerType = item.Capabilities.HasFlag(SubAgentCapabilities.Calendar)
+            ? AgentProviderType.Ollama
+            : AgentProviderType.Codex;
         var settings = await settingsResolver.Resolve(
             new AgentSettingsResolveRequest(
                 conversation,
@@ -64,13 +80,13 @@ public sealed class SubAgentRunWorker(
                 workspace.RootPath,
                 new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 {
-                    ["provider"] = AgentProviderType.Codex.ToString()
+                    ["provider"] = providerType.ToString()
                 }),
             cancellationToken);
         var resources = await resourceLoader.Load(
-            new AgentResourceLoadRequest(conversation, item.Channel, AgentProviderType.Codex, settings, workspace.RootPath),
+            new AgentResourceLoadRequest(conversation, item.Channel, providerType, settings, workspace.RootPath, item.Capabilities),
             cancellationToken);
-        var provider = providerSelector.Get(AgentProviderType.Codex);
+        var provider = providerSelector.Get(providerType);
 
         await runStore.Update(
             item.RunId,
@@ -94,7 +110,7 @@ public sealed class SubAgentRunWorker(
             cancellationToken);
 
         var request = new AgentProviderRequest(
-            AgentProviderType.Codex,
+            providerType,
             item.ChildConversationId,
             GetTaskPrompt(item),
             resources,
@@ -112,7 +128,14 @@ public sealed class SubAgentRunWorker(
             string.Empty,
             resources.ChannelInstructions,
             item.AllowsMutation);
-        var result = await provider.Send(request, cancellationToken);
+        var result = await providerToolLoop.Run(
+            provider,
+            request,
+            item.Channel,
+            item.ParentEntryId,
+            settings,
+            item.NotificationTarget,
+            cancellationToken);
         var latestRun = await runStore.Get(item.RunId, cancellationToken);
 
         if (latestRun?.Status == AgentRunStatus.Cancelled)
@@ -185,6 +208,87 @@ public sealed class SubAgentRunWorker(
             cancellationToken);
     }
 
+    private async Task ExecuteCalendarRead(
+        SubAgentWorkItem item,
+        AgentRun run,
+        DateTimeOffset start,
+        DateTimeOffset end,
+        CancellationToken cancellationToken)
+    {
+        await runStore.Update(
+            item.RunId,
+            AgentRunStatus.Running,
+            run.CodexThreadId,
+            null,
+            null,
+            cancellationToken);
+        await Publish(
+            AgentEventKind.ToolCallStarted,
+            item.ChildConversationId,
+            new Dictionary<string, string>
+            {
+                ["runId"] = item.RunId,
+                ["toolName"] = "calendar_list_events",
+                ["start"] = start.ToString("O"),
+                ["end"] = end.ToString("O")
+            },
+            cancellationToken);
+
+        string content;
+        AgentRunStatus status;
+        string? error = null;
+
+        try
+        {
+            var events = await calendarProvider.ListEvents(
+                new GoogleCalendarEventQuery(start, end, null, "primary", 50),
+                cancellationToken);
+            content = FormatCalendarSummary(start, events);
+            status = AgentRunStatus.Completed;
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException)
+        {
+            content = exception.Message;
+            error = exception.Message;
+            status = AgentRunStatus.Failed;
+        }
+
+        await runStore.Update(
+            item.RunId,
+            status,
+            run.CodexThreadId,
+            content,
+            error,
+            cancellationToken);
+        await conversationRepository.AddEntry(
+            item.ChildConversationId,
+            status == AgentRunStatus.Completed ? ConversationEntryRole.Assistant : ConversationEntryRole.Tool,
+            item.Channel,
+            content,
+            item.ParentEntryId,
+            cancellationToken);
+        await conversationRepository.AddEntry(
+            item.ParentConversationId,
+            ConversationEntryRole.Tool,
+            item.Channel,
+            $"Sub-agent run {item.RunId} completed with status {status}: {Shorten(content, 800)}",
+            item.ParentEntryId,
+            cancellationToken);
+        await Publish(
+            string.IsNullOrWhiteSpace(error) ? AgentEventKind.ToolCallCompleted : AgentEventKind.ProviderError,
+            item.ChildConversationId,
+            new Dictionary<string, string>
+            {
+                ["runId"] = item.RunId,
+                ["toolName"] = "calendar_list_events",
+                ["succeeded"] = string.IsNullOrWhiteSpace(error).ToString(),
+                ["error"] = error ?? string.Empty,
+                ["message"] = content
+            },
+            cancellationToken);
+        await Notify(item, new AgentProviderResult(content, [], new Dictionary<string, string>(), error), status, cancellationToken);
+    }
+
     private static string GetTaskPrompt(SubAgentWorkItem item)
     {
         List<string> sections =
@@ -203,12 +307,93 @@ public sealed class SubAgentRunWorker(
                 """);
         }
 
+        if (item.Capabilities.HasFlag(SubAgentCapabilities.Calendar))
+        {
+            sections.Add("""
+                Calendar policy: use the available Google Calendar tools for event, schedule, and availability questions.
+                Calendar access is read-only. Do not propose or perform calendar writes in this run.
+                Use explicit ISO 8601 date/time ranges when calling calendar tools.
+                """);
+        }
+
         if (!item.AllowsMutation)
         {
             sections.Add("Mutation is disabled for this run. Read, inspect, and propose only.");
         }
 
         return string.Join(Environment.NewLine + Environment.NewLine, sections);
+    }
+
+    private static bool TryGetSingleDayCalendarRange(
+        string task,
+        out DateTimeOffset start,
+        out DateTimeOffset end)
+    {
+        start = default;
+        end = default;
+        var match = Regex.Match(
+            task,
+            @"(?<month>January|February|March|April|May|June|July|August|September|October|November|December)\s+(?<day>\d{1,2}),\s+(?<year>\d{4})",
+            RegexOptions.IgnoreCase);
+
+        if (!match.Success)
+        {
+            return false;
+        }
+
+        if (!DateTime.TryParseExact(
+            $"{match.Groups["month"].Value} {match.Groups["day"].Value}, {match.Groups["year"].Value}",
+            "MMMM d, yyyy",
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.None,
+            out var date))
+        {
+            return false;
+        }
+
+        var timeZone = GetTimeZone(task);
+        var offset = timeZone.GetUtcOffset(date);
+        start = new DateTimeOffset(date.Date, offset);
+        end = start.AddDays(1);
+
+        return true;
+    }
+
+    private static TimeZoneInfo GetTimeZone(string task)
+    {
+        if (task.Contains("Australia/Brisbane", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById("Australia/Brisbane");
+            }
+            catch (TimeZoneNotFoundException)
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById("E. Australia Standard Time");
+            }
+        }
+
+        return TimeZoneInfo.Local;
+    }
+
+    private static string FormatCalendarSummary(
+        DateTimeOffset start,
+        IReadOnlyList<GoogleCalendarEvent> events)
+    {
+        if (events.Count == 0)
+        {
+            return $"No calendar events found for {start:dddd, MMMM d, yyyy}.";
+        }
+
+        return string.Join(
+            Environment.NewLine,
+            events.Select(x =>
+            {
+                var location = string.IsNullOrWhiteSpace(x.Location) ? string.Empty : $" Location: {x.Location}.";
+                var link = string.IsNullOrWhiteSpace(x.MeetingLink) ? string.Empty : $" Link: {x.MeetingLink}.";
+
+                return $"- {x.Start:HH:mm}-{x.End:HH:mm}: {x.Title}.{location}{link}";
+            }));
     }
 
     private async Task AddConversationResult(
