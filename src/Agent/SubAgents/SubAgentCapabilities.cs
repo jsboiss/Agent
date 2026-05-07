@@ -9,5 +9,11 @@ public enum SubAgentCapabilities
     Web = 4,
     Memory = 8,
     ExternalActions = 16,
-    Calendar = 32
+    CalendarRead = 32,
+    EmailRead = 64,
+    EmailDraft = 128,
+    EmailSend = 256,
+    ContactsRead = 512,
+    ExternalWrite = 1024,
+    Calendar = CalendarRead
 }

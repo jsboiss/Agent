@@ -104,7 +104,8 @@ public sealed class SubAgentCoordinator(
                 $"Task: {request.Task}",
                 $"ParentEntryId: {request.ParentEntryId}",
                 $"Capabilities: {request.Capabilities}",
-                $"RequiresConfirmation: {request.RequiresConfirmation}"
+                $"RequiresConfirmation: {request.RequiresConfirmation}",
+                "Integration permission policy: read capabilities may execute read-only tools directly. Write, send, and external side-effect capabilities must stage drafts unless the user explicitly authorized the exact action."
             ]);
     }
 

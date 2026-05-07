@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Agent.Automations;
 using Agent.Calendar;
+using Agent.Capabilities;
 using Agent.Compaction;
 using Agent.Conversations;
 using Agent.Channels.Telegram;
@@ -28,7 +29,8 @@ public sealed class ChatDashboardService(
     IAgentSettingsResolver settingsResolver,
     IAgentWorkspaceStore workspaceStore,
     IAgentRunStore runStore,
-    IWebHostEnvironment environment) : IChatDashboardService
+    IWebHostEnvironment environment,
+    IAgentCapabilityRegistry capabilityRegistry) : IChatDashboardService
 {
     private static readonly MarkdownPipeline MarkdownPipeline = new MarkdownPipelineBuilder()
         .UseAdvancedExtensions()
@@ -187,7 +189,7 @@ public sealed class ChatDashboardService(
             entries.Select(ToMessage).ToArray(),
             events.OrderByDescending(x => x.CreatedAt).Take(40).Select(RunTimelineService.ToRow).ToArray(),
             injectedMemories,
-            ["search_memory", "write_memory", "spawn_agent", "send_ack", "save_draft", "create_automation", "cancel_run", "retry_run"],
+            capabilityRegistry.GetToolDefinitions(SubAgentCapabilities.None).Select(x => x.Name).ToArray(),
             settings.Get("provider") ?? "Ollama",
             settings.Get("model") ?? "qwen3.5:latest",
             isRunning,
@@ -949,7 +951,8 @@ public sealed class OperationsDashboardService(
     ISubAgentCoordinator subAgentCoordinator,
     IAgentDraftStore draftStore,
     IAutomationStore automationStore,
-    IMemoryMaintenanceService memoryMaintenanceService) : IOperationsDashboardService
+    IMemoryMaintenanceService memoryMaintenanceService,
+    IAgentCapabilityRegistry capabilityRegistry) : IOperationsDashboardService
 {
     public TelegramStatusResponse GetTelegramStatus()
     {
@@ -985,7 +988,7 @@ public sealed class OperationsDashboardService(
                 run.Id,
                 run.Prompt,
                 run.Channel,
-                SubAgentCapabilities.ReadOnly | SubAgentCapabilities.Code,
+                capabilityRegistry.DefaultCapabilities,
                 IsMobileChannel(run.Channel),
                 null),
             cancellationToken);
@@ -1032,7 +1035,7 @@ public sealed class OperationsDashboardService(
                 string.IsNullOrWhiteSpace(request.ConversationId) ? "main" : request.ConversationId,
                 string.IsNullOrWhiteSpace(request.Channel) ? "local-web" : request.Channel,
                 request.NotificationTarget,
-                GetCapabilities(request.Capabilities)),
+                capabilityRegistry.Parse(request.Capabilities)),
             cancellationToken);
 
         return ToRow(automation);
@@ -1108,28 +1111,6 @@ public sealed class OperationsDashboardService(
             result.Merged,
             result.Superseded,
             result.Summary);
-    }
-
-    private static SubAgentCapabilities GetCapabilities(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return SubAgentCapabilities.ReadOnly | SubAgentCapabilities.Code;
-        }
-
-        SubAgentCapabilities capabilities = SubAgentCapabilities.None;
-
-        foreach (var item in value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            if (Enum.TryParse<SubAgentCapabilities>(item, true, out var parsed))
-            {
-                capabilities |= parsed;
-            }
-        }
-
-        return capabilities == SubAgentCapabilities.None
-            ? SubAgentCapabilities.ReadOnly
-            : capabilities;
     }
 
     private static bool IsMobileChannel(string channel)

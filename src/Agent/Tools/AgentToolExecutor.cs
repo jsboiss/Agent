@@ -1,6 +1,7 @@
 using Agent.Memory;
 using Agent.Automations;
 using Agent.Calendar;
+using Agent.Capabilities;
 using Agent.Drafts;
 using Agent.Notifications;
 using Agent.SubAgents;
@@ -16,7 +17,8 @@ public sealed class AgentToolExecutor(
     IAutomationStore automationStore,
     IAutomationScheduler automationScheduler,
     ICalendarProvider calendarProvider,
-    IAgentRunStore runStore) : IAgentToolExecutor
+    IAgentRunStore runStore,
+    IAgentCapabilityRegistry capabilityRegistry) : IAgentToolExecutor
 {
     public async Task<AgentToolResult> Execute(
         AgentToolRequest request,
@@ -200,7 +202,7 @@ public sealed class AgentToolExecutor(
     {
         var task = request.Arguments.GetValueOrDefault("task") ?? string.Empty;
         var parentEntryId = request.Arguments.GetValueOrDefault("parentEntryId") ?? request.ParentEntryId;
-        var capabilities = GetCapabilities(request.Arguments.GetValueOrDefault("capabilities"));
+        var capabilities = capabilityRegistry.Parse(request.Arguments.GetValueOrDefault("capabilities"));
         var requiresConfirmation = GetBool(request.Arguments.GetValueOrDefault("requiresConfirmation"), IsMobileChannel(request.Channel));
         var notificationTarget = request.Arguments.GetValueOrDefault("notificationTarget");
 
@@ -339,7 +341,7 @@ public sealed class AgentToolExecutor(
                 request.ConversationId,
                 request.Channel,
                 request.Arguments.GetValueOrDefault("notificationTarget"),
-                GetCapabilities(request.Arguments.GetValueOrDefault("capabilities"))),
+                capabilityRegistry.Parse(request.Arguments.GetValueOrDefault("capabilities"))),
             cancellationToken);
 
         return new AgentToolResult(
@@ -432,7 +434,7 @@ public sealed class AgentToolExecutor(
                 request.ParentEntryId,
                 run.Prompt,
                 request.Channel,
-                SubAgentCapabilities.ReadOnly | SubAgentCapabilities.Code,
+                capabilityRegistry.DefaultCapabilities,
                 IsMobileChannel(request.Channel),
                 null),
             cancellationToken);
@@ -569,28 +571,6 @@ public sealed class AgentToolExecutor(
     {
         return string.Equals(channel, "telegram", StringComparison.OrdinalIgnoreCase)
             || string.Equals(channel, "imessage", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static SubAgentCapabilities GetCapabilities(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return SubAgentCapabilities.ReadOnly | SubAgentCapabilities.Code;
-        }
-
-        SubAgentCapabilities result = SubAgentCapabilities.None;
-
-        foreach (var item in value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            if (Enum.TryParse<SubAgentCapabilities>(item, true, out var parsed))
-            {
-                result |= parsed;
-            }
-        }
-
-        return result == SubAgentCapabilities.None
-            ? SubAgentCapabilities.ReadOnly
-            : result;
     }
 
     private static double GetDouble(string? value, double fallback)

@@ -60,7 +60,7 @@ public sealed class SubAgentRunWorker(
             return;
         }
 
-        if (item.Capabilities.HasFlag(SubAgentCapabilities.Calendar)
+        if (item.Capabilities.HasFlag(SubAgentCapabilities.CalendarRead)
             && TryGetSingleDayCalendarRange(item.Task, out var start, out var end))
         {
             await ExecuteCalendarRead(item, run, start, end, cancellationToken);
@@ -73,7 +73,7 @@ public sealed class SubAgentRunWorker(
         Directory.CreateDirectory(workspace.RootPath);
         var conversation = await conversationRepository.Get(item.ChildConversationId, cancellationToken)
             ?? throw new InvalidOperationException($"Sub-agent conversation '{item.ChildConversationId}' was not found.");
-        var providerType = item.Capabilities.HasFlag(SubAgentCapabilities.Calendar)
+        var providerType = item.Capabilities.HasFlag(SubAgentCapabilities.CalendarRead)
             ? AgentProviderType.Ollama
             : AgentProviderType.Codex;
         var settings = await settingsResolver.Resolve(
@@ -345,13 +345,25 @@ public sealed class SubAgentRunWorker(
                 """);
         }
 
-        if (item.Capabilities.HasFlag(SubAgentCapabilities.Calendar))
+        if (item.Capabilities.HasFlag(SubAgentCapabilities.CalendarRead))
         {
             sections.Add("""
-                Calendar policy: use the available Google Calendar tools for event, schedule, and availability questions.
+                Calendar policy: CalendarRead allows direct Google Calendar event, schedule, and availability reads.
                 Calendar access is read-only. Do not propose or perform calendar writes in this run.
                 Use explicit ISO 8601 date/time ranges when calling calendar tools.
                 """);
+        }
+
+        if (item.Capabilities.HasFlag(SubAgentCapabilities.EmailRead))
+        {
+            sections.Add("EmailRead is reserved for future provider tools. No email tools are available in this run yet.");
+        }
+
+        if (item.Capabilities.HasFlag(SubAgentCapabilities.EmailDraft)
+            || item.Capabilities.HasFlag(SubAgentCapabilities.EmailSend)
+            || item.Capabilities.HasFlag(SubAgentCapabilities.ExternalWrite))
+        {
+            sections.Add("Write/send/external side effects must be staged as drafts unless the user explicitly authorized that exact action in this turn.");
         }
 
         if (!item.AllowsMutation)

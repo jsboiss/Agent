@@ -1,6 +1,7 @@
 using Agent.Compaction;
 using Agent.Automations;
 using Agent.Calendar;
+using Agent.Capabilities;
 using Agent.Channels.Telegram;
 using Agent.Context;
 using Agent.Conversations;
@@ -83,6 +84,7 @@ builder.Services.AddSingleton<IAgentWorkspaceStore>(x => x.GetRequiredService<Sq
 builder.Services.AddSingleton<IAgentRunStore>(x => x.GetRequiredService<SqliteAgentStateStore>());
 builder.Services.AddSingleton<IConversationMirrorStore>(x => x.GetRequiredService<SqliteAgentStateStore>());
 builder.Services.AddSingleton<IAgentMessageRouter, AgentMessageRouter>();
+builder.Services.AddSingleton<IAgentCapabilityRegistry, AgentCapabilityRegistry>();
 builder.Services.AddSingleton<IAgentResourceLoader, AgentResourceLoader>();
 builder.Services.AddSingleton<IProjectNoteStore, FileProjectNoteStore>();
 builder.Services.AddSingleton<IProjectNoteDistiller, RuleBasedProjectNoteDistiller>();
