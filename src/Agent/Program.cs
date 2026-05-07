@@ -2,6 +2,7 @@ using Agent.Compaction;
 using Agent.Automations;
 using Agent.Calendar;
 using Agent.Channels.Telegram;
+using Agent.Context;
 using Agent.Conversations;
 using Agent.Dashboard;
 using Agent.Drafts;
@@ -14,6 +15,7 @@ using Agent.Notifications;
 using Agent.Providers;
 using Agent.Providers.ClaudeCode;
 using Agent.Providers.Codex;
+using Agent.Providers.Gemini;
 using Agent.Providers.Ollama;
 using Agent.Resources;
 using Agent.Settings;
@@ -35,6 +37,10 @@ if (builder.Environment.IsDevelopment())
 }
 builder.Services.Configure<OllamaProviderOptions>(
     builder.Configuration.GetSection(OllamaProviderOptions.SectionName));
+builder.Services.Configure<GeminiProviderOptions>(
+    builder.Configuration.GetSection(GeminiProviderOptions.SectionName));
+builder.Services.Configure<ContextPlannerOptions>(
+    builder.Configuration.GetSection(ContextPlannerOptions.SectionName));
 builder.Services.Configure<CodexProviderOptions>(
     builder.Configuration.GetSection("Providers:Codex"));
 builder.Services.Configure<SqliteMemoryOptions>(
@@ -54,9 +60,15 @@ builder.Services.AddHttpClient<OllamaProviderClient>((services, httpClient) =>
     var options = services.GetRequiredService<IOptions<OllamaProviderOptions>>().Value;
     OllamaProviderClient.ConfigureHttpClient(httpClient, options);
 });
+builder.Services.AddHttpClient<GeminiProviderClient>((services, httpClient) =>
+{
+    var options = services.GetRequiredService<IOptions<GeminiProviderOptions>>().Value;
+    GeminiProviderClient.ConfigureHttpClient(httpClient, options);
+});
 builder.Services.AddSingleton<IAgentProviderClient, ClaudeCodeProviderClient>();
 builder.Services.AddSingleton<IAgentProviderClient, CodexProviderClient>();
 builder.Services.AddSingleton<IAgentProviderClient>(x => x.GetRequiredService<OllamaProviderClient>());
+builder.Services.AddSingleton<IAgentProviderClient>(x => x.GetRequiredService<GeminiProviderClient>());
 builder.Services.AddSingleton<IAgentProviderSelector, AgentProviderSelector>();
 builder.Services.AddSingleton<IAgentProviderToolLoop, AgentProviderToolLoop>();
 builder.Services.AddSingleton<IConversationRepository, SqliteConversationRepository>();
@@ -91,6 +103,11 @@ builder.Services.AddSingleton<ICalendarProvider, GoogleCalendarProvider>();
 builder.Services.AddSingleton<ICalendarScout, CalendarScout>();
 builder.Services.AddSingleton<IMemoryStore, SqliteMemoryStore>();
 builder.Services.AddSingleton<IMemoryScout, MemoryScout>();
+builder.Services.AddSingleton<RuleBasedContextPlanner>();
+builder.Services.AddSingleton<IContextPlanner, GeminiContextPlanner>();
+builder.Services.AddSingleton<IContextProvider, MemoryContextProvider>();
+builder.Services.AddSingleton<IContextProvider, CalendarContextProvider>();
+builder.Services.AddSingleton<IContextOrchestrator, ContextOrchestrator>();
 builder.Services.AddSingleton<RuleBasedMemoryExtractor>();
 builder.Services.AddSingleton<LlmMemoryExtractor>();
 builder.Services.AddSingleton<IMemoryExtractor, CompositeMemoryExtractor>();

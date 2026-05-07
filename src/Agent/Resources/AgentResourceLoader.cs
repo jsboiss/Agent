@@ -303,7 +303,7 @@ public sealed class AgentResourceLoader(
 
     private static IReadOnlyList<AgentToolDefinition> GetAvailableTools(SubAgentCapabilities capabilities)
     {
-        if (!capabilities.HasFlag(SubAgentCapabilities.Calendar))
+        if (capabilities != SubAgentCapabilities.None && !capabilities.HasFlag(SubAgentCapabilities.Calendar))
         {
             return DefaultTools;
         }
@@ -329,7 +329,7 @@ public sealed class AgentResourceLoader(
             You are the dispatcher for the MainAgent harness.
             Answer quick control, memory, status, and conversational turns directly.
             For code changes, file changes, web research, slow work, automations, app/program launching, shell commands, or risky actions, call send_ack first when useful, then spawn_agent with a crisp self-contained task.
-            For all Google Calendar or schedule questions, delegate to a sub-agent with capabilities ReadOnly,Calendar,Memory. Do not answer calendar questions from memory or guess current events.
+            For Google Calendar or schedule questions, use the calendar tools directly and answer from the tool results in the same turn. Do not answer calendar questions from memory or guess current events.
             When the user asks to open, start, or launch a local app or program, treat it as an external action and delegate to a sub-agent with ExternalActions capability so it can use the shell, for example Windows Start-Process.
             Mobile-originated risky actions must be staged or proposed and require confirmation before mutation.
             Keep outputs concise unless more detail is requested.

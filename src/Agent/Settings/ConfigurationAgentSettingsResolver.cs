@@ -17,11 +17,20 @@ public sealed class ConfigurationAgentSettingsResolver(IConfiguration configurat
         ["memory.scoutLimit"] = "5",
         ["memory.extraction.enabled"] = "true",
         ["memory.extraction.mode"] = "llm",
-        ["memory.extraction.provider"] = AgentProviderType.Ollama.ToString(),
+        ["memory.extraction.provider"] = AgentProviderType.Gemini.ToString(),
+        ["memory.extraction.model"] = "gemini-2.5-flash-lite",
         ["memory.compactionExtraction.enabled"] = "true",
-        ["memory.compactionExtraction.provider"] = AgentProviderType.Ollama.ToString(),
+        ["memory.compactionExtraction.provider"] = AgentProviderType.Gemini.ToString(),
         ["memory.compactionExtraction.mode"] = "llm",
+        ["memory.compactionExtraction.model"] = "gemini-2.5-flash-lite",
         ["memory.compactionExtraction.maxEntries"] = "24",
+        ["contextPlanner.provider"] = AgentProviderType.Gemini.ToString(),
+        ["contextPlanner.model"] = "gemini-2.5-flash-lite",
+        ["contextPlanner.timeoutMs"] = "1500",
+        ["contextPlanner.fallbackProvider"] = AgentProviderType.Ollama.ToString(),
+        ["contextPlanner.fallbackOnRateLimit"] = "true",
+        ["contextPlanner.fallbackOnTransientFailure"] = "true",
+        ["contextPlanner.enabledProviders"] = "Memory,Calendar",
         ["codex.sandbox"] = "danger-full-access",
         ["codex.approvalPolicy"] = "never",
         ["codex.mode"] = "mcp",
@@ -39,9 +48,12 @@ public sealed class ConfigurationAgentSettingsResolver(IConfiguration configurat
         appliedLayers.Add("app-defaults");
 
         var configuredProvider = values.GetValueOrDefault("provider");
-        var providerModel = string.Equals(configuredProvider, AgentProviderType.Codex.ToString(), StringComparison.OrdinalIgnoreCase)
-            ? configuration["Providers:Codex:Model"]
-            : configuration["Providers:Ollama:Model"];
+        var providerModel = configuredProvider switch
+        {
+            var x when string.Equals(x, AgentProviderType.Codex.ToString(), StringComparison.OrdinalIgnoreCase) => configuration["Providers:Codex:Model"],
+            var x when string.Equals(x, AgentProviderType.Gemini.ToString(), StringComparison.OrdinalIgnoreCase) => configuration["Providers:Gemini:Model"],
+            _ => configuration["Providers:Ollama:Model"]
+        };
 
         if (!string.IsNullOrWhiteSpace(providerModel))
         {

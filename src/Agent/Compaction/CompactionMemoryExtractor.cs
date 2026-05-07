@@ -61,16 +61,45 @@ public sealed class CompactionMemoryExtractor(
                 ["firstEntryId"] = firstEntryId,
                 ["lastEntryId"] = lastEntryId,
                 ["entryCount"] = selectedEntries.Length.ToString(),
-                ["provider"] = providerType.ToString()
+                ["provider"] = providerType.ToString(),
+                ["model"] = settings.GetValueOrDefault("memory.compactionExtraction.model") ?? settings.GetValueOrDefault("model") ?? string.Empty
             },
             cancellationToken);
 
-        var candidates = await GetCandidates(conversation, selectedEntries, providerType, cancellationToken);
+        var extraction = await GetCandidates(conversation, selectedEntries, providerType, settings, cancellationToken);
+        extraction = extraction with
+        {
+            Provider = string.IsNullOrWhiteSpace(extraction.Provider) ? providerType.ToString() : extraction.Provider,
+            Model = string.IsNullOrWhiteSpace(extraction.Model)
+                ? settings.GetValueOrDefault("memory.compactionExtraction.model") ?? settings.GetValueOrDefault("model") ?? string.Empty
+                : extraction.Model
+        };
+
+        if (!string.IsNullOrWhiteSpace(extraction.Error))
+        {
+            await Publish(
+                AgentEventKind.MemoryExtraction,
+                conversation.Id,
+                new Dictionary<string, string>
+                {
+                    ["source"] = "compaction",
+                    ["status"] = "failed",
+                    ["provider"] = extraction.Provider,
+                    ["model"] = extraction.Model,
+                    ["parseStatus"] = extraction.ParseStatus,
+                    ["rawResponseLength"] = extraction.RawResponseLength.ToString(),
+                    ["rawResponsePreview"] = extraction.RawResponsePreview,
+                    ["error"] = extraction.Error
+                },
+                cancellationToken);
+        }
+
         var reviewResult = await memoryCandidateReviewer.Review(
-            new MemoryCandidateReviewRequest(conversation.Id, candidates),
+            new MemoryCandidateReviewRequest(conversation.Id, extraction.Memories),
             cancellationToken);
         var written = 0;
         var skipped = 0;
+        var superseded = 0;
 
         foreach (var review in reviewResult.Reviews)
         {
@@ -88,9 +117,16 @@ public sealed class CompactionMemoryExtractor(
                     candidate.Segment,
                     candidate.Importance,
                     candidate.Confidence,
-                    candidate.SourceMessageId),
+                    candidate.SourceMessageId,
+                    GetSupersedesValue(review)),
                 cancellationToken);
             written++;
+
+            foreach (var memoryId in review.SupersededMemoryIds)
+            {
+                await memoryStore.UpdateLifecycle(memoryId, MemoryLifecycle.Archived, cancellationToken);
+                superseded++;
+            }
 
             await Publish(
                 AgentEventKind.MemoryWrite,
@@ -103,6 +139,8 @@ public sealed class CompactionMemoryExtractor(
                     ["tier"] = memory.Tier.ToString(),
                     ["segment"] = memory.Segment.ToString(),
                     ["reviewScore"] = review.Score.ToString("0.###"),
+                    ["supersededCount"] = review.SupersededMemoryIds.Count.ToString(),
+                    ["supersedes"] = memory.Supersedes ?? string.Empty,
                     ["text"] = memory.Text
                 },
                 cancellationToken);
@@ -116,21 +154,29 @@ public sealed class CompactionMemoryExtractor(
                 ["source"] = "compaction",
                 ["firstEntryId"] = firstEntryId,
                 ["lastEntryId"] = lastEntryId,
-                ["proposedCount"] = candidates.Count.ToString(),
+                ["proposedCount"] = extraction.Memories.Count.ToString(),
                 ["writtenCount"] = written.ToString(),
                 ["skippedCount"] = skipped.ToString(),
+                ["supersededCount"] = superseded.ToString(),
                 ["reviewedCount"] = reviewResult.Reviews.Count.ToString(),
+                ["provider"] = extraction.Provider,
+                ["model"] = extraction.Model,
+                ["parseStatus"] = extraction.ParseStatus,
+                ["rawResponseLength"] = extraction.RawResponseLength.ToString(),
+                ["rawResponsePreview"] = extraction.RawResponsePreview,
+                ["error"] = extraction.Error ?? string.Empty,
                 ["reviewSummary"] = string.Join("; ", reviewResult.Reviews.Select(x => $"{x.Score:0.##}:{x.Reason}"))
             },
             cancellationToken);
 
-        return new CompactionMemoryExtractionResult(candidates.Count, written, skipped);
+        return new CompactionMemoryExtractionResult(extraction.Memories.Count, written, skipped);
     }
 
-    private async Task<IReadOnlyList<ExtractedMemory>> GetCandidates(
+    private async Task<MemoryExtractionResult> GetCandidates(
         Conversation conversation,
         IReadOnlyList<ConversationEntry> entries,
         AgentProviderType providerType,
+        IReadOnlyDictionary<string, string> settings,
         CancellationToken cancellationToken)
     {
         try
@@ -141,7 +187,7 @@ public sealed class CompactionMemoryExtractor(
                     providerType,
                     conversation.Id,
                     GetExtractionPrompt(conversation, entries),
-                    GetResourceContext(),
+                    GetResourceContext(settings),
                     string.Empty,
                     [],
                     [],
@@ -151,18 +197,36 @@ public sealed class CompactionMemoryExtractor(
 
             if (!string.IsNullOrWhiteSpace(result.Error) || string.IsNullOrWhiteSpace(result.AssistantMessage))
             {
-                return [];
+                var error = !string.IsNullOrWhiteSpace(result.Error)
+                    ? result.Error
+                    : "Compaction memory extraction provider returned an empty response.";
+
+                return new MemoryExtractionResult(
+                    [],
+                    error,
+                    providerType.ToString(),
+                    result.UsageMetadata.GetValueOrDefault("model") ?? string.Empty,
+                    result.AssistantMessage.Length,
+                    Shorten(result.AssistantMessage, 500),
+                    string.IsNullOrWhiteSpace(result.Error) ? "empty-response" : "provider-error");
             }
 
             return ParseMemories(result.AssistantMessage, entries.Last().Id);
         }
-        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {
-            return [];
+            return new MemoryExtractionResult(
+                [],
+                $"Compaction memory extraction failed: {exception.Message}",
+                providerType.ToString(),
+                settings.GetValueOrDefault("memory.compactionExtraction.model") ?? string.Empty,
+                0,
+                string.Empty,
+                "exception");
         }
     }
 
-    private static IReadOnlyList<ExtractedMemory> ParseMemories(string json, string fallbackSourceEntryId)
+    private static MemoryExtractionResult ParseMemories(string json, string fallbackSourceEntryId)
     {
         try
         {
@@ -171,10 +235,15 @@ public sealed class CompactionMemoryExtractor(
 
             if (result?.Memories is null)
             {
-                return [];
+                return new MemoryExtractionResult(
+                    [],
+                    "Compaction memory extraction JSON did not contain a memories array.",
+                    RawResponseLength: json.Length,
+                    RawResponsePreview: Shorten(json, 500),
+                    ParseStatus: "missing-memories");
             }
 
-            return result.Memories
+            var memories = result.Memories
                 .Where(x => !string.IsNullOrWhiteSpace(x.Text))
                 .Select(x => new ExtractedMemory(
                     x.Text.Trim(),
@@ -184,10 +253,21 @@ public sealed class CompactionMemoryExtractor(
                     Math.Clamp(x.Confidence, 0, 1),
                     string.IsNullOrWhiteSpace(x.SourceEntryId) ? fallbackSourceEntryId : x.SourceEntryId.Trim()))
                 .ToArray();
+
+            return new MemoryExtractionResult(
+                memories,
+                RawResponseLength: json.Length,
+                RawResponsePreview: Shorten(json, 500),
+                ParseStatus: "parsed");
         }
-        catch (JsonException)
+        catch (JsonException exception)
         {
-            return [];
+            return new MemoryExtractionResult(
+                [],
+                $"Compaction memory extraction JSON parse failed: {exception.Message}",
+                RawResponseLength: json.Length,
+                RawResponsePreview: Shorten(json, 500),
+                ParseStatus: "parse-error");
         }
     }
 
@@ -211,8 +291,12 @@ public sealed class CompactionMemoryExtractor(
 
         return $$"""
         Extract sparse durable memory candidates from the conversation span that is about to be compacted.
-        Prefer explicit user-authored facts, preferences, corrections, and clear project decisions.
-        Do not store transient tasks, greetings, assistant speculation, raw tool output, or vague inferred preferences.
+        Extract stable user-authored facts even when no memory keyword appears.
+        Prefer personal facts, preferences, relationships, corrections, recurring workflow instructions, and clear project decisions.
+        Personal facts are allowed when stable and useful. Do not store secrets such as API keys, tokens, passwords, private credentials, or recovery codes.
+        Do not store transient tasks, one-off lookups, temporary debugging state, greetings, assistant speculation, generated content, raw tool output, or vague inferred preferences.
+        Treat explicit memory phrasing as an importance and confidence boost, not as a requirement.
+        Let the model decide tier, segment, importance, and confidence.
         Do not duplicate facts that are merely repeated in this span.
         Return JSON only with this schema:
         {
@@ -234,14 +318,21 @@ public sealed class CompactionMemoryExtractor(
         """;
     }
 
-    private static AgentResourceContext GetResourceContext()
+    private static AgentResourceContext GetResourceContext(IReadOnlyDictionary<string, string> sourceSettings)
     {
+        Dictionary<string, string> settings = new(sourceSettings, StringComparer.OrdinalIgnoreCase);
+
+        if (!string.IsNullOrWhiteSpace(settings.GetValueOrDefault("memory.compactionExtraction.model")))
+        {
+            settings["model"] = settings["memory.compactionExtraction.model"];
+        }
+
         var workspace = new WorkspaceContext(
             string.Empty,
             string.Empty,
             "compaction-memory-extraction",
             [],
-            new Dictionary<string, string>(),
+            settings,
             []);
 
         return new AgentResourceContext(
@@ -277,6 +368,13 @@ public sealed class CompactionMemoryExtractor(
         return value.Length <= length
             ? value
             : value[..length] + "...";
+    }
+
+    private static string? GetSupersedesValue(MemoryCandidateReview review)
+    {
+        return review.SupersededMemoryIds.Count == 0
+            ? null
+            : string.Join(",", review.SupersededMemoryIds);
     }
 
     private async Task Publish(

@@ -38,7 +38,8 @@ public sealed class MemoryCandidateReviewer(IMemoryStore memoryStore) : IMemoryC
                 false,
                 "Candidate score is below the durable-memory threshold.",
                 score,
-                null);
+                null,
+                []);
         }
 
         var candidateKey = GetMemoryKey(candidate.Text, candidate.Segment);
@@ -50,7 +51,8 @@ public sealed class MemoryCandidateReviewer(IMemoryStore memoryStore) : IMemoryC
                 false,
                 "A similar candidate was already accepted in this extraction batch.",
                 score,
-                null);
+                null,
+                []);
         }
 
         var existingMemories = await memoryStore.Search(
@@ -73,25 +75,34 @@ public sealed class MemoryCandidateReviewer(IMemoryStore memoryStore) : IMemoryC
                 false,
                 "A similar active memory already exists.",
                 score,
-                duplicate.Id);
+                duplicate.Id,
+                []);
         }
+
+        var conflicts = existingMemories
+            .Where(x => IsConflict(x, candidate))
+            .Select(x => x.Id)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
 
         return new MemoryCandidateReview(
             candidate,
             true,
-            "Candidate accepted.",
+            conflicts.Length == 0 ? "Candidate accepted." : "Candidate accepted and supersedes conflicting active memories.",
             score,
-            null);
+            null,
+            conflicts);
     }
 
     private static double GetScore(ExtractedMemory candidate)
     {
         var segmentBoost = candidate.Segment switch
         {
-            MemorySegment.Correction => 0.1,
-            MemorySegment.Identity => 0.08,
-            MemorySegment.Preference => 0.08,
-            MemorySegment.Project => 0.04,
+            MemorySegment.Correction => 0.14,
+            MemorySegment.Identity => 0.12,
+            MemorySegment.Relationship => 0.12,
+            MemorySegment.Preference => 0.12,
+            MemorySegment.Project => 0.08,
             _ => 0
         };
 
@@ -105,9 +116,28 @@ public sealed class MemoryCandidateReviewer(IMemoryStore memoryStore) : IMemoryC
         var lengthPenalty = candidate.Text.Length < 8 ? 0.2 : 0;
 
         return Math.Clamp(
-            (candidate.Importance * 0.45) + (candidate.Confidence * 0.45) + segmentBoost + tierBoost - lengthPenalty,
+            (candidate.Importance * 0.42) + (candidate.Confidence * 0.42) + segmentBoost + tierBoost - lengthPenalty,
             0,
             1);
+    }
+
+    private static bool IsConflict(MemoryRecord existingMemory, ExtractedMemory candidate)
+    {
+        if (existingMemory.Segment != candidate.Segment)
+        {
+            return false;
+        }
+
+        var existingTerms = GetTerms(existingMemory.Text);
+        var candidateTerms = GetTerms(candidate.Text);
+
+        if (existingTerms.Intersect(candidateTerms, StringComparer.OrdinalIgnoreCase).Count() < 2)
+        {
+            return false;
+        }
+
+        return HasOpposingTerm(existingTerms, candidateTerms)
+            || candidate.Segment is MemorySegment.Preference or MemorySegment.Identity or MemorySegment.Correction;
     }
 
     private static bool IsDuplicate(
@@ -151,6 +181,21 @@ public sealed class MemoryCandidateReviewer(IMemoryStore memoryStore) : IMemoryC
             : string.Join(' ', words);
     }
 
+    private static ISet<string> GetTerms(string value)
+    {
+        return Normalize(value)
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(x => x.Length >= 3)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static bool HasOpposingTerm(ISet<string> a, ISet<string> b)
+    {
+        return OpposingTerms.Any(x =>
+            (a.Contains(x.Key) && x.Value.Any(b.Contains))
+            || (b.Contains(x.Key) && x.Value.Any(a.Contains)));
+    }
+
     private static string GetMemoryKey(string text, MemorySegment segment)
     {
         var normalized = Normalize(text);
@@ -183,5 +228,18 @@ public sealed class MemoryCandidateReviewer(IMemoryStore memoryStore) : IMemoryC
         "prefers",
         "prefer",
         "preference"
+    };
+
+    private static Dictionary<string, string[]> OpposingTerms { get; } = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["verbose"] = ["concise", "short", "brief"],
+        ["concise"] = ["verbose", "detailed", "long"],
+        ["short"] = ["verbose", "detailed", "long"],
+        ["brief"] = ["verbose", "detailed", "long"],
+        ["like"] = ["dislike", "hate"],
+        ["likes"] = ["dislikes", "hates"],
+        ["prefer"] = ["avoid", "dislike"],
+        ["prefers"] = ["avoids", "dislikes"],
+        ["best"] = ["worst"]
     };
 }

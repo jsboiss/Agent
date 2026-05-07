@@ -376,7 +376,7 @@ public sealed class RunTimelineService(IAgentEventStore eventStore) : IRunTimeli
             x.CreatedAt,
             GetSummary(x),
             x.Data,
-            x.Kind == AgentEventKind.ProviderError || x.Data.ContainsKey("error"));
+            x.Kind == AgentEventKind.ProviderError || !string.IsNullOrWhiteSpace(x.Data.GetValueOrDefault("error")));
     }
 
     private static bool MatchesFilter(RunEventRow row, string filter)

@@ -23,6 +23,11 @@ public sealed class CompositeMemoryExtractor(
         {
             var llmResult = await llmExtractor.Extract(request, cancellationToken);
             memories.AddRange(llmResult.Memories);
+
+            if (!string.IsNullOrWhiteSpace(llmResult.Error))
+            {
+                return llmResult with { Memories = memories.DistinctBy(x => Normalize(x.Text)).ToArray() };
+            }
         }
 
         return new MemoryExtractionResult(memories.DistinctBy(x => Normalize(x.Text)).ToArray());

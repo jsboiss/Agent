@@ -105,7 +105,8 @@ public sealed class SqliteMemoryStore(IOptions<SqliteMemoryOptions> options) : I
             AccessCount = 0,
             CreatedAt = timestamp,
             UpdatedAt = timestamp,
-            SourceMessageId = request.SourceMessageId
+            SourceMessageId = request.SourceMessageId,
+            Supersedes = request.Supersedes
         };
 
         await using var connection = new SqliteConnection(Options.ConnectionString);
@@ -119,7 +120,7 @@ public sealed class SqliteMemoryStore(IOptions<SqliteMemoryOptions> options) : I
             )
             VALUES (
                 $id, $text, $tier, $segment, $lifecycle, $importance, $confidence, $accessCount,
-                $createdAt, $updatedAt, NULL, $sourceMessageId, NULL, NULL
+                $createdAt, $updatedAt, NULL, $sourceMessageId, $supersedes, NULL
             );
             """;
         command.Parameters.AddWithValue("$id", memory.Id);
@@ -133,6 +134,7 @@ public sealed class SqliteMemoryStore(IOptions<SqliteMemoryOptions> options) : I
         command.Parameters.AddWithValue("$createdAt", memory.CreatedAt.ToString("O"));
         command.Parameters.AddWithValue("$updatedAt", memory.UpdatedAt.ToString("O"));
         command.Parameters.AddWithValue("$sourceMessageId", (object?)memory.SourceMessageId ?? DBNull.Value);
+        command.Parameters.AddWithValue("$supersedes", (object?)memory.Supersedes ?? DBNull.Value);
 
         await command.ExecuteNonQueryAsync(cancellationToken);
 

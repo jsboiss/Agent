@@ -5,4 +5,5 @@ public sealed record MemoryCandidateReview(
     bool Accepted,
     string Reason,
     double Score,
-    string? ExistingMemoryId);
+    string? ExistingMemoryId,
+    IReadOnlyList<string> SupersededMemoryIds);

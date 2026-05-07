@@ -1,5 +1,6 @@
 using Agent.Conversations;
 using Agent.Calendar;
+using Agent.Context;
 using Agent.Events;
 using Agent.Memory;
 using Agent.Notifications;
@@ -24,8 +25,8 @@ public sealed class AgentMessageProcessor(
     IWebHostEnvironment environment,
     IAgentToolExecutor toolExecutor,
     IAgentProviderToolLoop providerToolLoop,
-    IMemoryScout memoryScout,
-    ICalendarScout calendarScout,
+    IContextPlanner contextPlanner,
+    IContextOrchestrator contextOrchestrator,
     IMemoryExtractor memoryExtractor,
     IMemoryCandidateReviewer memoryCandidateReviewer,
     IMemoryStore memoryStore,
@@ -130,21 +131,6 @@ public sealed class AgentMessageProcessor(
                 queueKind);
         }
 
-        var explicitMemoryResult = await TryHandleExplicitMemoryRequest(
-            conversation.Id,
-            request.Channel,
-            userEntry,
-            settings,
-            events,
-            eventCursor,
-            cancellationToken);
-
-        if (explicitMemoryResult is not null)
-        {
-            promptQueue.Complete(conversation.Id);
-            return explicitMemoryResult;
-        }
-
         if (route.RouteKind != AgentRouteKind.Chat && !route.AllowsMutation)
         {
             return await Refuse(
@@ -213,24 +199,17 @@ public sealed class AgentMessageProcessor(
         var resources = await resourceLoader.Load(
             new AgentResourceLoadRequest(conversation, request.Channel, providerType, settings, workspace.RootPath),
             cancellationToken);
-        var memoryScoutResult = await PrefetchMemory(
+        var planningRequest = new ContextPlanningRequest(
             conversation.Id,
-            request,
-            userEntry.Id,
+            request.Channel,
+            request.UserMessage,
             settings,
-            events,
-            eventCursor,
-            cancellationToken);
-        var calendarScoutResult = await PrefetchCalendar(
-            conversation.Id,
-            request,
-            userEntry.Id,
-            events,
-            eventCursor,
-            cancellationToken);
+            request.ReceivedAt);
+        var contextPlan = await contextPlanner.Plan(planningRequest, cancellationToken);
+        var evidenceBundle = await contextOrchestrator.Gather(contextPlan, planningRequest, cancellationToken);
         resources = resources with
         {
-            CalendarContext = calendarScoutResult.CompactContext
+            EvidenceContext = evidenceBundle.ToPromptSection()
         };
 
         var recentMirrors = string.IsNullOrWhiteSpace(route.CodexThreadId)
@@ -245,8 +224,8 @@ public sealed class AgentMessageProcessor(
             conversation.Id,
             request.UserMessage,
             resources,
-            memoryScoutResult.CompactContext,
-            memoryScoutResult.Memories,
+            string.Empty,
+            [],
             resources.Workspace.AvailableTools,
             [],
             [],
@@ -319,7 +298,7 @@ public sealed class AgentMessageProcessor(
                     conversation.Id,
                     userEntry,
                     assistantEntry,
-                    memoryScoutResult.Memories,
+                    [],
                     settings,
                     events,
                     eventCursor,
@@ -640,7 +619,11 @@ public sealed class AgentMessageProcessor(
             {
                 ["ConversationEntryId"] = userEntry.Id,
                 ["mode"] = settings.Get("memory.extraction.mode") ?? string.Empty,
-                ["provider"] = settings.Get("memory.extraction.provider") ?? string.Empty
+                ["provider"] = settings.Get("memory.extraction.provider") ?? string.Empty,
+                ["model"] = settings.Get("memory.extraction.model") ?? settings.Get("model") ?? string.Empty,
+                ["userMessageLength"] = userEntry.Content.Length.ToString(),
+                ["assistantMessageLength"] = (assistantEntry?.Content.Length ?? 0).ToString(),
+                ["injectedMemoryCount"] = injectedMemories.Count.ToString()
             }));
         await PublishPending(events, eventCursor, cancellationToken);
         var extraction = await memoryExtractor.Extract(
@@ -653,11 +636,31 @@ public sealed class AgentMessageProcessor(
                 settings.Values),
             cancellationToken);
 
+        if (!string.IsNullOrWhiteSpace(extraction.Error))
+        {
+            events.Add(GetEvent(
+                AgentEventKind.MemoryExtraction,
+                conversationId,
+                new Dictionary<string, string>
+                {
+                    ["ConversationEntryId"] = userEntry.Id,
+                    ["status"] = "failed",
+                    ["provider"] = extraction.Provider,
+                    ["model"] = extraction.Model,
+                    ["parseStatus"] = extraction.ParseStatus,
+                    ["rawResponseLength"] = extraction.RawResponseLength.ToString(),
+                    ["rawResponsePreview"] = extraction.RawResponsePreview,
+                    ["error"] = extraction.Error
+                }));
+            await PublishPending(events, eventCursor, cancellationToken);
+        }
+
         var reviewResult = await memoryCandidateReviewer.Review(
             new MemoryCandidateReviewRequest(conversationId, extraction.Memories),
             cancellationToken);
         var written = 0;
         var skipped = 0;
+        var superseded = 0;
 
         foreach (var review in reviewResult.Reviews)
         {
@@ -675,9 +678,16 @@ public sealed class AgentMessageProcessor(
                     extractedMemory.Segment,
                     extractedMemory.Importance,
                     extractedMemory.Confidence,
-                    extractedMemory.SourceMessageId),
+                    extractedMemory.SourceMessageId,
+                    GetSupersedesValue(review)),
                 cancellationToken);
             written++;
+
+            foreach (var memoryId in review.SupersededMemoryIds)
+            {
+                await memoryStore.UpdateLifecycle(memoryId, MemoryLifecycle.Archived, cancellationToken);
+                superseded++;
+            }
 
             events.Add(GetEvent(
                 AgentEventKind.MemoryWrite,
@@ -689,6 +699,8 @@ public sealed class AgentMessageProcessor(
                     ["tier"] = memory.Tier.ToString(),
                     ["segment"] = memory.Segment.ToString(),
                     ["reviewScore"] = review.Score.ToString("0.###"),
+                    ["supersededCount"] = review.SupersededMemoryIds.Count.ToString(),
+                    ["supersedes"] = memory.Supersedes ?? string.Empty,
                     ["text"] = memory.Text
                 }));
             await PublishPending(events, eventCursor, cancellationToken);
@@ -703,252 +715,24 @@ public sealed class AgentMessageProcessor(
                 ["proposedCount"] = extraction.Memories.Count.ToString(),
                 ["writtenCount"] = written.ToString(),
                 ["skippedCount"] = skipped.ToString(),
+                ["supersededCount"] = superseded.ToString(),
                 ["reviewedCount"] = reviewResult.Reviews.Count.ToString(),
+                ["provider"] = extraction.Provider,
+                ["model"] = extraction.Model,
+                ["parseStatus"] = extraction.ParseStatus,
+                ["rawResponseLength"] = extraction.RawResponseLength.ToString(),
+                ["rawResponsePreview"] = extraction.RawResponsePreview,
+                ["error"] = extraction.Error ?? string.Empty,
                 ["reviewSummary"] = string.Join("; ", reviewResult.Reviews.Select(x => $"{x.Score:0.##}:{x.Reason}"))
             }));
         await PublishPending(events, eventCursor, cancellationToken);
     }
 
-    private async Task<MemoryScoutResult> PrefetchMemory(
-        string conversationId,
-        MessageRequest request,
-        string userEntryId,
-        AgentSettings settings,
-        List<AgentEvent> events,
-        EventPublishCursor eventCursor,
-        CancellationToken cancellationToken)
+    private static string? GetSupersedesValue(MemoryCandidateReview review)
     {
-        if (string.Equals(settings.Get("memory.enabled"), "false", StringComparison.OrdinalIgnoreCase))
-        {
-            return new MemoryScoutResult(false, [], string.Empty);
-        }
-
-        events.Add(GetEvent(
-            AgentEventKind.MemoryScoutStarted,
-            conversationId,
-            new Dictionary<string, string>
-            {
-                ["ConversationEntryId"] = userEntryId,
-                ["channel"] = request.Channel
-            }));
-        await PublishPending(events, eventCursor, cancellationToken);
-        var result = await memoryScout.Prefetch(
-            new MemoryScoutRequest(
-                conversationId,
-                request.UserMessage,
-                new Dictionary<string, string>
-                {
-                    ["channel"] = request.Channel,
-                    ["ConversationEntryId"] = userEntryId,
-                    ["limit"] = settings.Get("memory.scoutLimit") ?? "5"
-                }),
-            cancellationToken);
-        events.Add(GetEvent(
-            AgentEventKind.MemoryScoutCompleted,
-            conversationId,
-            new Dictionary<string, string>
-            {
-                ["ConversationEntryId"] = userEntryId,
-                ["memoryCount"] = result.Memories.Count.ToString(),
-                ["isMemoryRelevant"] = result.IsMemoryRelevant.ToString()
-            }));
-        await PublishPending(events, eventCursor, cancellationToken);
-
-        if (result.IsMemoryRelevant)
-        {
-            events.Add(GetEvent(
-                AgentEventKind.MemoryInjected,
-                conversationId,
-                new Dictionary<string, string>
-                {
-                    ["ConversationEntryId"] = userEntryId,
-                    ["memoryIds"] = string.Join(",", result.Memories.Select(x => x.Id))
-                }));
-            await PublishPending(events, eventCursor, cancellationToken);
-        }
-
-        return result;
-    }
-
-    private async Task<CalendarScoutResult> PrefetchCalendar(
-        string conversationId,
-        MessageRequest request,
-        string userEntryId,
-        List<AgentEvent> events,
-        EventPublishCursor eventCursor,
-        CancellationToken cancellationToken)
-    {
-        events.Add(GetEvent(
-            AgentEventKind.CalendarScoutStarted,
-            conversationId,
-            new Dictionary<string, string>
-            {
-                ["ConversationEntryId"] = userEntryId,
-                ["channel"] = request.Channel
-            }));
-        await PublishPending(events, eventCursor, cancellationToken);
-
-        var result = await calendarScout.Prefetch(
-            new CalendarScoutRequest(
-                conversationId,
-                request.UserMessage,
-                new Dictionary<string, string>
-                {
-                    ["channel"] = request.Channel,
-                    ["ConversationEntryId"] = userEntryId
-                }),
-            cancellationToken);
-
-        events.Add(GetEvent(
-            AgentEventKind.CalendarScoutCompleted,
-            conversationId,
-            new Dictionary<string, string>
-            {
-                ["ConversationEntryId"] = userEntryId,
-                ["isCalendarRelevant"] = result.IsCalendarRelevant.ToString(),
-                ["isExplicitCalendarRequest"] = result.IsExplicitCalendarRequest.ToString(),
-                ["start"] = result.Start?.ToString("O") ?? string.Empty,
-                ["end"] = result.End?.ToString("O") ?? string.Empty,
-                ["error"] = result.Error ?? string.Empty
-            }));
-        await PublishPending(events, eventCursor, cancellationToken);
-
-        if (result.IsCalendarRelevant && !string.IsNullOrWhiteSpace(result.CompactContext))
-        {
-            events.Add(GetEvent(
-                AgentEventKind.CalendarInjected,
-                conversationId,
-                new Dictionary<string, string>
-                {
-                    ["ConversationEntryId"] = userEntryId,
-                    ["start"] = result.Start?.ToString("O") ?? string.Empty,
-                    ["end"] = result.End?.ToString("O") ?? string.Empty
-                }));
-            await PublishPending(events, eventCursor, cancellationToken);
-        }
-
-        return result;
-    }
-
-    private async Task<MessageResult?> TryHandleExplicitMemoryRequest(
-        string conversationId,
-        string channel,
-        ConversationEntry userEntry,
-        AgentSettings settings,
-        List<AgentEvent> events,
-        EventPublishCursor eventCursor,
-        CancellationToken cancellationToken)
-    {
-        if (!IsExplicitRememberThat(userEntry.Content)
-            || string.Equals(settings.Get("memory.enabled"), "false", StringComparison.OrdinalIgnoreCase))
-        {
-            return null;
-        }
-
-        var entries = await conversationRepository.ListEntries(conversationId, cancellationToken);
-        var sourceEntry = entries
-            .Where(x => !string.Equals(x.Id, userEntry.Id, StringComparison.OrdinalIgnoreCase))
-            .Where(x => x.Role is ConversationEntryRole.User or ConversationEntryRole.Assistant)
-            .OrderByDescending(x => x.CreatedAt)
-            .FirstOrDefault();
-
-        if (sourceEntry is null)
-        {
-            return null;
-        }
-
-        var memoryText = GetMemoryTextFromPriorEntry(sourceEntry.Content);
-
-        if (string.IsNullOrWhiteSpace(memoryText))
-        {
-            return null;
-        }
-
-        var memory = await memoryStore.Write(
-            new MemoryWriteRequest(
-                memoryText,
-                MemoryTier.Long,
-                GetSegmentForExplicitMemory(memoryText),
-                0.8,
-                0.9,
-                sourceEntry.Id),
-            cancellationToken);
-        events.Add(GetEvent(
-            AgentEventKind.MemoryWrite,
-            conversationId,
-            new Dictionary<string, string>
-            {
-                ["ConversationEntryId"] = userEntry.Id,
-                ["sourceEntryId"] = sourceEntry.Id,
-                ["memoryId"] = memory.Id,
-                ["tier"] = memory.Tier.ToString(),
-                ["segment"] = memory.Segment.ToString(),
-                ["text"] = memory.Text
-            }));
-
-        var assistantMessage = $"Saved that to memory: {memory.Text}";
-        var assistantEntry = await conversationRepository.AddEntry(
-            conversationId,
-            ConversationEntryRole.Assistant,
-            channel,
-            assistantMessage,
-            userEntry.Id,
-            cancellationToken);
-        events.Add(GetEvent(
-            AgentEventKind.MessagePersisted,
-            conversationId,
-            new Dictionary<string, string>
-            {
-                ["role"] = ConversationEntryRole.Assistant.ToString(),
-                ["channel"] = channel,
-                ["ConversationEntryId"] = assistantEntry.Id,
-                ["ParentEntryId"] = userEntry.Id,
-                ["message"] = assistantMessage
-            }));
-
-        return await Complete(
-            conversationId,
-            assistantMessage,
-            events,
-            eventCursor,
-            cancellationToken,
-            QueuedMessageKind.Prompt);
-    }
-
-    private static bool IsExplicitRememberThat(string value)
-    {
-        var normalized = value.Trim().TrimEnd('.', '!', '?');
-
-        return string.Equals(normalized, "remember that", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(normalized, "remember this", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(normalized, "save that", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(normalized, "save this", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string GetMemoryTextFromPriorEntry(string content)
-    {
-        var value = content.Trim();
-        var prefixIndex = value.IndexOf("your ", StringComparison.OrdinalIgnoreCase);
-
-        if (prefixIndex >= 0)
-        {
-            value = "User's " + value[(prefixIndex + "your ".Length)..];
-        }
-
-        return value
-            .Trim()
-            .Trim('"')
-            .TrimEnd('.');
-    }
-
-    private static MemorySegment GetSegmentForExplicitMemory(string text)
-    {
-        return text.Contains(" name is ", StringComparison.OrdinalIgnoreCase)
-            || text.Contains("girlfriend", StringComparison.OrdinalIgnoreCase)
-            || text.Contains("boyfriend", StringComparison.OrdinalIgnoreCase)
-            || text.Contains("partner", StringComparison.OrdinalIgnoreCase)
-            ? MemorySegment.Relationship
-            : MemorySegment.Context;
+        return review.SupersededMemoryIds.Count == 0
+            ? null
+            : string.Join(",", review.SupersededMemoryIds);
     }
 
     private async Task<IReadOnlyList<AgentProviderToolResult>> ExecuteToolCalls(
