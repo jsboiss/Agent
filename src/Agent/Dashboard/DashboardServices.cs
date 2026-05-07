@@ -54,7 +54,7 @@ public sealed class ChatDashboardService(
             builder.AppendLine();
         }
 
-        var directory = Path.Combine(GetWorkspaceRootPath(environment.ContentRootPath), "App_Data", "debug");
+        var directory = Path.Combine(WorkspacePathResolver.GetRepositoryRootPath(environment.ContentRootPath), "App_Data", "debug");
         Directory.CreateDirectory(directory);
         var path = Path.Combine(directory, "main-chat-transcript.md");
         var content = builder.ToString().ReplaceLineEndings("\r\n");
@@ -142,7 +142,7 @@ public sealed class ChatDashboardService(
         var entries = await conversationRepository.ListEntries(conversationId, cancellationToken);
         var events = await eventStore.List(conversationId, 120, cancellationToken);
         var workspaceResolution = await workspaceStore.GetOrCreateActive(
-            GetWorkspaceRootPath(environment.ContentRootPath),
+            WorkspacePathResolver.GetDefaultAgentWorkspacePath(environment.ContentRootPath),
             cancellationToken);
         var activeRun = string.IsNullOrWhiteSpace(workspaceResolution.Workspace.ActiveRunId)
             ? null
@@ -228,18 +228,6 @@ public sealed class ChatDashboardService(
         {
             yield return value.Substring(x, Math.Min(size, value.Length - x));
         }
-    }
-
-    private static string GetWorkspaceRootPath(string contentRootPath)
-    {
-        var directory = new DirectoryInfo(contentRootPath);
-
-        if (directory.Parent is not null && directory.Parent.Name.Equals("src", StringComparison.OrdinalIgnoreCase))
-        {
-            return directory.Parent.Parent?.FullName ?? directory.FullName;
-        }
-
-        return directory.FullName;
     }
 
     private static string RepairMojibake(string value)
@@ -719,7 +707,7 @@ public sealed class SettingsDashboardService(
     public async Task<SettingsDashboardSnapshot> Load(CancellationToken cancellationToken)
     {
         var workspaceResolution = await workspaceStore.GetOrCreateActive(
-            GetWorkspaceRootPath(environment.ContentRootPath),
+            WorkspacePathResolver.GetDefaultAgentWorkspacePath(environment.ContentRootPath),
             cancellationToken);
         var settings = await settingsResolver.Resolve(
             new AgentSettingsResolveRequest(
@@ -747,11 +735,27 @@ public sealed class SettingsDashboardService(
         CancellationToken cancellationToken)
     {
         var workspaceResolution = await workspaceStore.GetOrCreateActive(
-            GetWorkspaceRootPath(environment.ContentRootPath),
+            WorkspacePathResolver.GetDefaultAgentWorkspacePath(environment.ContentRootPath),
             cancellationToken);
         var workspace = await workspaceStore.SetRemoteExecutionAllowed(
             workspaceResolution.Workspace.Id,
             request.RemoteExecutionAllowed,
+            cancellationToken);
+
+        return ToStatus(workspace, null);
+    }
+
+    public async Task<WorkspaceStatus> UpdateWorkspaceRootPath(
+        WorkspaceRootPathUpdateDto request,
+        CancellationToken cancellationToken)
+    {
+        var rootPath = WorkspacePathResolver.NormalizeRootPath(request.RootPath, environment.ContentRootPath);
+        var workspaceResolution = await workspaceStore.GetOrCreateActive(
+            WorkspacePathResolver.GetDefaultAgentWorkspacePath(environment.ContentRootPath),
+            cancellationToken);
+        var workspace = await workspaceStore.SetRootPath(
+            workspaceResolution.Workspace.Id,
+            rootPath,
             cancellationToken);
 
         return ToStatus(workspace, null);
@@ -771,17 +775,6 @@ public sealed class SettingsDashboardService(
             activeRun?.Kind.ToString());
     }
 
-    private static string GetWorkspaceRootPath(string contentRootPath)
-    {
-        var directory = new DirectoryInfo(contentRootPath);
-
-        if (directory.Parent is not null && directory.Parent.Name.Equals("src", StringComparison.OrdinalIgnoreCase))
-        {
-            return directory.Parent.Parent?.FullName ?? directory.FullName;
-        }
-
-        return directory.FullName;
-    }
 }
 
 public sealed class CompactionDashboardService(
@@ -796,7 +789,7 @@ public sealed class CompactionDashboardService(
     {
         var conversation = (await conversationRepository.GetOrCreateMain(cancellationToken)).Conversation;
         var workspaceResolution = await workspaceStore.GetOrCreateActive(
-            GetWorkspaceRootPath(environment.ContentRootPath),
+            WorkspacePathResolver.GetDefaultAgentWorkspacePath(environment.ContentRootPath),
             cancellationToken);
         var settings = await settingsResolver.Resolve(
             new AgentSettingsResolveRequest(
@@ -852,18 +845,6 @@ public sealed class CompactionDashboardService(
             result.WrittenMemoryCount,
             result.SkippedMemoryCount,
             result.Summary.UpdatedAt);
-    }
-
-    private static string GetWorkspaceRootPath(string contentRootPath)
-    {
-        var directory = new DirectoryInfo(contentRootPath);
-
-        if (directory.Parent is not null && directory.Parent.Name.Equals("src", StringComparison.OrdinalIgnoreCase))
-        {
-            return directory.Parent.Parent?.FullName ?? directory.FullName;
-        }
-
-        return directory.FullName;
     }
 
     private async Task Publish(

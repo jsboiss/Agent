@@ -17,7 +17,8 @@ export function ChatPage() {
   const [streamedText, setStreamedText] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const transcriptEndRef = useRef<HTMLDivElement | null>(null);
+  const transcriptRef = useRef<HTMLDivElement | null>(null);
+  const didInitialScrollRef = useRef(false);
   const snapshot = chatQuery.data?.data;
   const messages = useMemo(() => {
     const loaded = snapshot?.messages ?? [];
@@ -47,7 +48,23 @@ export function ChatPage() {
   }, [pendingPrompt, snapshot?.messages, streamedText]);
 
   useEffect(() => {
-    transcriptEndRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
+    const transcript = transcriptRef.current;
+
+    if (!transcript || messages.length === 0) {
+      return;
+    }
+
+    if (!didInitialScrollRef.current) {
+      transcript.scrollTop = transcript.scrollHeight;
+      didInitialScrollRef.current = true;
+      return;
+    }
+
+    const distanceFromBottom = transcript.scrollHeight - transcript.scrollTop - transcript.clientHeight;
+
+    if (distanceFromBottom <= 160) {
+      transcript.scrollTop = transcript.scrollHeight;
+    }
   }, [messages.length, streamedText, isStreaming, errorMessage]);
 
   async function submit(event: FormEvent) {
@@ -136,7 +153,7 @@ export function ChatPage() {
           )}
         />
 
-        <div className="transcript">
+        <div className="transcript" ref={transcriptRef}>
           {chatQuery.isLoading && <LoadingState />}
           {chatQuery.isError && <ErrorState error={chatQuery.error} />}
           {!chatQuery.isLoading && !chatQuery.isError && messages.length === 0 && (
@@ -169,7 +186,6 @@ export function ChatPage() {
               </div>
             </article>
           )}
-          <div ref={transcriptEndRef} />
         </div>
 
         {errorMessage && <div className="callout error">{errorMessage}</div>}

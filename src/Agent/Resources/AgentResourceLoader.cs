@@ -2,6 +2,7 @@ using Agent.Conversations;
 using Agent.Compaction;
 using Agent.Providers;
 using Agent.Tools;
+using Agent.Workspaces;
 
 namespace Agent.Resources;
 
@@ -207,7 +208,7 @@ public sealed class AgentResourceLoader(
         AgentResourceLoadRequest request,
         CancellationToken cancellationToken)
     {
-        var rootPath = GetRootPath(environment.ContentRootPath);
+        var rootPath = WorkspacePathResolver.NormalizeRootPath(request.WorkspaceRootPath, environment.ContentRootPath);
         var workspaceInstructions = await ReadInstructions(rootPath, cancellationToken);
         var workspace = new WorkspaceContext(
             rootPath,
@@ -244,23 +245,6 @@ public sealed class AgentResourceLoader(
             GetToolContext(DefaultTools),
             string.Empty,
             GetConversationSummary(rollingSummary, entries, recentEntryCount));
-    }
-
-    private static string GetRootPath(string contentRootPath)
-    {
-        var directory = new DirectoryInfo(contentRootPath);
-
-        while (directory.Parent is not null && directory.Name.Equals("src", StringComparison.OrdinalIgnoreCase))
-        {
-            directory = directory.Parent;
-        }
-
-        if (directory.Parent is not null && directory.Parent.Name.Equals("src", StringComparison.OrdinalIgnoreCase))
-        {
-            return directory.Parent.Parent?.FullName ?? directory.FullName;
-        }
-
-        return directory.FullName;
     }
 
     private static async Task<string> ReadInstructions(string rootPath, CancellationToken cancellationToken)

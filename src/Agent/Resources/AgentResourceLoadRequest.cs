@@ -8,4 +8,5 @@ public sealed record AgentResourceLoadRequest(
     Conversation Conversation,
     string Channel,
     AgentProviderType ProviderType,
-    AgentSettings Settings);
+    AgentSettings Settings,
+    string WorkspaceRootPath);

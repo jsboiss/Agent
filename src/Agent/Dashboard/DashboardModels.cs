@@ -146,6 +146,8 @@ public sealed record SettingsDashboardSnapshot(
 
 public sealed record WorkspacePermissionUpdateDto(bool RemoteExecutionAllowed);
 
+public sealed record WorkspaceRootPathUpdateDto(string RootPath);
+
 public sealed record ManualCompactionResponse(
     string ConversationId,
     string? ThroughEntryId,
@@ -270,6 +272,10 @@ public interface ISettingsDashboardService
 
     Task<WorkspaceStatus> UpdateWorkspacePermissions(
         WorkspacePermissionUpdateDto request,
+        CancellationToken cancellationToken);
+
+    Task<WorkspaceStatus> UpdateWorkspaceRootPath(
+        WorkspaceRootPathUpdateDto request,
         CancellationToken cancellationToken);
 }
 

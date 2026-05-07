@@ -47,9 +47,10 @@ public sealed class AgentMessageProcessor(
             new ConversationResolveRequest(request.Channel, request.ConversationId),
             cancellationToken);
         var conversation = resolution.Conversation;
-        var rootPath = GetWorkspaceRootPath(environment.ContentRootPath);
+        var rootPath = WorkspacePathResolver.GetDefaultAgentWorkspacePath(environment.ContentRootPath);
         var workspaceResolution = await workspaceStore.GetOrCreateActive(rootPath, cancellationToken);
         var workspace = workspaceResolution.Workspace;
+        Directory.CreateDirectory(workspace.RootPath);
         workspace = await ClearStaleActiveRun(workspace, cancellationToken);
         var settings = await settingsResolver.Resolve(
             new AgentSettingsResolveRequest(
@@ -207,7 +208,7 @@ public sealed class AgentMessageProcessor(
         var providerType = GetProviderType(settings);
         var provider = providerSelector.Get(providerType);
         var resources = await resourceLoader.Load(
-            new AgentResourceLoadRequest(conversation, request.Channel, providerType, settings),
+            new AgentResourceLoadRequest(conversation, request.Channel, providerType, settings, workspace.RootPath),
             cancellationToken);
         var memoryScoutResult = await PrefetchMemory(
             conversation.Id,
@@ -1272,15 +1273,4 @@ public sealed class AgentMessageProcessor(
         return AgentProviderType.Ollama;
     }
 
-    private static string GetWorkspaceRootPath(string contentRootPath)
-    {
-        var directory = new DirectoryInfo(contentRootPath);
-
-        if (directory.Parent is not null && directory.Parent.Name.Equals("src", StringComparison.OrdinalIgnoreCase))
-        {
-            return directory.Parent.Parent?.FullName ?? directory.FullName;
-        }
-
-        return directory.FullName;
-    }
 }

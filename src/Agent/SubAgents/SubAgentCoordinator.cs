@@ -30,7 +30,7 @@ public sealed class SubAgentCoordinator(
             cancellationToken);
 
         var workspace = (await workspaceStore.GetOrCreateActive(
-            GetWorkspaceRootPath(environment.ContentRootPath),
+            WorkspacePathResolver.GetDefaultAgentWorkspacePath(environment.ContentRootPath),
             cancellationToken)).Workspace;
         var allowsMutation = workspace.RemoteExecutionAllowed || string.Equals(
             request.Channel,
@@ -108,15 +108,4 @@ public sealed class SubAgentCoordinator(
             ]);
     }
 
-    private static string GetWorkspaceRootPath(string contentRootPath)
-    {
-        var directory = new DirectoryInfo(contentRootPath);
-
-        if (directory.Parent is not null && directory.Parent.Name.Equals("src", StringComparison.OrdinalIgnoreCase))
-        {
-            return directory.Parent.Parent?.FullName ?? directory.FullName;
-        }
-
-        return directory.FullName;
-    }
 }

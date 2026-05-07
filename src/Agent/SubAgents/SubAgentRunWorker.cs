@@ -54,6 +54,7 @@ public sealed class SubAgentRunWorker(
         var workspace = (await workspaceStore.List(cancellationToken))
             .FirstOrDefault(x => string.Equals(x.Id, item.WorkspaceId, StringComparison.OrdinalIgnoreCase))
             ?? throw new InvalidOperationException($"Workspace '{item.WorkspaceId}' was not found.");
+        Directory.CreateDirectory(workspace.RootPath);
         var conversation = await conversationRepository.Get(item.ChildConversationId, cancellationToken)
             ?? throw new InvalidOperationException($"Sub-agent conversation '{item.ChildConversationId}' was not found.");
         var settings = await settingsResolver.Resolve(
@@ -67,7 +68,7 @@ public sealed class SubAgentRunWorker(
                 }),
             cancellationToken);
         var resources = await resourceLoader.Load(
-            new AgentResourceLoadRequest(conversation, item.Channel, AgentProviderType.Codex, settings),
+            new AgentResourceLoadRequest(conversation, item.Channel, AgentProviderType.Codex, settings, workspace.RootPath),
             cancellationToken);
         var provider = providerSelector.Get(AgentProviderType.Codex);
 

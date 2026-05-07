@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Copy, DatabaseZap, ShieldCheck, ShieldOff, Sparkles, Trash2 } from "lucide-react";
+import { type FormEvent, useState } from "react";
+import { Copy, DatabaseZap, FolderInput, ShieldCheck, ShieldOff, Sparkles, Trash2 } from "lucide-react";
 import { useGetSettings } from "../../api/generated";
 import { ErrorState, IconButton, LoadingState, PageFrame, Panel } from "../components";
 
@@ -26,6 +26,7 @@ export function SettingsPage() {
   const [maintenanceResult, setMaintenanceResult] = useState<string | null>(null);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [isUpdatingWorkspace, setIsUpdatingWorkspace] = useState(false);
+  const [workspaceRootPath, setWorkspaceRootPath] = useState("");
 
   async function compactMain() {
     setIsCompacting(true);
@@ -109,6 +110,39 @@ export function SettingsPage() {
     }
   }
 
+  async function updateWorkspaceRootPath(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const rootPath = workspaceRootPath.trim();
+
+    if (!rootPath) {
+      return;
+    }
+
+    setIsUpdatingWorkspace(true);
+    setWorkspaceError(null);
+
+    try {
+      const response = await fetch("/api/dashboard/settings/workspace-root", {
+        body: JSON.stringify({ rootPath }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST"
+      });
+
+      if (!response.ok) {
+        const body = await response.text();
+        throw new Error(body || `Workspace root update failed: ${response.status}`);
+      }
+
+      setWorkspaceRootPath("");
+      await settingsQuery.refetch();
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsUpdatingWorkspace(false);
+    }
+  }
+
   return (
     <PageFrame
       eyebrow="Read-only configuration"
@@ -156,6 +190,18 @@ export function SettingsPage() {
                   </dd>
                 </div>
               </dl>
+              <form className="workspace-path-form" onSubmit={(event) => void updateWorkspaceRootPath(event)}>
+                <input
+                  aria-label="Workspace root path"
+                  onChange={(event) => setWorkspaceRootPath(event.target.value)}
+                  placeholder={workspace.rootPath}
+                  value={workspaceRootPath}
+                />
+                <button className="secondary-action" disabled={isUpdatingWorkspace || !workspaceRootPath.trim()} type="submit">
+                  <FolderInput size={14} />
+                  Change
+                </button>
+              </form>
             </Panel>
           )}
           <SettingsPanel

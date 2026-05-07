@@ -941,6 +941,17 @@ dd {
   margin-bottom: 14px;
 }
 
+.workspace-path-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.workspace-path-form input {
+  min-width: 0;
+}
+
 .settings-list dd {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

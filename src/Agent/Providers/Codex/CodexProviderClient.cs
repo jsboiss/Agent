@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using Agent.Workspaces;
 using Microsoft.Extensions.Options;
 
 namespace Agent.Providers.Codex;
@@ -45,10 +46,11 @@ public sealed class CodexProviderClient(IOptions<CodexProviderOptions> options) 
 
         try
         {
-            var process = await GetProcess(request.WorkspaceRootPath, timeoutSource.Token);
+            var workspaceRootPath = WorkspacePathResolver.NormalizeRootPath(request.WorkspaceRootPath, Directory.GetCurrentDirectory());
+            var process = await GetProcess(workspaceRootPath, timeoutSource.Token);
 
             var toolName = string.IsNullOrWhiteSpace(request.CodexThreadId) ? "codex" : "codex-reply";
-            var arguments = GetToolArguments(request, toolName);
+            var arguments = GetToolArguments(request with { WorkspaceRootPath = workspaceRootPath }, toolName);
             var requestId = GetNextRequestId();
             var toolResponse = await SendRpc(
                 process,
@@ -199,10 +201,13 @@ public sealed class CodexProviderClient(IOptions<CodexProviderOptions> options) 
 
     private ProcessStartInfo GetStartInfo(string workspaceRootPath)
     {
+        var workingDirectory = string.IsNullOrWhiteSpace(Options.WorkingDirectory)
+            ? workspaceRootPath
+            : WorkspacePathResolver.NormalizeRootPath(Options.WorkingDirectory, workspaceRootPath);
         var startInfo = new ProcessStartInfo
         {
             FileName = Options.Command,
-            WorkingDirectory = workspaceRootPath,
+            WorkingDirectory = workingDirectory,
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
