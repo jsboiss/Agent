@@ -1,8 +1,8 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
-import { SendHorizontal, Terminal } from "lucide-react";
+import { Gauge, SendHorizontal, Terminal } from "lucide-react";
 import { getGetMainChatQueryKey, getMainChatResponse, sendMainChatMessage, useGetMainChat } from "../../api/generated";
-import type { ChatDashboardMessage } from "../../api/generated";
+import type { ChatDashboardMessage, TokenUsageBreakdown } from "../../api/generated";
 import { EmptyState, ErrorState, formatLocalTime, IconButton, LoadingState, StatusChip, TopBar } from "../components";
 
 export function ChatPage() {
@@ -147,8 +147,7 @@ export function ChatPage() {
               <StatusChip label={snapshot.isRunning || isStreaming ? "processing" : "online"} tone={snapshot.isRunning || isStreaming ? "green" : "blue"} />
               <span>{snapshot.provider}</span>
               <strong>{snapshot.model}</strong>
-              <span>{formatTokens(snapshot.tokens.totalTokens)} tokens</span>
-              <span>{formatTokens(snapshot.tokens.remainingUntilCompactionTokens)} until compaction</span>
+              <TokenUsageHoverCard tokens={snapshot.tokens} tokenUsage={snapshot.tokenUsage} />
             </>
           )}
         />
@@ -292,6 +291,76 @@ function MessageBody({ content, htmlContent }: { content: string; htmlContent: s
   }
 
   return <p className="message-body">{content}</p>;
+}
+
+function TokenUsageHoverCard({
+  tokens,
+  tokenUsage
+}: {
+  tokens: {
+    totalTokens: number | string;
+    mainContextTokens: number | string;
+    contextWindowTokens: number | string;
+    remainingUntilCompactionTokens: number | string;
+    source: string;
+  };
+  tokenUsage: TokenUsageBreakdown[];
+}) {
+  const codexUsage = getProviderUsage(tokenUsage, "Codex");
+  const geminiUsage = getProviderUsage(tokenUsage, "Gemini");
+  const contextWindowTokens = Number(tokens.contextWindowTokens);
+  const contextUsedPercent = contextWindowTokens > 0
+    ? Math.min(100, Math.round((Number(tokens.mainContextTokens) / contextWindowTokens) * 100))
+    : 0;
+
+  return (
+    <div className="usage-hover-card">
+      <button className="usage-trigger" type="button" aria-label="Show token usage">
+        <Gauge size={14} />
+        <span>{formatTokens(tokens.mainContextTokens)}</span>
+        <small>{contextUsedPercent}% ctx</small>
+      </button>
+      <div className="usage-popout" role="tooltip">
+        <div className="usage-popout-header">
+          <span>Usage</span>
+          <strong>{formatTokens(tokens.mainContextTokens)} / {formatTokens(tokens.contextWindowTokens)}</strong>
+        </div>
+        <div className="usage-meter" aria-hidden="true">
+          <span style={{ width: `${contextUsedPercent}%` }} />
+        </div>
+        <dl className="usage-summary-grid">
+          <div>
+            <dt>Context</dt>
+            <dd>{formatTokens(tokens.mainContextTokens)}</dd>
+          </div>
+          <div>
+            <dt>Until compact</dt>
+            <dd>{formatTokens(tokens.remainingUntilCompactionTokens)}</dd>
+          </div>
+        </dl>
+        <div className="usage-provider-list">
+          <ProviderUsageRow label="Codex" usage={codexUsage} showRequests={false} />
+          <ProviderUsageRow label="Gemini" usage={geminiUsage} showRequests />
+        </div>
+        <div className="usage-source">{tokens.source}</div>
+      </div>
+    </div>
+  );
+}
+
+function ProviderUsageRow({ label, usage, showRequests }: { label: string; usage?: TokenUsageBreakdown; showRequests: boolean }) {
+  return (
+    <div className="usage-provider-row">
+      <span>{label}</span>
+      <strong>{formatTokens(usage?.totalTokens ?? 0)} tokens</strong>
+      {showRequests && <small>{formatTokens(usage?.requestCount ?? 0)} requests</small>}
+      {!showRequests && <small>{usage?.source ?? "estimate"}</small>}
+    </div>
+  );
+}
+
+function getProviderUsage(tokenUsage: TokenUsageBreakdown[], provider: string) {
+  return tokenUsage.find((x) => x.provider.toLowerCase() === provider.toLowerCase());
 }
 
 function shorten(value: string, length: number) {

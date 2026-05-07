@@ -45,6 +45,7 @@ export interface ChatDashboardSnapshot {
   queuedPrompt: ChatDashboardSnapshotQueuedPrompt;
   workspace: ChatDashboardSnapshotWorkspace;
   tokens: TokenUsageSummary;
+  tokenUsage: TokenUsageBreakdown[];
 }
 
 export interface MemoryGraphEdge {
@@ -304,6 +305,39 @@ export interface TokenUsageSummary {
   compactionThresholdTokens: TokenUsageSummaryCompactionThresholdTokens;
   /** @pattern ^-?(?:0|[1-9]\d*)$ */
   remainingUntilCompactionTokens: TokenUsageSummaryRemainingUntilCompactionTokens;
+  source: string;
+}
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type TokenUsageBreakdownPromptTokens = number | string;
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type TokenUsageBreakdownCompletionTokens = number | string;
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type TokenUsageBreakdownTotalTokens = number | string;
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type TokenUsageBreakdownRequestCount = number | string;
+
+export interface TokenUsageBreakdown {
+  provider: string;
+  /** @pattern ^-?(?:0|[1-9]\d*)$ */
+  promptTokens: TokenUsageBreakdownPromptTokens;
+  /** @pattern ^-?(?:0|[1-9]\d*)$ */
+  completionTokens: TokenUsageBreakdownCompletionTokens;
+  /** @pattern ^-?(?:0|[1-9]\d*)$ */
+  totalTokens: TokenUsageBreakdownTotalTokens;
+  /** @pattern ^-?(?:0|[1-9]\d*)$ */
+  requestCount: TokenUsageBreakdownRequestCount;
   source: string;
 }
 

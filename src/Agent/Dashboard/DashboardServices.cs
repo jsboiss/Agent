@@ -180,6 +180,7 @@ public sealed class ChatDashboardService(
 
         var rollingSummary = await summaryStore.Get(conversationId, cancellationToken);
         var tokenSummary = TokenUsageDashboardMapper.FromConversation(entries, rollingSummary, settings);
+        var tokenUsage = TokenUsageDashboardMapper.ByProvider(events);
 
         return new ChatDashboardSnapshot(
             conversationId,
@@ -201,7 +202,8 @@ public sealed class ChatDashboardService(
                 workspaceResolution.Workspace.RemoteExecutionAllowed,
                 activeRun?.Status.ToString(),
                 activeRun?.Kind.ToString()),
-            tokenSummary);
+            tokenSummary,
+            tokenUsage);
     }
 
     private static ChatDashboardMessage ToMessage(ConversationEntry x)
@@ -537,6 +539,26 @@ internal static class TokenUsageDashboardMapper
             summaries.Any(x => string.Equals(x.Source, "provider", StringComparison.OrdinalIgnoreCase)) ? "provider" : "estimate");
     }
 
+    public static IReadOnlyList<TokenUsageBreakdown> ByProvider(IReadOnlyList<AgentEvent> events)
+    {
+        return events
+            .Where(x => x.Kind == AgentEventKind.ProviderTurnCompleted)
+            .Where(x => !string.IsNullOrWhiteSpace(x.Data.GetValueOrDefault("provider")))
+            .GroupBy(x => x.Data.GetValueOrDefault("provider")!, StringComparer.OrdinalIgnoreCase)
+            .Select(x => new TokenUsageBreakdown(
+                x.Key,
+                x.Sum(y => GetMetadataValue(y.Data, "promptTokens") ?? 0),
+                x.Sum(y => GetMetadataValue(y.Data, "completionTokens") ?? 0),
+                x.Sum(y => GetMetadataValue(y.Data, "totalTokens") ?? 0),
+                x.Count(),
+                x.Any(y => string.Equals(y.Data.GetValueOrDefault("tokenUsageSource"), "provider", StringComparison.OrdinalIgnoreCase))
+                    ? "provider"
+                    : "estimate"))
+            .OrderByDescending(x => IsPreferredUsageProvider(x.Provider))
+            .ThenBy(x => x.Provider)
+            .ToArray();
+    }
+
     private static TokenUsageSummary FromUsage(AgentTokenUsage usage)
     {
         return new TokenUsageSummary(
@@ -603,6 +625,19 @@ internal static class TokenUsageDashboardMapper
         return int.TryParse(settings.Get(key), out var value) && value > 0
             ? value
             : fallback;
+    }
+
+    private static int? GetMetadataValue(IReadOnlyDictionary<string, string>? metadata, string key)
+    {
+        return metadata?.TryGetValue(key, out var value) == true && int.TryParse(value, out var tokens)
+            ? tokens
+            : null;
+    }
+
+    private static bool IsPreferredUsageProvider(string provider)
+    {
+        return string.Equals(provider, "Codex", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(provider, "Gemini", StringComparison.OrdinalIgnoreCase);
     }
 }
 

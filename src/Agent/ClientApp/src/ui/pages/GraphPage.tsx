@@ -1,5 +1,5 @@
 import ForceGraph2D, { ForceGraphMethods } from "react-force-graph-2d";
-import { RefObject, useEffect, useMemo, useRef, useState } from "react";
+import { RefCallback, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Crosshair, RefreshCcw, Search } from "lucide-react";
 import { MemoryRow, useGetMemories } from "../../api/generated";
 import { EmptyState, ErrorState, IconButton, LoadingState, PageFrame, toNumber } from "../components";
@@ -43,8 +43,7 @@ const graphParams = { lifecycle: "Active" };
 export function GraphPage() {
   const graphQuery = useGetMemories(graphParams);
   const graphRef = useRef<ForceGraphMethods | undefined>(undefined);
-  const stageRef = useRef<HTMLDivElement | null>(null);
-  const stageSize = useElementSize(stageRef);
+  const [stageRef, stageElement, stageSize] = useElementSize<HTMLDivElement>();
   const [query, setQuery] = useState("");
   const [segment, setSegment] = useState("All");
   const [tier, setTier] = useState("All");
@@ -100,8 +99,8 @@ export function GraphPage() {
   function handleNodeHover(node: GraphNode | null | undefined) {
     setHoveredNodeId(node?.id ?? null);
 
-    if (stageRef.current) {
-      stageRef.current.style.cursor = node ? "pointer" : "default";
+    if (stageElement) {
+      stageElement.style.cursor = node ? "pointer" : "default";
     }
   }
 
@@ -280,16 +279,31 @@ function buildGraph(memories: MemoryRow[]) {
   return { nodes, links, hubs };
 }
 
-function useElementSize(ref: RefObject<HTMLElement | null>) {
+function useElementSize<T extends HTMLElement>() {
+  const [element, setElement] = useState<T | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
+  const ref: RefCallback<T> = useCallback((node) => {
+    setElement(node);
+  }, []);
 
   useEffect(() => {
-    const element = ref.current;
-
     if (!element) {
+      setSize({ width: 0, height: 0 });
+
       return;
     }
 
+    function updateSize() {
+      const rect = element!.getBoundingClientRect();
+
+      setSize({
+        width: Math.floor(rect.width),
+        height: Math.floor(rect.height)
+      });
+    }
+
+    updateSize();
+    const animationFrameId = window.requestAnimationFrame(updateSize);
     const observer = new ResizeObserver(([entry]) => {
       setSize({
         width: Math.floor(entry.contentRect.width),
@@ -298,10 +312,13 @@ function useElementSize(ref: RefObject<HTMLElement | null>) {
     });
     observer.observe(element);
 
-    return () => observer.disconnect();
-  }, [ref]);
+    return () => {
+      window.cancelAnimationFrame(animationFrameId);
+      observer.disconnect();
+    };
+  }, [element]);
 
-  return size;
+  return [ref, element, size] as const;
 }
 
 function getNodeRadius(node: GraphNode) {

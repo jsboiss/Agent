@@ -15,7 +15,8 @@ public sealed record ChatDashboardSnapshot(
     bool IsRunning,
     string? QueuedPrompt,
     WorkspaceStatus? Workspace,
-    TokenUsageSummary Tokens);
+    TokenUsageSummary Tokens,
+    IReadOnlyList<TokenUsageBreakdown> TokenUsage);
 
 public sealed record WorkspaceStatus(
     string Id,
@@ -116,6 +117,14 @@ public sealed record TokenUsageSummary(
     int RemainingContextTokens,
     int CompactionThresholdTokens,
     int RemainingUntilCompactionTokens,
+    string Source);
+
+public sealed record TokenUsageBreakdown(
+    string Provider,
+    int PromptTokens,
+    int CompletionTokens,
+    int TotalTokens,
+    int RequestCount,
     string Source);
 
 public sealed record RunTurnGroup(
