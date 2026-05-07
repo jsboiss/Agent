@@ -16,7 +16,9 @@ public static class WorkspacePathResolver
 
     public static string GetDefaultAgentWorkspacePath(string contentRootPath)
     {
-        return Path.Combine(GetRepositoryRootPath(contentRootPath), "App_Data", "CodexWorkspace");
+        var documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+
+        return Path.Combine(documentsPath, "Agent");
     }
 
     public static string NormalizeRootPath(string rootPath, string contentRootPath)
