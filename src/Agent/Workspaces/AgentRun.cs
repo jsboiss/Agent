@@ -10,6 +10,7 @@ public sealed record AgentRun(
     string Channel,
     string? ParentRunId,
     string? ParentCodexThreadId,
+    string? ChildConversationId,
     DateTimeOffset StartedAt,
     DateTimeOffset? CompletedAt,
     string? FinalResponse,

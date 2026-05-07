@@ -201,6 +201,7 @@ public sealed class SqliteAgentStateStore(IOptions<SqliteAgentStateOptions> opti
         string channel,
         string? parentRunId,
         string? parentCodexThreadId,
+        string? childConversationId,
         CancellationToken cancellationToken)
     {
         await EnsureDatabase(cancellationToken);
@@ -216,6 +217,7 @@ public sealed class SqliteAgentStateStore(IOptions<SqliteAgentStateOptions> opti
             channel,
             parentRunId,
             parentCodexThreadId,
+            childConversationId,
             timestamp,
             null,
             null,
@@ -226,11 +228,11 @@ public sealed class SqliteAgentStateStore(IOptions<SqliteAgentStateOptions> opti
         command.CommandText = """
             INSERT INTO AgentRuns (
                 Id, WorkspaceId, Prompt, CodexThreadId, Status, Kind, Channel,
-                ParentRunId, ParentCodexThreadId, StartedAt, CompletedAt, FinalResponse, Error
+                ParentRunId, ParentCodexThreadId, ChildConversationId, StartedAt, CompletedAt, FinalResponse, Error
             )
             VALUES (
                 $id, $workspaceId, $prompt, NULL, $status, $kind, $channel,
-                $parentRunId, $parentCodexThreadId, $startedAt, NULL, NULL, NULL
+                $parentRunId, $parentCodexThreadId, $childConversationId, $startedAt, NULL, NULL, NULL
             );
             """;
         command.Parameters.AddWithValue("$id", run.Id);
@@ -241,6 +243,7 @@ public sealed class SqliteAgentStateStore(IOptions<SqliteAgentStateOptions> opti
         command.Parameters.AddWithValue("$channel", run.Channel);
         command.Parameters.AddWithValue("$parentRunId", (object?)run.ParentRunId ?? DBNull.Value);
         command.Parameters.AddWithValue("$parentCodexThreadId", (object?)run.ParentCodexThreadId ?? DBNull.Value);
+        command.Parameters.AddWithValue("$childConversationId", (object?)run.ChildConversationId ?? DBNull.Value);
         command.Parameters.AddWithValue("$startedAt", run.StartedAt.ToString("O"));
         await command.ExecuteNonQueryAsync(cancellationToken);
 
@@ -279,14 +282,14 @@ public sealed class SqliteAgentStateStore(IOptions<SqliteAgentStateOptions> opti
         command.CommandText = kind is null
             ? """
             SELECT Id, WorkspaceId, Prompt, CodexThreadId, Status, Kind, Channel,
-                   ParentRunId, ParentCodexThreadId, StartedAt, CompletedAt, FinalResponse, Error
+                   ParentRunId, ParentCodexThreadId, ChildConversationId, StartedAt, CompletedAt, FinalResponse, Error
             FROM AgentRuns
             ORDER BY StartedAt DESC
             LIMIT $limit;
             """
             : """
             SELECT Id, WorkspaceId, Prompt, CodexThreadId, Status, Kind, Channel,
-                   ParentRunId, ParentCodexThreadId, StartedAt, CompletedAt, FinalResponse, Error
+                   ParentRunId, ParentCodexThreadId, ChildConversationId, StartedAt, CompletedAt, FinalResponse, Error
             FROM AgentRuns
             WHERE Kind = $kind
             ORDER BY StartedAt DESC
@@ -489,6 +492,7 @@ public sealed class SqliteAgentStateStore(IOptions<SqliteAgentStateOptions> opti
                 Channel TEXT NOT NULL,
                 ParentRunId TEXT NULL,
                 ParentCodexThreadId TEXT NULL,
+                ChildConversationId TEXT NULL,
                 StartedAt TEXT NOT NULL,
                 CompletedAt TEXT NULL,
                 FinalResponse TEXT NULL,
@@ -511,6 +515,33 @@ public sealed class SqliteAgentStateStore(IOptions<SqliteAgentStateOptions> opti
             CREATE INDEX IF NOT EXISTS IX_ConversationMirrors_Workspace_Thread ON ConversationMirrors (WorkspaceId, CodexThreadId, CreatedAt);
             """;
         await command.ExecuteNonQueryAsync(cancellationToken);
+        await EnsureAgentRunsChildConversationColumn(connection, cancellationToken);
+
+        await using var indexCommand = connection.CreateCommand();
+        indexCommand.CommandText = "CREATE INDEX IF NOT EXISTS IX_AgentRuns_ChildConversation ON AgentRuns (ChildConversationId);";
+        await indexCommand.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task EnsureAgentRunsChildConversationColumn(
+        SqliteConnection connection,
+        CancellationToken cancellationToken)
+    {
+        await using var readCommand = connection.CreateCommand();
+        readCommand.CommandText = "PRAGMA table_info(AgentRuns);";
+
+        await using var reader = await readCommand.ExecuteReaderAsync(cancellationToken);
+
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            if (string.Equals(reader.GetString(1), "ChildConversationId", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+        }
+
+        await using var alterCommand = connection.CreateCommand();
+        alterCommand.CommandText = "ALTER TABLE AgentRuns ADD COLUMN ChildConversationId TEXT NULL;";
+        await alterCommand.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private async Task<SqliteConnection> Open(CancellationToken cancellationToken)
@@ -581,7 +612,7 @@ public sealed class SqliteAgentStateStore(IOptions<SqliteAgentStateOptions> opti
         await using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT Id, WorkspaceId, Prompt, CodexThreadId, Status, Kind, Channel,
-                   ParentRunId, ParentCodexThreadId, StartedAt, CompletedAt, FinalResponse, Error
+                   ParentRunId, ParentCodexThreadId, ChildConversationId, StartedAt, CompletedAt, FinalResponse, Error
             FROM AgentRuns
             WHERE Id = $runId;
             """;
@@ -620,10 +651,11 @@ public sealed class SqliteAgentStateStore(IOptions<SqliteAgentStateOptions> opti
             reader.GetString(6),
             reader.IsDBNull(7) ? null : reader.GetString(7),
             reader.IsDBNull(8) ? null : reader.GetString(8),
-            DateTimeOffset.Parse(reader.GetString(9)),
-            reader.IsDBNull(10) ? null : DateTimeOffset.Parse(reader.GetString(10)),
-            reader.IsDBNull(11) ? null : reader.GetString(11),
-            reader.IsDBNull(12) ? null : reader.GetString(12));
+            reader.IsDBNull(9) ? null : reader.GetString(9),
+            DateTimeOffset.Parse(reader.GetString(10)),
+            reader.IsDBNull(11) ? null : DateTimeOffset.Parse(reader.GetString(11)),
+            reader.IsDBNull(12) ? null : reader.GetString(12),
+            reader.IsDBNull(13) ? null : reader.GetString(13));
     }
 
     private static ConversationMirrorEntry GetMirrorEntry(SqliteDataReader reader)

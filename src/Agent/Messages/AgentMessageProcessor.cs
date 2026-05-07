@@ -189,6 +189,7 @@ public sealed class AgentMessageProcessor(
                 request.Channel,
                 null,
                 workspace.WorkThreadId,
+                null,
                 cancellationToken);
             workspace = await workspaceStore.SetActiveRun(workspace.Id, activeRun.Id, cancellationToken);
         }

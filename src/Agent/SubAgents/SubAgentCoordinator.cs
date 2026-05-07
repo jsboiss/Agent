@@ -64,6 +64,7 @@ public sealed class SubAgentCoordinator(
             request.Channel,
             null,
             workspace.WorkThreadId,
+            childConversation.Id,
             cancellationToken);
         await workQueue.Enqueue(
             new SubAgentWorkItem(

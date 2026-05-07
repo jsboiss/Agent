@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using Agent.Automations;
 using Agent.Calendar;
 using Agent.Capabilities;
@@ -437,6 +438,7 @@ public sealed class RunTimelineService(IAgentEventStore eventStore) : IRunTimeli
 public sealed class SubAgentDashboardService(
     IAgentRunStore runStore,
     IAgentEventStore eventStore,
+    IConversationRepository conversationRepository,
     IAgentTokenTracker tokenTracker) : ISubAgentDashboardService
 {
     public async Task<SubAgentRunsSnapshot> List(CancellationToken cancellationToken)
@@ -461,6 +463,7 @@ public sealed class SubAgentDashboardService(
                 run.CodexThreadId,
                 run.ParentRunId,
                 run.ParentCodexThreadId,
+                run.ChildConversationId,
                 run.StartedAt,
                 run.CompletedAt,
                 run.FinalResponse,
@@ -471,6 +474,302 @@ public sealed class SubAgentDashboardService(
         return new SubAgentRunsSnapshot(
             rows,
             TokenUsageDashboardMapper.FromSummaries(rows.Select(x => x.Tokens).ToArray()));
+    }
+
+    public async Task<SubAgentRunDetailSnapshot> GetDetail(string runId, CancellationToken cancellationToken)
+    {
+        var run = await runStore.Get(runId, cancellationToken)
+            ?? throw new InvalidOperationException($"Run '{runId}' was not found.");
+
+        return await BuildDetail(run, cancellationToken);
+    }
+
+    public async Task StreamDetail(
+        string runId,
+        Stream responseStream,
+        CancellationToken cancellationToken)
+    {
+        var lastSignature = string.Empty;
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            var detail = await GetDetail(runId, cancellationToken);
+            var signature = GetSignature(detail);
+
+            if (!string.Equals(signature, lastSignature, StringComparison.Ordinal))
+            {
+                await WriteSse(responseStream, "snapshot", detail, cancellationToken);
+                lastSignature = signature;
+            }
+
+            if (IsTerminal(detail.Run.Status))
+            {
+                await WriteSse(responseStream, "done", detail, cancellationToken);
+                return;
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+        }
+    }
+
+    private async Task<SubAgentRunDetailSnapshot> BuildDetail(
+        AgentRun run,
+        CancellationToken cancellationToken)
+    {
+        var allEvents = await eventStore.List(null, 500, cancellationToken);
+        var runEvents = allEvents
+            .Where(x => string.Equals(x.Data.GetValueOrDefault("runId"), run.Id, StringComparison.OrdinalIgnoreCase)
+                || (!string.IsNullOrWhiteSpace(run.ChildConversationId)
+                    && string.Equals(x.ConversationId, run.ChildConversationId, StringComparison.OrdinalIgnoreCase)))
+            .OrderBy(x => x.CreatedAt)
+            .ToArray();
+        var row = ToRow(run, runEvents);
+
+        if (string.IsNullOrWhiteSpace(run.ChildConversationId))
+        {
+            return new SubAgentRunDetailSnapshot(
+                row,
+                null,
+                false,
+                "Transcript unavailable for this run because it was created before child conversation tracking was added.",
+                GetFallbackTranscript(run, runEvents),
+                DateTimeOffset.UtcNow);
+        }
+
+        var entries = await conversationRepository.ListEntries(run.ChildConversationId, cancellationToken);
+        var transcript = BuildTranscript(run, entries, runEvents);
+
+        return new SubAgentRunDetailSnapshot(
+            row,
+            run.ChildConversationId,
+            true,
+            null,
+            transcript,
+            DateTimeOffset.UtcNow);
+    }
+
+    private SubAgentRunRow ToRow(
+        AgentRun run,
+        IReadOnlyList<AgentEvent> runEvents)
+    {
+        return new SubAgentRunRow(
+            run.Id,
+            run.WorkspaceId,
+            run.Status.ToString(),
+            run.Kind.ToString(),
+            run.Channel,
+            run.Prompt,
+            run.CodexThreadId,
+            run.ParentRunId,
+            run.ParentCodexThreadId,
+            run.ChildConversationId,
+            run.StartedAt,
+            run.CompletedAt,
+            run.FinalResponse,
+            run.Error,
+            TokenUsageDashboardMapper.FromEvents(runEvents, tokenTracker));
+    }
+
+    private static IReadOnlyList<SubAgentTranscriptEntry> BuildTranscript(
+        AgentRun run,
+        IReadOnlyList<ConversationEntry> entries,
+        IReadOnlyList<AgentEvent> events)
+    {
+        List<SubAgentTranscriptEntry> transcript =
+        [
+            new SubAgentTranscriptEntry(
+                "task:" + run.Id,
+                "Task",
+                "User",
+                "Task",
+                run.Prompt,
+                run.StartedAt,
+                false,
+                new Dictionary<string, string>())
+        ];
+
+        transcript.AddRange(entries
+            .Where(x => x.Role != ConversationEntryRole.System)
+            .Select(ToTranscriptEntry));
+        transcript.AddRange(events.Select(ToTranscriptEntry));
+
+        if (!string.IsNullOrWhiteSpace(run.FinalResponse)
+            && !transcript.Any(x => string.Equals(x.Content, run.FinalResponse, StringComparison.Ordinal)))
+        {
+            transcript.Add(new SubAgentTranscriptEntry(
+                "final:" + run.Id,
+                "FinalResponse",
+                "Assistant",
+                "Final response",
+                run.FinalResponse,
+                run.CompletedAt ?? DateTimeOffset.UtcNow,
+                false,
+                new Dictionary<string, string>()));
+        }
+
+        if (!string.IsNullOrWhiteSpace(run.Error)
+            && !transcript.Any(x => x.IsError && string.Equals(x.Content, run.Error, StringComparison.Ordinal)))
+        {
+            transcript.Add(new SubAgentTranscriptEntry(
+                "error:" + run.Id,
+                "Error",
+                "System",
+                "Error",
+                run.Error,
+                run.CompletedAt ?? DateTimeOffset.UtcNow,
+                true,
+                new Dictionary<string, string>()));
+        }
+
+        return transcript
+            .OrderBy(x => x.CreatedAt)
+            .ThenBy(x => GetKindOrder(x.Kind))
+            .ToArray();
+    }
+
+    private static IReadOnlyList<SubAgentTranscriptEntry> GetFallbackTranscript(
+        AgentRun run,
+        IReadOnlyList<AgentEvent> events)
+    {
+        return BuildTranscript(run, [], events);
+    }
+
+    private static SubAgentTranscriptEntry ToTranscriptEntry(ConversationEntry entry)
+    {
+        var role = entry.Role switch
+        {
+            ConversationEntryRole.User => "User",
+            ConversationEntryRole.Assistant => "Assistant",
+            ConversationEntryRole.Tool => "Tool",
+            _ => entry.Role.ToString()
+        };
+
+        return new SubAgentTranscriptEntry(
+            "entry:" + entry.Id,
+            "ConversationEntry",
+            role,
+            role,
+            RepairMojibake(entry.Content),
+            entry.CreatedAt,
+            false,
+            new Dictionary<string, string>
+            {
+                ["conversationEntryId"] = entry.Id,
+                ["channel"] = entry.Channel
+            });
+    }
+
+    private static SubAgentTranscriptEntry ToTranscriptEntry(AgentEvent agentEvent)
+    {
+        var content = GetEventContent(agentEvent);
+
+        return new SubAgentTranscriptEntry(
+            "event:" + agentEvent.Id,
+            agentEvent.Kind.ToString(),
+            GetEventRole(agentEvent.Kind),
+            GetEventTitle(agentEvent),
+            RepairMojibake(content),
+            agentEvent.CreatedAt,
+            agentEvent.Kind == AgentEventKind.ProviderError
+                || !string.IsNullOrWhiteSpace(agentEvent.Data.GetValueOrDefault("error")),
+            agentEvent.Data);
+    }
+
+    private static string GetEventRole(AgentEventKind kind)
+    {
+        return kind switch
+        {
+            AgentEventKind.ProviderTextDelta or AgentEventKind.ProviderTurnCompleted => "Assistant",
+            AgentEventKind.ToolCallStarted or AgentEventKind.ToolCallOutput or AgentEventKind.ToolCallCompleted => "Tool",
+            AgentEventKind.ProviderError => "Error",
+            _ => "Event"
+        };
+    }
+
+    private static string GetEventTitle(AgentEvent agentEvent)
+    {
+        return agentEvent.Kind switch
+        {
+            AgentEventKind.ProviderRequestStarted => "Provider started",
+            AgentEventKind.ProviderTextDelta => "Assistant output",
+            AgentEventKind.ProviderTurnCompleted => "Provider turn completed",
+            AgentEventKind.ToolCallStarted => $"Tool started: {agentEvent.Data.GetValueOrDefault("toolName") ?? "tool"}",
+            AgentEventKind.ToolCallOutput => $"Tool output: {agentEvent.Data.GetValueOrDefault("toolName") ?? "tool"}",
+            AgentEventKind.ToolCallCompleted => $"Tool completed: {agentEvent.Data.GetValueOrDefault("toolName") ?? "tool"}",
+            AgentEventKind.ProviderError => "Provider error",
+            _ => agentEvent.Kind.ToString()
+        };
+    }
+
+    private static string GetEventContent(AgentEvent agentEvent)
+    {
+        return agentEvent.Kind switch
+        {
+            AgentEventKind.ProviderTextDelta => agentEvent.Data.GetValueOrDefault("text") ?? string.Empty,
+            AgentEventKind.ToolCallOutput => agentEvent.Data.GetValueOrDefault("output") ?? string.Empty,
+            AgentEventKind.ToolCallStarted => agentEvent.Data.GetValueOrDefault("toolName") ?? "Tool call started.",
+            AgentEventKind.ToolCallCompleted => $"Succeeded: {agentEvent.Data.GetValueOrDefault("succeeded") ?? string.Empty}",
+            AgentEventKind.ProviderError => agentEvent.Data.GetValueOrDefault("error") ?? "Provider error.",
+            _ => agentEvent.Data.GetValueOrDefault("message")
+                ?? agentEvent.Data.GetValueOrDefault("error")
+                ?? agentEvent.Data.GetValueOrDefault("text")
+                ?? agentEvent.Kind.ToString()
+        };
+    }
+
+    private static int GetKindOrder(string kind)
+    {
+        return kind switch
+        {
+            "Task" => 0,
+            "ConversationEntry" => 1,
+            _ => 2
+        };
+    }
+
+    private static bool IsTerminal(string status)
+    {
+        return string.Equals(status, AgentRunStatus.Completed.ToString(), StringComparison.OrdinalIgnoreCase)
+            || string.Equals(status, AgentRunStatus.Failed.ToString(), StringComparison.OrdinalIgnoreCase)
+            || string.Equals(status, AgentRunStatus.Cancelled.ToString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string GetSignature(SubAgentRunDetailSnapshot detail)
+    {
+        return string.Join(
+            "|",
+            [
+                detail.Run.Status,
+                detail.Run.CompletedAt?.ToString("O") ?? string.Empty,
+                detail.Run.FinalResponse ?? string.Empty,
+                detail.Run.Error ?? string.Empty,
+                detail.Transcript.Count.ToString(),
+                detail.Transcript.LastOrDefault()?.Id ?? string.Empty
+            ]);
+    }
+
+    private static async Task WriteSse(
+        Stream responseStream,
+        string eventName,
+        SubAgentRunDetailSnapshot detail,
+        CancellationToken cancellationToken)
+    {
+        var json = JsonSerializer.Serialize(detail, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var content = $"event: {eventName}\ndata: {json}\n\n";
+        var bytes = Encoding.UTF8.GetBytes(content);
+        await responseStream.WriteAsync(bytes, cancellationToken);
+        await responseStream.FlushAsync(cancellationToken);
+    }
+
+    private static string RepairMojibake(string value)
+    {
+        return value
+            .Replace("Ã”Ã‡Ã–", "'", StringComparison.Ordinal)
+            .Replace("Ã”Ã‡Â£", "\"", StringComparison.Ordinal)
+            .Replace("Ã”Ã‡Ã˜", "\"", StringComparison.Ordinal)
+            .Replace("Ã”Ã‡Ã´", "-", StringComparison.Ordinal)
+            .Replace("Ã”Ã‡Ã¶", "-", StringComparison.Ordinal)
+            .Replace("Ã”Ã‡Âª", "...", StringComparison.Ordinal);
     }
 }
 

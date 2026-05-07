@@ -12,6 +12,7 @@ interface SubAgentRunRow {
   codexThreadId?: string | null;
   parentRunId?: string | null;
   parentCodexThreadId?: string | null;
+  childConversationId?: string | null;
   startedAt: string;
   completedAt?: string | null;
   finalResponse?: string | null;
@@ -36,13 +37,36 @@ interface TokenUsageSummary {
   source: string;
 }
 
+interface SubAgentRunDetailSnapshot {
+  run: SubAgentRunRow;
+  childConversationId?: string | null;
+  transcriptAvailable: boolean;
+  transcriptUnavailableReason?: string | null;
+  transcript: SubAgentTranscriptEntry[];
+  updatedAt: string;
+}
+
+interface SubAgentTranscriptEntry {
+  id: string;
+  kind: string;
+  role: string;
+  title: string;
+  content: string;
+  createdAt: string;
+  isError: boolean;
+  metadata: Record<string, string>;
+}
+
 export function SubAgentsPage() {
   const [snapshot, setSnapshot] = useState<SubAgentRunsSnapshot | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [detail, setDetail] = useState<SubAgentRunDetailSnapshot | null>(null);
+  const [detailError, setDetailError] = useState<Error | null>(null);
+  const [isStreaming, setIsStreaming] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const runs = snapshot?.runs ?? [];
-  const selectedRun = runs.find((x) => x.id === selectedRunId) ?? runs[0];
+  const selectedRun = detail?.run ?? runs.find((x) => x.id === selectedRunId) ?? runs[0];
 
   async function load() {
     setIsLoading(true);
@@ -57,6 +81,10 @@ export function SubAgentsPage() {
 
       const data = await response.json() as SubAgentRunsSnapshot;
       setSnapshot(data);
+
+      if (!selectedRunId && data.runs.length > 0) {
+        setSelectedRunId(data.runs[0].id);
+      }
     } catch (caught) {
       setError(caught instanceof Error ? caught : new Error(String(caught)));
     } finally {
@@ -74,9 +102,64 @@ export function SubAgentsPage() {
     await load();
   }
 
+  async function loadDetail(runId: string) {
+    try {
+      const response = await fetch(`/api/dashboard/subagents/${runId}`);
+
+      if (!response.ok) {
+        throw new Error(`Detail request failed: ${response.status}`);
+      }
+
+      const data = await response.json() as SubAgentRunDetailSnapshot;
+      setDetail(data);
+      setDetailError(null);
+    } catch (caught) {
+      setDetailError(caught instanceof Error ? caught : new Error(String(caught)));
+    }
+  }
+
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    if (!selectedRunId) {
+      setDetail(null);
+      setDetailError(null);
+      setIsStreaming(false);
+      return;
+    }
+
+    setDetail(null);
+    setDetailError(null);
+    setIsStreaming(true);
+
+    const source = new EventSource(`/api/dashboard/subagents/${selectedRunId}/stream`);
+
+    function handleMessage(event: MessageEvent<string>) {
+      const data = JSON.parse(event.data) as SubAgentRunDetailSnapshot;
+      setDetail(data);
+      setDetailError(null);
+
+      if (isTerminal(data.run.status)) {
+        setIsStreaming(false);
+        source.close();
+      }
+    }
+
+    source.addEventListener("snapshot", handleMessage as EventListener);
+    source.addEventListener("done", handleMessage as EventListener);
+    source.onerror = () => {
+      setIsStreaming(false);
+      source.close();
+      void loadDetail(selectedRunId);
+    };
+
+    return () => {
+      source.close();
+      setIsStreaming(false);
+    };
+  }, [selectedRunId]);
 
   return (
     <PageFrame
@@ -164,9 +247,25 @@ export function SubAgentsPage() {
                 <dt>Error</dt>
                 <dd>{selectedRun.error ?? "none"}</dd>
               </dl>
-              <section className="inspector-message">
-                <h3>Result</h3>
-                <p>{selectedRun.finalResponse ?? "none"}</p>
+              <section className="subagent-transcript">
+                <div className="transcript-heading">
+                  <h3>Live transcript</h3>
+                  <span className={`status-square ${isStreaming ? "active" : ""}`} />
+                </div>
+                {detailError && <ErrorState error={detailError} />}
+                {!detail && !detailError && <LoadingState />}
+                {detail?.transcriptUnavailableReason && <p className="muted">{detail.transcriptUnavailableReason}</p>}
+                {detail && detail.transcript.length === 0 && <p className="muted">No visible transcript entries are available yet.</p>}
+                {detail?.transcript.map((entry) => (
+                  <article className={`transcript-entry ${entry.isError ? "is-error" : ""}`} key={entry.id}>
+                    <header>
+                      <strong>{entry.title}</strong>
+                      <span>{entry.role}</span>
+                      <time>{formatLocalDateTime(entry.createdAt)}</time>
+                    </header>
+                    <p>{entry.content || entry.kind}</p>
+                  </article>
+                ))}
               </section>
             </>
           )}
@@ -178,4 +277,8 @@ export function SubAgentsPage() {
 
 function formatTokens(value: number) {
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(value);
+}
+
+function isTerminal(status: string) {
+  return status === "Completed" || status === "Failed" || status === "Cancelled";
 }

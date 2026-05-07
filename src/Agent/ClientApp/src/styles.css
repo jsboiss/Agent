@@ -800,7 +800,7 @@ td small,
 
 .subagent-inspector {
   max-height: calc(100vh - 118px);
-  overflow: hidden;
+  overflow: auto;
 }
 
 .inspector-message {
@@ -828,6 +828,73 @@ td small,
   border: 1px solid var(--border);
   background: var(--surface-low);
   padding: 8px;
+  font-size: 12px;
+  line-height: 16px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.subagent-transcript {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.transcript-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.transcript-heading h3 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 14px;
+  text-transform: uppercase;
+}
+
+.transcript-entry {
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface-low);
+  padding: 8px;
+}
+
+.transcript-entry.is-error {
+  border-color: rgba(255, 90, 102, 0.8);
+  background: rgba(255, 90, 102, 0.12);
+}
+
+.transcript-entry header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px 8px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 14px;
+}
+
+.transcript-entry header strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.transcript-entry header time {
+  grid-column: 1 / -1;
+}
+
+.transcript-entry p {
+  max-height: 220px;
+  margin: 0;
+  overflow: auto;
+  font-family: "Space Grotesk", "Cascadia Mono", Consolas, monospace;
   font-size: 12px;
   line-height: 16px;
   white-space: pre-wrap;

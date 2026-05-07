@@ -53,6 +53,20 @@ public static class DashboardEndpoints
                 await service.List(cancellationToken))
             .WithName("GetSubAgents");
         group.MapGet(
+            "/subagents/{id}",
+            async (string id, ISubAgentDashboardService service, CancellationToken cancellationToken) =>
+                await service.GetDetail(id, cancellationToken))
+            .WithName("GetSubAgentDetail");
+        group.MapGet(
+            "/subagents/{id}/stream",
+            async (string id, ISubAgentDashboardService service, HttpResponse response, CancellationToken cancellationToken) =>
+            {
+                response.ContentType = "text/event-stream; charset=utf-8";
+                response.Headers.CacheControl = "no-cache";
+                await service.StreamDetail(id, response.Body, cancellationToken);
+            })
+            .WithName("StreamSubAgentDetail");
+        group.MapGet(
             "/memories",
             async (string? query, string? lifecycle, string? segment, string? tier, IMemoryDashboardService service, CancellationToken cancellationToken) =>
                 await service.Search(

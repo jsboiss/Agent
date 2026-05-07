@@ -102,11 +102,30 @@ public sealed record SubAgentRunRow(
     string? CodexThreadId,
     string? ParentRunId,
     string? ParentCodexThreadId,
+    string? ChildConversationId,
     DateTimeOffset StartedAt,
     DateTimeOffset? CompletedAt,
     string? FinalResponse,
     string? Error,
     TokenUsageSummary Tokens);
+
+public sealed record SubAgentRunDetailSnapshot(
+    SubAgentRunRow Run,
+    string? ChildConversationId,
+    bool TranscriptAvailable,
+    string? TranscriptUnavailableReason,
+    IReadOnlyList<SubAgentTranscriptEntry> Transcript,
+    DateTimeOffset UpdatedAt);
+
+public sealed record SubAgentTranscriptEntry(
+    string Id,
+    string Kind,
+    string Role,
+    string Title,
+    string Content,
+    DateTimeOffset CreatedAt,
+    bool IsError,
+    IReadOnlyDictionary<string, string> Metadata);
 
 public sealed record TokenUsageSummary(
     int PromptTokens,
@@ -275,6 +294,10 @@ public interface IRunTimelineService
 public interface ISubAgentDashboardService
 {
     Task<SubAgentRunsSnapshot> List(CancellationToken cancellationToken);
+
+    Task<SubAgentRunDetailSnapshot> GetDetail(string runId, CancellationToken cancellationToken);
+
+    Task StreamDetail(string runId, Stream responseStream, CancellationToken cancellationToken);
 }
 
 public interface IMemoryGraphService

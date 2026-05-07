@@ -41,6 +41,7 @@ public interface IAgentRunStore
         string channel,
         string? parentRunId,
         string? parentCodexThreadId,
+        string? childConversationId,
         CancellationToken cancellationToken);
 
     Task<AgentRun?> Get(string runId, CancellationToken cancellationToken);
