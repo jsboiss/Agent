@@ -38,6 +38,7 @@ public sealed class AgentMessageProcessor(
     IAgentMessageRouter messageRouter,
     IAgentTokenTracker tokenTracker,
     IProjectNoteStore projectNoteStore,
+    IProjectNoteDistiller projectNoteDistiller,
     IAgentNotifier notifier) : IMessageProcessor
 {
     private static int MaxToolIterations => 3;
@@ -350,6 +351,14 @@ public sealed class AgentMessageProcessor(
             workspace,
             "main-thread",
             content,
+            cancellationToken);
+
+        await projectNoteDistiller.Distill(
+            workspace,
+            new ProjectNoteDistillationRequest(
+                "main-thread",
+                userMessage,
+                assistantMessage),
             cancellationToken);
     }
 

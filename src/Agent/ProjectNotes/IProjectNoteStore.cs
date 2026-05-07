@@ -11,4 +11,9 @@ public interface IProjectNoteStore
         string source,
         string content,
         CancellationToken cancellationToken);
+
+    Task ApplyDistillation(
+        AgentWorkspace workspace,
+        IReadOnlyList<ProjectNoteUpdate> updates,
+        CancellationToken cancellationToken);
 }

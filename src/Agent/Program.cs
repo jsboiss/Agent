@@ -85,6 +85,7 @@ builder.Services.AddSingleton<IConversationMirrorStore>(x => x.GetRequiredServic
 builder.Services.AddSingleton<IAgentMessageRouter, AgentMessageRouter>();
 builder.Services.AddSingleton<IAgentResourceLoader, AgentResourceLoader>();
 builder.Services.AddSingleton<IProjectNoteStore, FileProjectNoteStore>();
+builder.Services.AddSingleton<IProjectNoteDistiller, RuleBasedProjectNoteDistiller>();
 builder.Services.AddSingleton<IConversationPromptQueue, InMemoryConversationPromptQueue>();
 builder.Services.AddSingleton<IAgentSettingsResolver, ConfigurationAgentSettingsResolver>();
 builder.Services.AddSingleton<ISubAgentWorkQueue, SubAgentWorkQueue>();

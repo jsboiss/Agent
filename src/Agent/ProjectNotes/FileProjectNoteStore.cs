@@ -86,6 +86,55 @@ public sealed class FileProjectNoteStore(IOptions<AgentHomeOptions> options, IWe
             cancellationToken);
     }
 
+    public async Task ApplyDistillation(
+        AgentWorkspace workspace,
+        IReadOnlyList<ProjectNoteUpdate> updates,
+        CancellationToken cancellationToken)
+    {
+        if (updates.Count == 0)
+        {
+            return;
+        }
+
+        var projectName = GetProjectName(workspace.RootPath);
+        var directory = GetProjectDirectory(projectName);
+        Directory.CreateDirectory(directory);
+        await EnsureDefaultFiles(directory, projectName, cancellationToken);
+
+        foreach (var update in updates)
+        {
+            if (!DefaultFiles.Contains(update.FileName, StringComparer.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var path = Path.Combine(directory, update.FileName);
+            var existing = File.Exists(path)
+                ? await File.ReadAllTextAsync(path, cancellationToken)
+                : GetInitialContent(projectName, update.FileName);
+            var normalizedContent = NormalizeEntry(update.Content);
+
+            if (string.IsNullOrWhiteSpace(normalizedContent)
+                || existing.Contains(normalizedContent, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var builder = new StringBuilder(RemovePlaceholder(existing.TrimEnd()))
+                .AppendLine()
+                .AppendLine()
+                .AppendLine($"## {update.Heading}")
+                .AppendLine()
+                .AppendLine(normalizedContent);
+
+            await File.WriteAllTextAsync(
+                path,
+                builder.ToString().ReplaceLineEndings("\r\n"),
+                new UTF8Encoding(false),
+                cancellationToken);
+        }
+    }
+
     private async Task EnsureDefaultFiles(
         string directory,
         string projectName,
@@ -171,6 +220,25 @@ public sealed class FileProjectNoteStore(IOptions<AgentHomeOptions> options, IWe
 
             {Trim(content.Trim(), 1800)}
             """;
+    }
+
+    private static string RemovePlaceholder(string value)
+    {
+        return value.Replace(
+            $"{Environment.NewLine}{Environment.NewLine}No durable notes yet.",
+            string.Empty,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeEntry(string value)
+    {
+        return string.Join(
+            Environment.NewLine,
+            value
+                .ReplaceLineEndings(Environment.NewLine)
+                .Split(Environment.NewLine)
+                .Select(x => x.TrimEnd()))
+            .Trim();
     }
 
     private static string Trim(string value, int maxLength)

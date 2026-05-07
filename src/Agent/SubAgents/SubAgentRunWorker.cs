@@ -27,6 +27,7 @@ public sealed class SubAgentRunWorker(
     IAgentEventSink eventSink,
     IAgentTokenTracker tokenTracker,
     IProjectNoteStore projectNoteStore,
+    IProjectNoteDistiller projectNoteDistiller,
     IAgentNotifier notifier,
     ILogger<SubAgentRunWorker> logger) : BackgroundService
 {
@@ -233,6 +234,15 @@ public sealed class SubAgentRunWorker(
             workspace,
             "sub-agent",
             content,
+            cancellationToken);
+
+        await projectNoteDistiller.Distill(
+            workspace,
+            new ProjectNoteDistillationRequest(
+                "sub-agent",
+                item.Task,
+                result.AssistantMessage,
+                result.Error),
             cancellationToken);
     }
 
