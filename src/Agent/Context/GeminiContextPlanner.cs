@@ -110,6 +110,7 @@ public sealed class GeminiContextPlanner(
             string.Empty,
             string.Empty,
             string.Empty,
+            string.Empty,
             string.Empty);
     }
 

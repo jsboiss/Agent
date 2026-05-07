@@ -1,6 +1,7 @@
 using Agent.Conversations;
 using Agent.Compaction;
 using Agent.Providers;
+using Agent.ProjectNotes;
 using Agent.SubAgents;
 using Agent.Tools;
 using Agent.Workspaces;
@@ -11,7 +12,8 @@ public sealed class AgentResourceLoader(
     IWebHostEnvironment environment,
     IConversationRepository conversationRepository,
     IConversationSummaryStore summaryStore,
-    IConversationCompactor conversationCompactor) : IAgentResourceLoader
+    IConversationCompactor conversationCompactor,
+    IProjectNoteStore projectNoteStore) : IAgentResourceLoader
 {
     private static IReadOnlyList<AgentToolDefinition> DefaultTools =>
     [
@@ -271,6 +273,18 @@ public sealed class AgentResourceLoader(
             string.IsNullOrWhiteSpace(workspaceInstructions) ? [] : [workspaceInstructions],
             request.Settings.Values,
             availableTools);
+        var projectNotes = await projectNoteStore.Load(
+            new AgentWorkspace(
+                string.Empty,
+                workspace.ProjectName,
+                rootPath,
+                null,
+                null,
+                null,
+                false,
+                DateTimeOffset.UtcNow,
+                DateTimeOffset.UtcNow),
+            cancellationToken);
 
         var recentEntryCount = GetRecentEntryCount(request.Settings.Values);
         var compactionThreshold = GetCompactionThreshold(request.Settings.Values);
@@ -297,6 +311,7 @@ public sealed class AgentResourceLoader(
             GetProviderConstraints(request.ProviderType),
             GetPromptTemplate(workspace),
             GetToolContext(availableTools),
+            projectNotes.ToPromptSection(),
             string.Empty,
             GetConversationSummary(rollingSummary, entries, recentEntryCount));
     }

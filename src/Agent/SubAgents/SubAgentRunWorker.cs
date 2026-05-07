@@ -2,6 +2,7 @@ using Agent.Conversations;
 using Agent.Events;
 using Agent.Calendar;
 using Agent.Notifications;
+using Agent.ProjectNotes;
 using Agent.Providers;
 using Agent.Resources;
 using Agent.Settings;
@@ -25,6 +26,7 @@ public sealed class SubAgentRunWorker(
     IAgentSettingsResolver settingsResolver,
     IAgentEventSink eventSink,
     IAgentTokenTracker tokenTracker,
+    IProjectNoteStore projectNoteStore,
     IAgentNotifier notifier,
     ILogger<SubAgentRunWorker> logger) : BackgroundService
 {
@@ -185,6 +187,7 @@ public sealed class SubAgentRunWorker(
         }
 
         await AddConversationResult(item, result, status, cancellationToken);
+        await RecordProjectActivity(workspace, item, result, status, cancellationToken);
         await Notify(item, result, status, cancellationToken);
         var completedData = new Dictionary<string, string>
         {
@@ -205,6 +208,31 @@ public sealed class SubAgentRunWorker(
             string.IsNullOrWhiteSpace(result.Error) ? AgentEventKind.ProviderTurnCompleted : AgentEventKind.ProviderError,
             item.ChildConversationId,
             completedData,
+            cancellationToken);
+    }
+
+    private async Task RecordProjectActivity(
+        AgentWorkspace workspace,
+        SubAgentWorkItem item,
+        AgentProviderResult result,
+        AgentRunStatus status,
+        CancellationToken cancellationToken)
+    {
+        var content = $"""
+            Sub-agent task:
+            {Shorten(item.Task, 700)}
+
+            Status: {status}
+            Error: {result.Error ?? "none"}
+
+            Result:
+            {Shorten(result.AssistantMessage, 1200)}
+            """;
+
+        await projectNoteStore.RecordActivity(
+            workspace,
+            "sub-agent",
+            content,
             cancellationToken);
     }
 

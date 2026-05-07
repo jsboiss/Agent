@@ -4,6 +4,7 @@ using Agent.Context;
 using Agent.Events;
 using Agent.Memory;
 using Agent.Notifications;
+using Agent.ProjectNotes;
 using Agent.Providers;
 using Agent.Resources;
 using Agent.Settings;
@@ -36,6 +37,7 @@ public sealed class AgentMessageProcessor(
     IConversationMirrorStore mirrorStore,
     IAgentMessageRouter messageRouter,
     IAgentTokenTracker tokenTracker,
+    IProjectNoteStore projectNoteStore,
     IAgentNotifier notifier) : IMessageProcessor
 {
     private static int MaxToolIterations => 3;
@@ -294,6 +296,12 @@ public sealed class AgentMessageProcessor(
                     providerResult.AssistantMessage,
                     cancellationToken);
 
+                await RecordProjectActivity(
+                    workspace,
+                    request.UserMessage,
+                    providerResult.AssistantMessage,
+                    cancellationToken);
+
                 await ExtractMemories(
                     conversation.Id,
                     userEntry,
@@ -322,6 +330,27 @@ public sealed class AgentMessageProcessor(
 
             promptQueue.Complete(conversation.Id);
         }
+    }
+
+    private async Task RecordProjectActivity(
+        AgentWorkspace workspace,
+        string userMessage,
+        string assistantMessage,
+        CancellationToken cancellationToken)
+    {
+        var content = $"""
+            User request:
+            {Shorten(userMessage, 700)}
+
+            Assistant result:
+            {Shorten(assistantMessage, 1200)}
+            """;
+
+        await projectNoteStore.RecordActivity(
+            workspace,
+            "main-thread",
+            content,
+            cancellationToken);
     }
 
     private async Task PersistCodexState(
@@ -894,6 +923,13 @@ public sealed class AgentMessageProcessor(
 
         var afterEnd = end + "</delegate_to_sub_agent>".Length;
         return (assistantMessage[..start] + assistantMessage[afterEnd..]).Trim();
+    }
+
+    private static string Shorten(string value, int length)
+    {
+        return value.Length <= length
+            ? value
+            : value[..length] + "...";
     }
 
     private async Task SendDelegationAck(

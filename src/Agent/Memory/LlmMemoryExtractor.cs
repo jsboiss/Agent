@@ -169,6 +169,7 @@ public sealed class LlmMemoryExtractor(IAgentProviderSelector providerSelector) 
             string.Empty,
             string.Empty,
             string.Empty,
+            string.Empty,
             string.Empty);
     }
 

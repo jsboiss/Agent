@@ -8,6 +8,7 @@ public sealed record AgentResourceContext(
     string ProviderConstraints,
     string PromptTemplate,
     string ToolContext,
+    string ProjectNotesContext,
     string EvidenceContext,
     string ConversationSummary,
     string CompactMemoryContext = "")
@@ -22,6 +23,7 @@ public sealed record AgentResourceContext(
             ProviderConstraints,
             PromptTemplate,
             ToolContext,
+            ProjectNotesContext,
             EvidenceContext,
             ConversationSummary
         };

@@ -12,6 +12,7 @@ using Agent.Frontend;
 using Agent.Memory;
 using Agent.Messages;
 using Agent.Notifications;
+using Agent.ProjectNotes;
 using Agent.Providers;
 using Agent.Providers.ClaudeCode;
 using Agent.Providers.Codex;
@@ -51,6 +52,8 @@ builder.Services.Configure<TelegramChannelOptions>(
     builder.Configuration.GetSection(TelegramChannelOptions.SectionName));
 builder.Services.Configure<GoogleCalendarOptions>(
     builder.Configuration.GetSection(GoogleCalendarOptions.SectionName));
+builder.Services.Configure<AgentHomeOptions>(
+    builder.Configuration.GetSection(AgentHomeOptions.SectionName));
 builder.Services.AddDataProtection();
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession();
@@ -81,6 +84,7 @@ builder.Services.AddSingleton<IAgentRunStore>(x => x.GetRequiredService<SqliteAg
 builder.Services.AddSingleton<IConversationMirrorStore>(x => x.GetRequiredService<SqliteAgentStateStore>());
 builder.Services.AddSingleton<IAgentMessageRouter, AgentMessageRouter>();
 builder.Services.AddSingleton<IAgentResourceLoader, AgentResourceLoader>();
+builder.Services.AddSingleton<IProjectNoteStore, FileProjectNoteStore>();
 builder.Services.AddSingleton<IConversationPromptQueue, InMemoryConversationPromptQueue>();
 builder.Services.AddSingleton<IAgentSettingsResolver, ConfigurationAgentSettingsResolver>();
 builder.Services.AddSingleton<ISubAgentWorkQueue, SubAgentWorkQueue>();

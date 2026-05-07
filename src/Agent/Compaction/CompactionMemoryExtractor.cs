@@ -344,6 +344,7 @@ public sealed class CompactionMemoryExtractor(
             string.Empty,
             string.Empty,
             string.Empty,
+            string.Empty,
             string.Empty);
     }
 
