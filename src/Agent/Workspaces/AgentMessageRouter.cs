@@ -23,55 +23,12 @@ public sealed class AgentMessageRouter(IAgentRunStore runStore) : IAgentMessageR
                 "Active run follow-up.");
         }
 
-        if (IsWorkRequest(userMessage))
-        {
-            return new AgentRouteResolution(
-                workspace,
-                AgentRouteKind.Work,
-                workspace.WorkThreadId,
-                null,
-                AllowsMutation(channel, workspace),
-                "Message classified as coding/execution work.");
-        }
-
         return new AgentRouteResolution(
             workspace,
             AgentRouteKind.Chat,
             workspace.ChatThreadId,
             null,
             false,
-            "Message classified as general chat.");
-    }
-
-    private static bool IsWorkRequest(string userMessage)
-    {
-        if (string.IsNullOrWhiteSpace(userMessage))
-        {
-            return false;
-        }
-
-        var value = userMessage.Trim();
-
-        if (value.StartsWith("/work", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        if (value.StartsWith("/chat", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        return false;
-    }
-
-    private static bool AllowsMutation(string channel, AgentWorkspace workspace)
-    {
-        if (string.Equals(channel, "local-web", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        return workspace.RemoteExecutionAllowed;
+            "Strict dispatcher mode routes main messages through chat; work is delegated to sub-agents.");
     }
 }

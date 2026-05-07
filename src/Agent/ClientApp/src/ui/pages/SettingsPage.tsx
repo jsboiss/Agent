@@ -1,16 +1,32 @@
-import { useState } from "react";
-import { Copy, DatabaseZap } from "lucide-react";
+import { type FormEvent, useState } from "react";
+import { Copy, DatabaseZap, FolderInput, ShieldCheck, ShieldOff, Sparkles, Trash2 } from "lucide-react";
 import { useGetSettings } from "../../api/generated";
 import { ErrorState, IconButton, LoadingState, PageFrame, Panel } from "../components";
+
+type WorkspaceSettings = {
+  id: string;
+  name: string;
+  rootPath: string;
+  remoteExecutionAllowed: boolean;
+};
+
+type SettingsSnapshotWithWorkspace = {
+  workspace?: WorkspaceSettings;
+};
 
 export function SettingsPage() {
   const settingsQuery = useGetSettings();
   const snapshot = settingsQuery.data?.data;
+  const workspace = (snapshot as (typeof snapshot & SettingsSnapshotWithWorkspace) | undefined)?.workspace;
   const values = snapshot?.values ?? {};
   const appliedLayers = snapshot?.appliedLayers ?? [];
   const [isCompacting, setIsCompacting] = useState(false);
   const [compactionResult, setCompactionResult] = useState<string | null>(null);
   const [compactionError, setCompactionError] = useState<string | null>(null);
+  const [maintenanceResult, setMaintenanceResult] = useState<string | null>(null);
+  const [workspaceError, setWorkspaceError] = useState<string | null>(null);
+  const [isUpdatingWorkspace, setIsUpdatingWorkspace] = useState(false);
+  const [workspaceRootPath, setWorkspaceRootPath] = useState("");
 
   async function compactMain() {
     setIsCompacting(true);
@@ -51,6 +67,82 @@ export function SettingsPage() {
     }
   }
 
+  async function runMemoryMaintenance(path: string) {
+    setMaintenanceResult(null);
+
+    const response = await fetch(path, { method: "POST" });
+
+    if (!response.ok) {
+      throw new Error(`Memory maintenance failed: ${response.status}`);
+    }
+
+    const result = await response.json() as {
+      scanned: number;
+      archived: number;
+      pruned: number;
+      merged: number;
+      superseded: number;
+      summary: string;
+    };
+    setMaintenanceResult(`${result.summary} Scanned ${result.scanned}; archived ${result.archived}; pruned ${result.pruned}; merged ${result.merged}; superseded ${result.superseded}.`);
+  }
+
+  async function updateWorkspacePermissions(remoteExecutionAllowed: boolean) {
+    setIsUpdatingWorkspace(true);
+    setWorkspaceError(null);
+
+    try {
+      const response = await fetch("/api/dashboard/settings/workspace-permissions", {
+        body: JSON.stringify({ remoteExecutionAllowed }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST"
+      });
+
+      if (!response.ok) {
+        throw new Error(`Workspace permission update failed: ${response.status}`);
+      }
+
+      await settingsQuery.refetch();
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsUpdatingWorkspace(false);
+    }
+  }
+
+  async function updateWorkspaceRootPath(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const rootPath = workspaceRootPath.trim();
+
+    if (!rootPath) {
+      return;
+    }
+
+    setIsUpdatingWorkspace(true);
+    setWorkspaceError(null);
+
+    try {
+      const response = await fetch("/api/dashboard/settings/workspace-root", {
+        body: JSON.stringify({ rootPath }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST"
+      });
+
+      if (!response.ok) {
+        const body = await response.text();
+        throw new Error(body || `Workspace root update failed: ${response.status}`);
+      }
+
+      setWorkspaceRootPath("");
+      await settingsQuery.refetch();
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsUpdatingWorkspace(false);
+    }
+  }
+
   return (
     <PageFrame
       eyebrow="Read-only configuration"
@@ -65,9 +157,53 @@ export function SettingsPage() {
       {settingsQuery.isLoading && <LoadingState />}
       {settingsQuery.isError && <ErrorState error={settingsQuery.error} />}
       {compactionResult && <p className="muted">{compactionResult}</p>}
+      {maintenanceResult && <p className="muted">{maintenanceResult}</p>}
       {compactionError && <ErrorState error={new Error(compactionError)} />}
+      {workspaceError && <ErrorState error={new Error(workspaceError)} />}
       {snapshot && (
         <div className="settings-grid">
+          {workspace && (
+            <Panel title="Workspace">
+              <dl className="settings-list">
+                <div className="settings-row">
+                  <dt>Project</dt>
+                  <dd>
+                    <code>{workspace.name}</code>
+                    <IconButton onClick={() => navigator.clipboard.writeText(workspace.rootPath)} title="Copy workspace path" type="button">
+                      <Copy size={13} />
+                    </IconButton>
+                  </dd>
+                </div>
+                <div className="settings-row">
+                  <dt>Remote execution</dt>
+                  <dd>
+                    <code>{workspace.remoteExecutionAllowed ? "enabled" : "disabled"}</code>
+                    <button
+                      className="secondary-action"
+                      disabled={isUpdatingWorkspace}
+                      onClick={() => void updateWorkspacePermissions(!workspace.remoteExecutionAllowed)}
+                      type="button"
+                    >
+                      {workspace.remoteExecutionAllowed ? <ShieldOff size={14} /> : <ShieldCheck size={14} />}
+                      {workspace.remoteExecutionAllowed ? "Disable" : "Enable"}
+                    </button>
+                  </dd>
+                </div>
+              </dl>
+              <form className="workspace-path-form" onSubmit={(event) => void updateWorkspaceRootPath(event)}>
+                <input
+                  aria-label="Workspace root path"
+                  onChange={(event) => setWorkspaceRootPath(event.target.value)}
+                  placeholder={workspace.rootPath}
+                  value={workspaceRootPath}
+                />
+                <button className="secondary-action" disabled={isUpdatingWorkspace || !workspaceRootPath.trim()} type="submit">
+                  <FolderInput size={14} />
+                  Change
+                </button>
+              </form>
+            </Panel>
+          )}
           <SettingsPanel
             title="Provider"
             rows={[
@@ -85,6 +221,18 @@ export function SettingsPage() {
               ["SQLite", snapshot.memoryConnectionString]
             ]}
           />
+          <Panel title="Memory Maintenance">
+            <div className="row-actions">
+              <button className="secondary-action" onClick={() => void runMemoryMaintenance("/api/dashboard/memory/cleanup")} type="button">
+                <Trash2 size={14} />
+                Cleanup
+              </button>
+              <button className="secondary-action" onClick={() => void runMemoryMaintenance("/api/dashboard/memory/consolidate")} type="button">
+                <Sparkles size={14} />
+                Consolidate
+              </button>
+            </div>
+          </Panel>
           <SettingsPanel
             title="Compaction"
             rows={[

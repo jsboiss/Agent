@@ -1,11 +1,15 @@
 using Agent.Compaction;
+using Agent.Automations;
+using Agent.Channels.Telegram;
 using Agent.Conversations;
 using Agent.Dashboard;
+using Agent.Drafts;
 using Agent.Endpoints;
 using Agent.Events;
 using Agent.Frontend;
 using Agent.Memory;
 using Agent.Messages;
+using Agent.Notifications;
 using Agent.Providers;
 using Agent.Providers.ClaudeCode;
 using Agent.Providers.Codex;
@@ -36,6 +40,8 @@ builder.Services.Configure<SqliteMemoryOptions>(
     builder.Configuration.GetSection("Memory:Sqlite"));
 builder.Services.Configure<SqliteAgentStateOptions>(
     builder.Configuration.GetSection("Agent:Sqlite"));
+builder.Services.Configure<TelegramChannelOptions>(
+    builder.Configuration.GetSection(TelegramChannelOptions.SectionName));
 builder.Services.AddHttpClient<OllamaProviderClient>((services, httpClient) =>
 {
     var options = services.GetRequiredService<IOptions<OllamaProviderOptions>>().Value;
@@ -62,14 +68,24 @@ builder.Services.AddSingleton<ISubAgentCoordinator, SubAgentCoordinator>();
 builder.Services.AddSingleton<IAgentTokenTracker, AgentTokenTracker>();
 builder.Services.AddHostedService<InterruptedSubAgentRunCleanupService>();
 builder.Services.AddHostedService<SubAgentRunWorker>();
+builder.Services.AddSingleton<IAgentNotifier, CompositeAgentNotifier>();
+builder.Services.AddSingleton<TelegramChatChannel>();
+builder.Services.AddSingleton<IChannelNotifier>(x => x.GetRequiredService<TelegramChatChannel>());
+builder.Services.AddHostedService(x => x.GetRequiredService<TelegramChatChannel>());
 builder.Services.AddSingleton<IAgentEventStore, SqliteAgentEventStore>();
 builder.Services.AddSingleton<IAgentEventSink>(x => x.GetRequiredService<IAgentEventStore>());
+builder.Services.AddSingleton<IAgentDraftStore, SqliteAgentDraftStore>();
+builder.Services.AddSingleton<IAutomationScheduler, SimpleAutomationScheduler>();
+builder.Services.AddSingleton<IAutomationStore, SqliteAutomationStore>();
+builder.Services.AddHostedService<AutomationWorker>();
 builder.Services.AddSingleton<IMemoryStore, SqliteMemoryStore>();
 builder.Services.AddSingleton<IMemoryScout, MemoryScout>();
 builder.Services.AddSingleton<RuleBasedMemoryExtractor>();
 builder.Services.AddSingleton<LlmMemoryExtractor>();
 builder.Services.AddSingleton<IMemoryExtractor, CompositeMemoryExtractor>();
 builder.Services.AddSingleton<IMemoryCandidateReviewer, MemoryCandidateReviewer>();
+builder.Services.AddSingleton<IMemoryMaintenanceService, MemoryMaintenanceService>();
+builder.Services.AddHostedService<MemoryMaintenanceWorker>();
 builder.Services.AddSingleton<ICompactionMemoryExtractor, CompactionMemoryExtractor>();
 builder.Services.AddSingleton<IAgentToolExecutor, AgentToolExecutor>();
 builder.Services.AddScoped<IChatDashboardService, ChatDashboardService>();
@@ -79,6 +95,7 @@ builder.Services.AddScoped<ISubAgentDashboardService, SubAgentDashboardService>(
 builder.Services.AddScoped<IMemoryGraphService, MemoryGraphService>();
 builder.Services.AddScoped<ISettingsDashboardService, SettingsDashboardService>();
 builder.Services.AddScoped<ICompactionDashboardService, CompactionDashboardService>();
+builder.Services.AddScoped<IOperationsDashboardService, OperationsDashboardService>();
 builder.Services.AddScoped<IMessageProcessor, AgentMessageProcessor>();
 
 var app = builder.Build();

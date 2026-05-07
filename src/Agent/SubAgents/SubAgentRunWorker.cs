@@ -1,5 +1,6 @@
 using Agent.Conversations;
 using Agent.Events;
+using Agent.Notifications;
 using Agent.Providers;
 using Agent.Resources;
 using Agent.Settings;
@@ -19,6 +20,7 @@ public sealed class SubAgentRunWorker(
     IAgentSettingsResolver settingsResolver,
     IAgentEventSink eventSink,
     IAgentTokenTracker tokenTracker,
+    IAgentNotifier notifier,
     ILogger<SubAgentRunWorker> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -44,9 +46,15 @@ public sealed class SubAgentRunWorker(
     {
         var run = await runStore.Get(item.RunId, cancellationToken)
             ?? throw new InvalidOperationException($"Sub-agent run '{item.RunId}' was not found.");
+
+        if (run.Status == AgentRunStatus.Cancelled)
+        {
+            return;
+        }
         var workspace = (await workspaceStore.List(cancellationToken))
             .FirstOrDefault(x => string.Equals(x.Id, item.WorkspaceId, StringComparison.OrdinalIgnoreCase))
             ?? throw new InvalidOperationException($"Workspace '{item.WorkspaceId}' was not found.");
+        Directory.CreateDirectory(workspace.RootPath);
         var conversation = await conversationRepository.Get(item.ChildConversationId, cancellationToken)
             ?? throw new InvalidOperationException($"Sub-agent conversation '{item.ChildConversationId}' was not found.");
         var settings = await settingsResolver.Resolve(
@@ -60,7 +68,7 @@ public sealed class SubAgentRunWorker(
                 }),
             cancellationToken);
         var resources = await resourceLoader.Load(
-            new AgentResourceLoadRequest(conversation, item.Channel, AgentProviderType.Codex, settings),
+            new AgentResourceLoadRequest(conversation, item.Channel, AgentProviderType.Codex, settings, workspace.RootPath),
             cancellationToken);
         var provider = providerSelector.Get(AgentProviderType.Codex);
 
@@ -79,6 +87,8 @@ public sealed class SubAgentRunWorker(
                 ["runId"] = item.RunId,
                 ["workspaceId"] = item.WorkspaceId,
                 ["routeKind"] = AgentRouteKind.Work.ToString(),
+                ["capabilities"] = item.Capabilities.ToString(),
+                ["requiresConfirmation"] = item.RequiresConfirmation.ToString(),
                 ["message"] = "Sub-agent background run started."
             },
             cancellationToken);
@@ -86,7 +96,7 @@ public sealed class SubAgentRunWorker(
         var request = new AgentProviderRequest(
             AgentProviderType.Codex,
             item.ChildConversationId,
-            item.Task,
+            GetTaskPrompt(item),
             resources,
             string.Empty,
             [],
@@ -103,6 +113,13 @@ public sealed class SubAgentRunWorker(
             resources.ChannelInstructions,
             item.AllowsMutation);
         var result = await provider.Send(request, cancellationToken);
+        var latestRun = await runStore.Get(item.RunId, cancellationToken);
+
+        if (latestRun?.Status == AgentRunStatus.Cancelled)
+        {
+            return;
+        }
+
         var mainContext = await conversationRepository.ListEntries(item.ChildConversationId, cancellationToken);
         var tokenUsage = tokenTracker.Measure(request, result, settings, mainContext);
         var status = string.IsNullOrWhiteSpace(result.Error)
@@ -145,6 +162,7 @@ public sealed class SubAgentRunWorker(
         }
 
         await AddConversationResult(item, result, status, cancellationToken);
+        await Notify(item, result, status, cancellationToken);
         var completedData = new Dictionary<string, string>
         {
             ["runId"] = item.RunId,
@@ -165,6 +183,32 @@ public sealed class SubAgentRunWorker(
             item.ChildConversationId,
             completedData,
             cancellationToken);
+    }
+
+    private static string GetTaskPrompt(SubAgentWorkItem item)
+    {
+        List<string> sections =
+        [
+            "Sub-agent task:",
+            item.Task,
+            $"Capabilities: {item.Capabilities}"
+        ];
+
+        if (item.RequiresConfirmation)
+        {
+            sections.Add("""
+                Confirmation policy: this request originated from a mobile or confirmation-gated path.
+                Do not apply file changes, commit, push, send external messages, delete data, or run destructive commands.
+                Produce a concise plan, risk summary, and exact next confirmation needed. If code/file changes are requested, inspect and propose the change; wait for approval before mutation.
+                """);
+        }
+
+        if (!item.AllowsMutation)
+        {
+            sections.Add("Mutation is disabled for this run. Read, inspect, and propose only.");
+        }
+
+        return string.Join(Environment.NewLine + Environment.NewLine, sections);
     }
 
     private async Task AddConversationResult(
@@ -198,6 +242,28 @@ public sealed class SubAgentRunWorker(
             cancellationToken);
     }
 
+    private async Task Notify(
+        SubAgentWorkItem item,
+        AgentProviderResult result,
+        AgentRunStatus status,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(item.NotificationTarget) && !IsMobileChannel(item.Channel))
+        {
+            return;
+        }
+
+        var content = status == AgentRunStatus.Completed
+            ? result.AssistantMessage
+            : $"Sub-agent run {item.RunId} finished with status {status}: {result.Error}";
+
+        await notifier.Send(
+            item.Channel,
+            item.NotificationTarget,
+            Shorten(content, 1800),
+            cancellationToken);
+    }
+
     private async Task Publish(
         AgentEventKind kind,
         string conversationId,
@@ -219,5 +285,11 @@ public sealed class SubAgentRunWorker(
         return value.Length <= length
             ? value
             : value[..length] + "...";
+    }
+
+    private static bool IsMobileChannel(string channel)
+    {
+        return string.Equals(channel, "telegram", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(channel, "imessage", StringComparison.OrdinalIgnoreCase);
     }
 }

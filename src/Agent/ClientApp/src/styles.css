@@ -886,6 +886,72 @@ dd {
   gap: 8px;
 }
 
+.secondary-action {
+  align-items: center;
+  background: var(--surface-low);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  display: inline-flex;
+  font: inherit;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 10px;
+}
+
+.secondary-action:hover {
+  border-color: var(--border-strong);
+}
+
+.stack-list {
+  display: grid;
+  gap: 10px;
+}
+
+.compact-row {
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  padding: 10px;
+}
+
+.compact-row strong,
+.compact-row small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.compact-row small {
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.row-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.operation-form {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr);
+  margin-bottom: 14px;
+}
+
+.workspace-path-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.workspace-path-form input {
+  min-width: 0;
+}
+
 .settings-list dd {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

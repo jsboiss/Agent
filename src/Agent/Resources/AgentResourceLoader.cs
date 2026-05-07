@@ -2,6 +2,7 @@ using Agent.Conversations;
 using Agent.Compaction;
 using Agent.Providers;
 using Agent.Tools;
+using Agent.Workspaces;
 
 namespace Agent.Resources;
 
@@ -71,7 +72,7 @@ public sealed class AgentResourceLoader(
             "The stored memory record id and metadata."),
         new AgentToolDefinition(
             "spawn_agent",
-            "Create a child sub-agent conversation for explicit delegated work.",
+            "Create a child sub-agent conversation for delegated work. Use this for code, file, web, shell, app/program launching, slow, or risky work.",
             """
             {
               "type": "object",
@@ -83,19 +84,131 @@ public sealed class AgentResourceLoader(
                 "parentEntryId": {
                   "type": "string",
                   "description": "Conversation entry id where the child conversation branches from."
+                },
+                "capabilities": {
+                  "type": "string",
+                  "description": "Comma-separated capabilities: ReadOnly, Code, Web, Memory, ExternalActions."
+                },
+                "requiresConfirmation": {
+                  "type": "boolean",
+                  "description": "Whether risky actions require explicit user confirmation."
+                },
+                "notificationTarget": {
+                  "type": "string",
+                  "description": "Optional channel-specific notification target."
                 }
               },
               "required": ["task", "parentEntryId"]
             }
             """,
-            "A child conversation id and final sub-agent result summary.")
+            "A child conversation id and final sub-agent result summary."),
+        new AgentToolDefinition(
+            "send_ack",
+            "Send a short acknowledgement before slow delegated work.",
+            """
+            {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "description": "Short acknowledgement text."
+                },
+                "target": {
+                  "type": "string",
+                  "description": "Optional channel target."
+                }
+              },
+              "required": ["message"]
+            }
+            """,
+            "Acknowledgement delivery status."),
+        new AgentToolDefinition(
+            "save_draft",
+            "Stage a risky or external action for later approval instead of applying it immediately.",
+            """
+            {
+              "type": "object",
+              "properties": {
+                "kind": { "type": "string" },
+                "summary": { "type": "string" },
+                "payload": { "type": "string" },
+                "sourceRunId": { "type": "string" }
+              },
+              "required": ["kind", "summary", "payload"]
+            }
+            """,
+            "Pending draft id."),
+        new AgentToolDefinition(
+            "list_drafts",
+            "List staged drafts pending approval or previously handled.",
+            """
+            {
+              "type": "object",
+              "properties": {
+                "status": { "type": "string", "enum": ["Pending", "Approved", "Rejected", "Applied"] }
+              }
+            }
+            """,
+            "Draft summaries."),
+        new AgentToolDefinition(
+            "approve_draft",
+            "Approve a pending draft after the user confirms it.",
+            "{ \"type\": \"object\", \"properties\": { \"draftId\": { \"type\": \"string\" } }, \"required\": [\"draftId\"] }",
+            "Draft approval status."),
+        new AgentToolDefinition(
+            "reject_draft",
+            "Reject a pending draft after the user cancels it.",
+            "{ \"type\": \"object\", \"properties\": { \"draftId\": { \"type\": \"string\" } }, \"required\": [\"draftId\"] }",
+            "Draft rejection status."),
+        new AgentToolDefinition(
+            "create_automation",
+            "Create a scheduled task that spawns a sub-agent when due.",
+            """
+            {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "task": { "type": "string" },
+                "schedule": { "type": "string", "description": "TimeSpan, 'every <TimeSpan>', or simple daily 5-field cron." },
+                "capabilities": { "type": "string" },
+                "notificationTarget": { "type": "string" }
+              },
+              "required": ["name", "task", "schedule"]
+            }
+            """,
+            "Automation id and next run time."),
+        new AgentToolDefinition(
+            "list_automations",
+            "List scheduled automations.",
+            "{ \"type\": \"object\", \"properties\": {} }",
+            "Automation summaries."),
+        new AgentToolDefinition(
+            "toggle_automation",
+            "Enable or disable a scheduled automation.",
+            "{ \"type\": \"object\", \"properties\": { \"automationId\": { \"type\": \"string\" }, \"enabled\": { \"type\": \"boolean\" } }, \"required\": [\"automationId\", \"enabled\"] }",
+            "Automation status."),
+        new AgentToolDefinition(
+            "delete_automation",
+            "Delete a scheduled automation.",
+            "{ \"type\": \"object\", \"properties\": { \"automationId\": { \"type\": \"string\" } }, \"required\": [\"automationId\"] }",
+            "Deletion status."),
+        new AgentToolDefinition(
+            "cancel_run",
+            "Cancel a queued or running agent run.",
+            "{ \"type\": \"object\", \"properties\": { \"runId\": { \"type\": \"string\" } }, \"required\": [\"runId\"] }",
+            "Cancellation status."),
+        new AgentToolDefinition(
+            "retry_run",
+            "Retry a prior sub-agent run as a new run.",
+            "{ \"type\": \"object\", \"properties\": { \"runId\": { \"type\": \"string\" } }, \"required\": [\"runId\"] }",
+            "New run id.")
     ];
 
     public async Task<AgentResourceContext> Load(
         AgentResourceLoadRequest request,
         CancellationToken cancellationToken)
     {
-        var rootPath = GetRootPath(environment.ContentRootPath);
+        var rootPath = WorkspacePathResolver.NormalizeRootPath(request.WorkspaceRootPath, environment.ContentRootPath);
         var workspaceInstructions = await ReadInstructions(rootPath, cancellationToken);
         var workspace = new WorkspaceContext(
             rootPath,
@@ -134,23 +247,6 @@ public sealed class AgentResourceLoader(
             GetConversationSummary(rollingSummary, entries, recentEntryCount));
     }
 
-    private static string GetRootPath(string contentRootPath)
-    {
-        var directory = new DirectoryInfo(contentRootPath);
-
-        while (directory.Parent is not null && directory.Name.Equals("src", StringComparison.OrdinalIgnoreCase))
-        {
-            directory = directory.Parent;
-        }
-
-        if (directory.Parent is not null && directory.Parent.Name.Equals("src", StringComparison.OrdinalIgnoreCase))
-        {
-            return directory.Parent.Parent?.FullName ?? directory.FullName;
-        }
-
-        return directory.FullName;
-    }
-
     private static async Task<string> ReadInstructions(string rootPath, CancellationToken cancellationToken)
     {
         var path = Path.Combine(rootPath, "AGENTS.md");
@@ -165,7 +261,14 @@ public sealed class AgentResourceLoader(
 
     private static string GetGlobalInstructions()
     {
-        return "You are the local development model for the MainAgent harness. Respond directly and keep outputs concise unless more detail is requested.";
+        return """
+            You are the dispatcher for the MainAgent harness.
+            Answer quick control, memory, status, and conversational turns directly.
+            For code changes, file changes, web research, slow work, automations, app/program launching, shell commands, or risky actions, call send_ack first when useful, then spawn_agent with a crisp self-contained task.
+            When the user asks to open, start, or launch a local app or program, treat it as an external action and delegate to a sub-agent with ExternalActions capability so it can use the shell, for example Windows Start-Process.
+            Mobile-originated risky actions must be staged or proposed and require confirmation before mutation.
+            Keep outputs concise unless more detail is requested.
+            """;
     }
 
     private static string GetChannelInstructions(string channel)

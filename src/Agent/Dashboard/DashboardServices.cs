@@ -1,12 +1,16 @@
 using System.Net;
 using System.Text;
+using Agent.Automations;
 using Agent.Compaction;
 using Agent.Conversations;
+using Agent.Channels.Telegram;
+using Agent.Drafts;
 using Agent.Events;
 using Agent.Memory;
 using Agent.Memory.MemoryGraph;
 using Agent.Messages;
 using Agent.Settings;
+using Agent.SubAgents;
 using Agent.Tokens;
 using Agent.Workspaces;
 using Markdig;
@@ -50,7 +54,7 @@ public sealed class ChatDashboardService(
             builder.AppendLine();
         }
 
-        var directory = Path.Combine(GetWorkspaceRootPath(environment.ContentRootPath), "App_Data", "debug");
+        var directory = Path.Combine(WorkspacePathResolver.GetRepositoryRootPath(environment.ContentRootPath), "App_Data", "debug");
         Directory.CreateDirectory(directory);
         var path = Path.Combine(directory, "main-chat-transcript.md");
         var content = builder.ToString().ReplaceLineEndings("\r\n");
@@ -138,7 +142,7 @@ public sealed class ChatDashboardService(
         var entries = await conversationRepository.ListEntries(conversationId, cancellationToken);
         var events = await eventStore.List(conversationId, 120, cancellationToken);
         var workspaceResolution = await workspaceStore.GetOrCreateActive(
-            GetWorkspaceRootPath(environment.ContentRootPath),
+            WorkspacePathResolver.GetDefaultAgentWorkspacePath(environment.ContentRootPath),
             cancellationToken);
         var activeRun = string.IsNullOrWhiteSpace(workspaceResolution.Workspace.ActiveRunId)
             ? null
@@ -181,7 +185,7 @@ public sealed class ChatDashboardService(
             entries.Select(ToMessage).ToArray(),
             events.OrderByDescending(x => x.CreatedAt).Take(40).Select(RunTimelineService.ToRow).ToArray(),
             injectedMemories,
-            ["search_memory", "write_memory", "spawn_agent"],
+            ["search_memory", "write_memory", "spawn_agent", "send_ack", "save_draft", "create_automation", "cancel_run", "retry_run"],
             settings.Get("provider") ?? "Ollama",
             settings.Get("model") ?? "qwen3.5:latest",
             isRunning,
@@ -224,18 +228,6 @@ public sealed class ChatDashboardService(
         {
             yield return value.Substring(x, Math.Min(size, value.Length - x));
         }
-    }
-
-    private static string GetWorkspaceRootPath(string contentRootPath)
-    {
-        var directory = new DirectoryInfo(contentRootPath);
-
-        if (directory.Parent is not null && directory.Parent.Name.Equals("src", StringComparison.OrdinalIgnoreCase))
-        {
-            return directory.Parent.Parent?.FullName ?? directory.FullName;
-        }
-
-        return directory.FullName;
     }
 
     private static string RepairMojibake(string value)
@@ -708,10 +700,15 @@ public sealed class MemoryGraphService(IMemoryStore memoryStore) : IMemoryGraphS
 
 public sealed class SettingsDashboardService(
     IAgentSettingsResolver settingsResolver,
-    IOptions<SqliteMemoryOptions> memoryOptions) : ISettingsDashboardService
+    IOptions<SqliteMemoryOptions> memoryOptions,
+    IAgentWorkspaceStore workspaceStore,
+    IWebHostEnvironment environment) : ISettingsDashboardService
 {
     public async Task<SettingsDashboardSnapshot> Load(CancellationToken cancellationToken)
     {
+        var workspaceResolution = await workspaceStore.GetOrCreateActive(
+            WorkspacePathResolver.GetDefaultAgentWorkspacePath(environment.ContentRootPath),
+            cancellationToken);
         var settings = await settingsResolver.Resolve(
             new AgentSettingsResolveRequest(
                 new Conversation(
@@ -722,15 +719,62 @@ public sealed class SettingsDashboardService(
                     DateTimeOffset.UtcNow,
                     DateTimeOffset.UtcNow),
                 "local-web",
-                Directory.GetCurrentDirectory(),
+                workspaceResolution.Workspace.RootPath,
                 new Dictionary<string, string>()),
             cancellationToken);
 
         return new SettingsDashboardSnapshot(
             settings.Values,
             settings.AppliedLayers,
-            memoryOptions.Value.ConnectionString);
+            memoryOptions.Value.ConnectionString,
+            ToStatus(workspaceResolution.Workspace, null));
     }
+
+    public async Task<WorkspaceStatus> UpdateWorkspacePermissions(
+        WorkspacePermissionUpdateDto request,
+        CancellationToken cancellationToken)
+    {
+        var workspaceResolution = await workspaceStore.GetOrCreateActive(
+            WorkspacePathResolver.GetDefaultAgentWorkspacePath(environment.ContentRootPath),
+            cancellationToken);
+        var workspace = await workspaceStore.SetRemoteExecutionAllowed(
+            workspaceResolution.Workspace.Id,
+            request.RemoteExecutionAllowed,
+            cancellationToken);
+
+        return ToStatus(workspace, null);
+    }
+
+    public async Task<WorkspaceStatus> UpdateWorkspaceRootPath(
+        WorkspaceRootPathUpdateDto request,
+        CancellationToken cancellationToken)
+    {
+        var rootPath = WorkspacePathResolver.NormalizeRootPath(request.RootPath, environment.ContentRootPath);
+        var workspaceResolution = await workspaceStore.GetOrCreateActive(
+            WorkspacePathResolver.GetDefaultAgentWorkspacePath(environment.ContentRootPath),
+            cancellationToken);
+        var workspace = await workspaceStore.SetRootPath(
+            workspaceResolution.Workspace.Id,
+            rootPath,
+            cancellationToken);
+
+        return ToStatus(workspace, null);
+    }
+
+    private static WorkspaceStatus ToStatus(AgentWorkspace workspace, AgentRun? activeRun)
+    {
+        return new WorkspaceStatus(
+            workspace.Id,
+            workspace.Name,
+            workspace.RootPath,
+            workspace.ChatThreadId,
+            workspace.WorkThreadId,
+            workspace.ActiveRunId,
+            workspace.RemoteExecutionAllowed,
+            activeRun?.Status.ToString(),
+            activeRun?.Kind.ToString());
+    }
+
 }
 
 public sealed class CompactionDashboardService(
@@ -745,7 +789,7 @@ public sealed class CompactionDashboardService(
     {
         var conversation = (await conversationRepository.GetOrCreateMain(cancellationToken)).Conversation;
         var workspaceResolution = await workspaceStore.GetOrCreateActive(
-            GetWorkspaceRootPath(environment.ContentRootPath),
+            WorkspacePathResolver.GetDefaultAgentWorkspacePath(environment.ContentRootPath),
             cancellationToken);
         var settings = await settingsResolver.Resolve(
             new AgentSettingsResolveRequest(
@@ -803,18 +847,6 @@ public sealed class CompactionDashboardService(
             result.Summary.UpdatedAt);
     }
 
-    private static string GetWorkspaceRootPath(string contentRootPath)
-    {
-        var directory = new DirectoryInfo(contentRootPath);
-
-        if (directory.Parent is not null && directory.Parent.Name.Equals("src", StringComparison.OrdinalIgnoreCase))
-        {
-            return directory.Parent.Parent?.FullName ?? directory.FullName;
-        }
-
-        return directory.FullName;
-    }
-
     private async Task Publish(
         AgentEventKind kind,
         string conversationId,
@@ -829,5 +861,201 @@ public sealed class CompactionDashboardService(
                 DateTimeOffset.UtcNow,
                 data),
             cancellationToken);
+    }
+}
+
+public sealed class OperationsDashboardService(
+    IOptions<TelegramChannelOptions> telegramOptions,
+    IAgentRunStore runStore,
+    ISubAgentCoordinator subAgentCoordinator,
+    IAgentDraftStore draftStore,
+    IAutomationStore automationStore,
+    IMemoryMaintenanceService memoryMaintenanceService) : IOperationsDashboardService
+{
+    public TelegramStatusResponse GetTelegramStatus()
+    {
+        var options = telegramOptions.Value;
+
+        return new TelegramStatusResponse(
+            !string.IsNullOrWhiteSpace(options.BotToken),
+            options.TrustedChatIds.Length);
+    }
+
+    public async Task<RunActionResponse> CancelRun(string runId, CancellationToken cancellationToken)
+    {
+        var run = await runStore.Get(runId, cancellationToken)
+            ?? throw new InvalidOperationException($"Run '{runId}' was not found.");
+        var updated = await runStore.Update(
+            run.Id,
+            AgentRunStatus.Cancelled,
+            run.CodexThreadId,
+            run.FinalResponse,
+            "Cancelled from dashboard.",
+            cancellationToken);
+
+        return new RunActionResponse(updated.Id, updated.Status.ToString(), "Run cancelled.");
+    }
+
+    public async Task<RunActionResponse> RetryRun(string runId, CancellationToken cancellationToken)
+    {
+        var run = await runStore.Get(runId, cancellationToken)
+            ?? throw new InvalidOperationException($"Run '{runId}' was not found.");
+        var result = await subAgentCoordinator.CreateAndReport(
+            new SubAgentRunRequest(
+                "main",
+                run.Id,
+                run.Prompt,
+                run.Channel,
+                SubAgentCapabilities.ReadOnly | SubAgentCapabilities.Code,
+                IsMobileChannel(run.Channel),
+                null),
+            cancellationToken);
+
+        return new RunActionResponse(result.RunId ?? string.Empty, result.Status, result.Summary);
+    }
+
+    public async Task<IReadOnlyList<DraftRow>> ListDrafts(
+        string? status,
+        CancellationToken cancellationToken)
+    {
+        var filter = Enum.TryParse<DraftStatus>(status, true, out var parsed) ? parsed : (DraftStatus?)null;
+        var drafts = await draftStore.List(filter, 100, cancellationToken);
+
+        return drafts.Select(ToRow).ToArray();
+    }
+
+    public async Task<DraftRow> ApproveDraft(string id, CancellationToken cancellationToken)
+    {
+        return ToRow(await draftStore.UpdateStatus(id, DraftStatus.Approved, cancellationToken));
+    }
+
+    public async Task<DraftRow> RejectDraft(string id, CancellationToken cancellationToken)
+    {
+        return ToRow(await draftStore.UpdateStatus(id, DraftStatus.Rejected, cancellationToken));
+    }
+
+    public async Task<IReadOnlyList<AutomationRow>> ListAutomations(CancellationToken cancellationToken)
+    {
+        var automations = await automationStore.List(cancellationToken);
+
+        return automations.Select(ToRow).ToArray();
+    }
+
+    public async Task<AutomationRow> CreateAutomation(
+        AutomationCreateDto request,
+        CancellationToken cancellationToken)
+    {
+        var automation = await automationStore.Create(
+            new AutomationWriteRequest(
+                request.Name.Trim(),
+                request.Task.Trim(),
+                request.Schedule.Trim(),
+                string.IsNullOrWhiteSpace(request.ConversationId) ? "main" : request.ConversationId,
+                string.IsNullOrWhiteSpace(request.Channel) ? "local-web" : request.Channel,
+                request.NotificationTarget,
+                GetCapabilities(request.Capabilities)),
+            cancellationToken);
+
+        return ToRow(automation);
+    }
+
+    public async Task<AutomationRow> ToggleAutomation(
+        string id,
+        AutomationToggleDto request,
+        CancellationToken cancellationToken)
+    {
+        var automation = await automationStore.SetStatus(
+            id,
+            request.Enabled ? AutomationStatus.Enabled : AutomationStatus.Disabled,
+            cancellationToken);
+
+        return ToRow(automation);
+    }
+
+    public async Task DeleteAutomation(string id, CancellationToken cancellationToken)
+    {
+        await automationStore.Delete(id, cancellationToken);
+    }
+
+    public async Task<MemoryMaintenanceResponse> CleanupMemory(CancellationToken cancellationToken)
+    {
+        return ToResponse(await memoryMaintenanceService.Cleanup(cancellationToken));
+    }
+
+    public async Task<MemoryMaintenanceResponse> ConsolidateMemory(CancellationToken cancellationToken)
+    {
+        return ToResponse(await memoryMaintenanceService.Consolidate(cancellationToken));
+    }
+
+    private static DraftRow ToRow(AgentDraft draft)
+    {
+        return new DraftRow(
+            draft.Id,
+            draft.Kind,
+            draft.Summary,
+            draft.Payload,
+            draft.SourceRunId,
+            draft.ConversationId,
+            draft.Channel,
+            draft.Status.ToString(),
+            draft.CreatedAt,
+            draft.UpdatedAt);
+    }
+
+    private static AutomationRow ToRow(AgentAutomation automation)
+    {
+        return new AutomationRow(
+            automation.Id,
+            automation.Name,
+            automation.Task,
+            automation.Schedule,
+            automation.Status.ToString(),
+            automation.ConversationId,
+            automation.Channel,
+            automation.NotificationTarget,
+            automation.Capabilities.ToString(),
+            automation.NextRunAt,
+            automation.LastRunAt,
+            automation.LastRunId,
+            automation.LastResult);
+    }
+
+    private static MemoryMaintenanceResponse ToResponse(MemoryMaintenanceResult result)
+    {
+        return new MemoryMaintenanceResponse(
+            result.Scanned,
+            result.Archived,
+            result.Pruned,
+            result.Merged,
+            result.Superseded,
+            result.Summary);
+    }
+
+    private static SubAgentCapabilities GetCapabilities(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return SubAgentCapabilities.ReadOnly | SubAgentCapabilities.Code;
+        }
+
+        SubAgentCapabilities capabilities = SubAgentCapabilities.None;
+
+        foreach (var item in value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (Enum.TryParse<SubAgentCapabilities>(item, true, out var parsed))
+            {
+                capabilities |= parsed;
+            }
+        }
+
+        return capabilities == SubAgentCapabilities.None
+            ? SubAgentCapabilities.ReadOnly
+            : capabilities;
+    }
+
+    private static bool IsMobileChannel(string channel)
+    {
+        return string.Equals(channel, "telegram", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(channel, "imessage", StringComparison.OrdinalIgnoreCase);
     }
 }

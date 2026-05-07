@@ -9,3 +9,4 @@ dist/
 *.db-shm
 *.db-wal
 *.log
+/src/Agent/appsettings.Development.json

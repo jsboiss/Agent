@@ -8,7 +8,7 @@ public sealed class CompositeMemoryExtractor(
         MemoryExtractionRequest request,
         CancellationToken cancellationToken)
     {
-        var mode = request.Settings.GetValueOrDefault("memory.extraction.mode") ?? "rule-and-llm";
+        var mode = request.Settings.GetValueOrDefault("memory.extraction.mode") ?? "llm";
         List<ExtractedMemory> memories = [];
 
         if (mode.Equals("rule", StringComparison.OrdinalIgnoreCase)
