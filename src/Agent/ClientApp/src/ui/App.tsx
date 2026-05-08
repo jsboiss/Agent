@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bot, BrainCircuit, GitBranch, MessageSquareText, Network, Settings, SlidersHorizontal } from "lucide-react";
+import { Bot, BrainCircuit, GitBranch, LogOut, MessageSquareText, Network, Settings, SlidersHorizontal } from "lucide-react";
 import { ChatPage } from "./pages/ChatPage";
 import { GraphPage } from "./pages/GraphPage";
 import { MemoriesPage } from "./pages/MemoriesPage";
@@ -67,6 +67,12 @@ export function App() {
             </button>
           ))}
         </nav>
+        <form action="/logout" className="rail-footer" method="post">
+          <button className="rail-link" title="Sign out" type="submit">
+            <LogOut aria-hidden="true" size={17} strokeWidth={1.8} />
+            <span>Logout</span>
+          </button>
+        </form>
       </aside>
       <main className="app-main">{page}</main>
     </div>

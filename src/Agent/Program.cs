@@ -1,8 +1,9 @@
-using Agent.Compaction;
+using Agent.Authentication;
 using Agent.Automations;
 using Agent.Calendar;
 using Agent.Capabilities;
 using Agent.Channels.Telegram;
+using Agent.Compaction;
 using Agent.Context;
 using Agent.Conversations;
 using Agent.Dashboard;
@@ -25,12 +26,56 @@ using Agent.SubAgents;
 using Agent.Tokens;
 using Agent.Tools;
 using Agent.Workspaces;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddOpenApi();
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.Cookie.Name = "MainAgent.Auth";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.ExpireTimeSpan = TimeSpan.FromDays(7);
+        options.SlidingExpiration = true;
+        options.LoginPath = "/login";
+        options.LogoutPath = "/logout";
+        options.Events.OnRedirectToLogin = context =>
+        {
+            if (IsApiRequest(context.Request.Path))
+            {
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                context.Response.ContentType = "application/json; charset=utf-8";
+
+                return context.Response.WriteAsync("{\"error\":\"Authentication required.\"}");
+            }
+
+            context.Response.Redirect(context.RedirectUri);
+
+            return Task.CompletedTask;
+        };
+        options.Events.OnRedirectToAccessDenied = context =>
+        {
+            if (IsApiRequest(context.Request.Path))
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                context.Response.ContentType = "application/json; charset=utf-8";
+
+                return context.Response.WriteAsync("{\"error\":\"Access denied.\"}");
+            }
+
+            context.Response.Redirect(context.RedirectUri);
+
+            return Task.CompletedTask;
+        };
+    });
+builder.Services.AddAuthorization();
+builder.Services.Configure<DashboardAuthOptions>(
+    builder.Configuration.GetSection(DashboardAuthOptions.SectionName));
 builder.Services.Configure<DevelopmentFrontendOptions>(
     builder.Configuration.GetSection(DevelopmentFrontendOptions.SectionName));
 if (builder.Environment.IsDevelopment())
@@ -123,6 +168,7 @@ builder.Services.AddSingleton<IMemoryMaintenanceService, MemoryMaintenanceServic
 builder.Services.AddHostedService<MemoryMaintenanceWorker>();
 builder.Services.AddSingleton<ICompactionMemoryExtractor, CompactionMemoryExtractor>();
 builder.Services.AddSingleton<IAgentToolExecutor, AgentToolExecutor>();
+builder.Services.AddSingleton<IDashboardPasswordVerifier, ConfigurationDashboardPasswordVerifier>();
 builder.Services.AddScoped<IChatDashboardService, ChatDashboardService>();
 builder.Services.AddScoped<IMemoryDashboardService, MemoryDashboardService>();
 builder.Services.AddScoped<IRunTimelineService, RunTimelineService>();
@@ -144,9 +190,36 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 app.MapOpenApi();
+app.UseAuthentication();
+app.Use(async (context, next) =>
+{
+    if (DashboardAuthEndpoints.AllowsAnonymousAccess(context.Request.Path)
+        || context.User.Identity?.IsAuthenticated == true)
+    {
+        await next(context);
+
+        return;
+    }
+
+    if (IsApiRequest(context.Request.Path))
+    {
+        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        context.Response.ContentType = "application/json; charset=utf-8";
+        await context.Response.WriteAsync("{\"error\":\"Authentication required.\"}");
+
+        return;
+    }
+
+    await context.ChallengeAsync();
+});
+app.UseAuthorization();
+app.MapDashboardAuthEndpoints();
 if (app.Environment.IsDevelopment())
 {
     app.MapGet("/dev", (IOptions<DevelopmentFrontendOptions> options) =>
@@ -171,3 +244,9 @@ app.MapFallback(async context =>
 });
 
 app.Run();
+
+static bool IsApiRequest(PathString path)
+{
+    return path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments("/openapi", StringComparison.OrdinalIgnoreCase);
+}

@@ -94,6 +94,8 @@ textarea {
   position: sticky;
   top: 0;
   z-index: 4;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
   height: 100vh;
   border-right: 1px solid var(--border);
   background: var(--surface);
@@ -115,7 +117,13 @@ textarea {
 
 .rail-nav {
   display: grid;
+  align-content: start;
   gap: 4px;
+}
+
+.rail-footer {
+  display: grid;
+  margin: 8px 0 0;
 }
 
 .rail-link {
@@ -1247,6 +1255,9 @@ dd {
   .left-rail {
     position: fixed;
     inset: auto 0 0;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: 1fr;
+    gap: 4px;
     height: 62px;
     border-top: 1px solid var(--border);
     border-right: 0;
@@ -1257,7 +1268,14 @@ dd {
   }
 
   .rail-nav {
-    grid-template-columns: repeat(5, 1fr);
+    grid-auto-columns: minmax(54px, 1fr);
+    grid-auto-flow: column;
+    overflow-x: auto;
+  }
+
+  .rail-footer {
+    margin: 0;
+    min-width: 54px;
   }
 
   .rail-link {
