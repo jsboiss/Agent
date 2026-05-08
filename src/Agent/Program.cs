@@ -9,8 +9,10 @@ using Agent.Conversations;
 using Agent.Dashboard;
 using Agent.Drafts;
 using Agent.Endpoints;
+using Agent.Email;
 using Agent.Events;
 using Agent.Frontend;
+using Agent.Integrations.Composio;
 using Agent.Memory;
 using Agent.Messages;
 using Agent.Notifications;
@@ -98,12 +100,19 @@ builder.Services.Configure<TelegramChannelOptions>(
     builder.Configuration.GetSection(TelegramChannelOptions.SectionName));
 builder.Services.Configure<GoogleCalendarOptions>(
     builder.Configuration.GetSection(GoogleCalendarOptions.SectionName));
+builder.Services.Configure<ComposioOptions>(
+    builder.Configuration.GetSection(ComposioOptions.SectionName));
 builder.Services.Configure<AgentHomeOptions>(
     builder.Configuration.GetSection(AgentHomeOptions.SectionName));
 builder.Services.AddDataProtection();
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession();
-builder.Services.AddHttpClient<IGoogleCalendarClient, GoogleCalendarClient>();
+builder.Services.AddHttpClient<IComposioClient, ComposioClient>((services, httpClient) =>
+{
+    var options = services.GetRequiredService<IOptions<ComposioOptions>>().Value;
+    ComposioClient.ConfigureHttpClient(httpClient, options);
+});
+builder.Services.AddSingleton<IGoogleCalendarClient, GoogleCalendarClient>();
 builder.Services.AddHttpClient<OllamaProviderClient>((services, httpClient) =>
 {
     var options = services.GetRequiredService<IOptions<OllamaProviderOptions>>().Value;
@@ -151,14 +160,17 @@ builder.Services.AddSingleton<IAutomationScheduler, SimpleAutomationScheduler>()
 builder.Services.AddSingleton<IAutomationStore, SqliteAutomationStore>();
 builder.Services.AddHostedService<AutomationWorker>();
 builder.Services.AddSingleton<IGoogleCalendarAuthStore, SqliteGoogleCalendarAuthStore>();
+builder.Services.AddSingleton<IComposioConnectionStore, SqliteComposioConnectionStore>();
 builder.Services.AddSingleton<ICalendarProvider, GoogleCalendarProvider>();
 builder.Services.AddSingleton<ICalendarScout, CalendarScout>();
+builder.Services.AddSingleton<IEmailProvider, GmailProvider>();
 builder.Services.AddSingleton<IMemoryStore, SqliteMemoryStore>();
 builder.Services.AddSingleton<IMemoryScout, MemoryScout>();
 builder.Services.AddSingleton<RuleBasedContextPlanner>();
 builder.Services.AddSingleton<IContextPlanner, GeminiContextPlanner>();
 builder.Services.AddSingleton<IContextProvider, MemoryContextProvider>();
 builder.Services.AddSingleton<IContextProvider, CalendarContextProvider>();
+builder.Services.AddSingleton<IContextProvider, EmailContextProvider>();
 builder.Services.AddSingleton<IContextOrchestrator, ContextOrchestrator>();
 builder.Services.AddSingleton<RuleBasedMemoryExtractor>();
 builder.Services.AddSingleton<LlmMemoryExtractor>();
@@ -178,6 +190,7 @@ builder.Services.AddScoped<ISettingsDashboardService, SettingsDashboardService>(
 builder.Services.AddScoped<ICompactionDashboardService, CompactionDashboardService>();
 builder.Services.AddScoped<IOperationsDashboardService, OperationsDashboardService>();
 builder.Services.AddScoped<ICalendarDashboardService, CalendarDashboardService>();
+builder.Services.AddScoped<IEmailDashboardService, EmailDashboardService>();
 builder.Services.AddScoped<IMessageProcessor, AgentMessageProcessor>();
 
 var app = builder.Build();

@@ -3,6 +3,7 @@ using Agent.Automations;
 using Agent.Calendar;
 using Agent.Capabilities;
 using Agent.Drafts;
+using Agent.Email;
 using Agent.Notifications;
 using Agent.SubAgents;
 using Agent.Workspaces;
@@ -17,6 +18,7 @@ public sealed class AgentToolExecutor(
     IAutomationStore automationStore,
     IAutomationScheduler automationScheduler,
     ICalendarProvider calendarProvider,
+    IEmailProvider emailProvider,
     IAgentRunStore runStore,
     IAgentCapabilityRegistry capabilityRegistry) : IAgentToolExecutor
 {
@@ -41,6 +43,10 @@ public sealed class AgentToolExecutor(
             "calendar_list_events" => await ListCalendarEvents(request, false, cancellationToken),
             "calendar_search_events" => await ListCalendarEvents(request, true, cancellationToken),
             "calendar_get_availability" => await GetCalendarAvailability(request, cancellationToken),
+            "gmail_search_messages" => await SearchGmailMessages(request, cancellationToken),
+            "gmail_get_message" => await GetGmailMessage(request, cancellationToken),
+            "gmail_create_draft" => await CreateGmailDraft(request, cancellationToken),
+            "gmail_send_draft" => await SendGmailDraft(request, cancellationToken),
             "cancel_run" => await CancelRun(request, cancellationToken),
             "retry_run" => await RetryRun(request, cancellationToken),
             _ => new AgentToolResult(
@@ -194,6 +200,135 @@ public sealed class AgentToolExecutor(
             : $" link={calendarEvent.MeetingLink}";
 
         return $"- {calendarEvent.Title}: {calendarEvent.Start:O} to {calendarEvent.End:O} timezone={calendarEvent.TimeZone} id={calendarEvent.Id} calendar={calendarEvent.CalendarId}{location}{attendees}{link}";
+    }
+
+    private async Task<AgentToolResult> SearchGmailMessages(
+        AgentToolRequest request,
+        CancellationToken cancellationToken)
+    {
+        var query = request.Arguments.GetValueOrDefault("query") ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return new AgentToolResult(request.Name, false, "Missing required argument 'query'.", new Dictionary<string, string>());
+        }
+
+        try
+        {
+            var messages = await emailProvider.SearchMessages(
+                new GmailMessageQuery(query, GetInt(request.Arguments.GetValueOrDefault("limit"), 10)),
+                cancellationToken);
+            var content = messages.Count == 0
+                ? "No Gmail messages found."
+                : string.Join(Environment.NewLine, messages.Select(FormatMessage));
+
+            return new AgentToolResult(
+                request.Name,
+                true,
+                content,
+                new Dictionary<string, string> { ["count"] = messages.Count.ToString() });
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException)
+        {
+            return new AgentToolResult(request.Name, false, exception.Message, new Dictionary<string, string>());
+        }
+    }
+
+    private async Task<AgentToolResult> GetGmailMessage(
+        AgentToolRequest request,
+        CancellationToken cancellationToken)
+    {
+        var messageId = request.Arguments.GetValueOrDefault("messageId") ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(messageId))
+        {
+            return new AgentToolResult(request.Name, false, "Missing required argument 'messageId'.", new Dictionary<string, string>());
+        }
+
+        try
+        {
+            var message = await emailProvider.GetMessage(messageId, cancellationToken);
+
+            return new AgentToolResult(
+                request.Name,
+                true,
+                FormatMessage(message),
+                new Dictionary<string, string> { ["messageId"] = message.Id, ["threadId"] = message.ThreadId });
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException)
+        {
+            return new AgentToolResult(request.Name, false, exception.Message, new Dictionary<string, string>());
+        }
+    }
+
+    private async Task<AgentToolResult> CreateGmailDraft(
+        AgentToolRequest request,
+        CancellationToken cancellationToken)
+    {
+        var to = request.Arguments.GetValueOrDefault("to") ?? string.Empty;
+        var subject = request.Arguments.GetValueOrDefault("subject") ?? string.Empty;
+        var body = request.Arguments.GetValueOrDefault("body") ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(to) || string.IsNullOrWhiteSpace(subject) || string.IsNullOrWhiteSpace(body))
+        {
+            return new AgentToolResult(request.Name, false, "Missing required Gmail draft recipient, subject, or body.", new Dictionary<string, string>());
+        }
+
+        try
+        {
+            var draftId = await emailProvider.CreateDraft(
+                new GmailDraftRequest(
+                    to,
+                    subject,
+                    body,
+                    request.Arguments.GetValueOrDefault("cc"),
+                    request.Arguments.GetValueOrDefault("bcc")),
+                cancellationToken);
+
+            return new AgentToolResult(
+                request.Name,
+                true,
+                $"Gmail draft created: {draftId}",
+                new Dictionary<string, string> { ["draftId"] = draftId });
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException)
+        {
+            return new AgentToolResult(request.Name, false, exception.Message, new Dictionary<string, string>());
+        }
+    }
+
+    private async Task<AgentToolResult> SendGmailDraft(
+        AgentToolRequest request,
+        CancellationToken cancellationToken)
+    {
+        var draftId = request.Arguments.GetValueOrDefault("draftId") ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(draftId))
+        {
+            return new AgentToolResult(request.Name, false, "Missing required argument 'draftId'.", new Dictionary<string, string>());
+        }
+
+        try
+        {
+            var messageId = await emailProvider.SendDraft(draftId, cancellationToken);
+
+            return new AgentToolResult(
+                request.Name,
+                true,
+                $"Gmail draft sent: {messageId}",
+                new Dictionary<string, string> { ["messageId"] = messageId });
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException)
+        {
+            return new AgentToolResult(request.Name, false, exception.Message, new Dictionary<string, string>());
+        }
+    }
+
+    private static string FormatMessage(GmailMessageSummary message)
+    {
+        var date = message.Date is null ? string.Empty : $" date={message.Date:O}";
+
+        return $"- {message.Subject}: from={message.From} to={message.To}{date} id={message.Id} thread={message.ThreadId} snippet={message.Snippet}";
     }
 
     private async Task<AgentToolResult> SpawnAgent(

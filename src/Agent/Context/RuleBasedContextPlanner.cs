@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Options;
 
@@ -36,6 +37,11 @@ public sealed partial class RuleBasedContextPlanner(IOptions<ContextPlannerOptio
                 hasWindow ? 0.75 : 0.45));
         }
 
+        if (enabled.Contains("Email") && IsEmailRelevant(request.UserMessage))
+        {
+            providers.Add(new ContextProviderPlan("email", request.UserMessage, null, null, null, false, 0.7));
+        }
+
         return Task.FromResult(providers.Count == 0
             ? ContextPlan.Empty
             : new ContextPlan(true, providers, providers.Max(x => x.Confidence), providers.Any(x => x.Required), null));
@@ -54,6 +60,13 @@ public sealed partial class RuleBasedContextPlanner(IOptions<ContextPlannerOptio
             || PlanningWords().IsMatch(message)
             || DateWords().IsMatch(message)
             || WeekdayWords().IsMatch(message);
+    }
+
+    private static bool IsEmailRelevant(string message)
+    {
+        return EmailWords().IsMatch(message)
+            || EmailQuestionWords().IsMatch(message)
+            || EmailAddressWords().IsMatch(message);
     }
 
     private static bool IsExplicitCalendarRequest(string message)
@@ -84,6 +97,22 @@ public sealed partial class RuleBasedContextPlanner(IOptions<ContextPlannerOptio
         {
             label = "today";
             start = AtStartOfDay(today, localNow.Offset);
+            end = start.AddDays(1);
+            return true;
+        }
+
+        var isoDate = IsoDate().Match(message);
+
+        if (isoDate.Success
+            && DateOnly.TryParseExact(
+                isoDate.Groups["date"].Value,
+                "yyyy-MM-dd",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var parsedDate))
+        {
+            label = isoDate.Groups["date"].Value;
+            start = AtStartOfDay(parsedDate, localNow.Offset);
             end = start.AddDays(1);
             return true;
         }
@@ -150,4 +179,16 @@ public sealed partial class RuleBasedContextPlanner(IOptions<ContextPlannerOptio
 
     [GeneratedRegex(@"\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b", RegexOptions.IgnoreCase)]
     private static partial Regex WeekdayWords();
+
+    [GeneratedRegex(@"\b(email|gmail|inbox|sent mail|sent|reply|replied|message|mail|receipt|invoice|booking|confirmation|confirmations|emailed|newsletter|attachment)\b", RegexOptions.IgnoreCase)]
+    private static partial Regex EmailWords();
+
+    [GeneratedRegex(@"\b(did i get|have i got|have i received|was i sent|sent me|emailed me|from .+ about|any emails? from|check (my )?(email|gmail|inbox))\b", RegexOptions.IgnoreCase)]
+    private static partial Regex EmailQuestionWords();
+
+    [GeneratedRegex(@"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", RegexOptions.IgnoreCase)]
+    private static partial Regex EmailAddressWords();
+
+    [GeneratedRegex(@"\b(?<date>\d{4}-\d{2}-\d{2})\b", RegexOptions.IgnoreCase)]
+    private static partial Regex IsoDate();
 }

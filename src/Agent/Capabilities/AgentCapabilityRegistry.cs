@@ -266,6 +266,75 @@ public sealed class AgentCapabilityRegistry : IAgentCapabilityRegistry
             "Busy and free windows for the requested calendar range.")
     ];
 
+    private static IReadOnlyList<AgentToolDefinition> EmailReadTools =>
+    [
+        new AgentToolDefinition(
+            "gmail_search_messages",
+            "Search Gmail messages. EmailRead only; executes directly and never modifies email.",
+            """
+            {
+              "type": "object",
+              "properties": {
+                "query": { "type": "string", "description": "Gmail search query." },
+                "limit": { "type": "integer", "minimum": 1, "maximum": 20 }
+              },
+              "required": ["query"]
+            }
+            """,
+            "Concise matching Gmail message metadata."),
+        new AgentToolDefinition(
+            "gmail_get_message",
+            "Get Gmail message metadata and snippet by message id. EmailRead only; executes directly and never modifies email.",
+            """
+            {
+              "type": "object",
+              "properties": {
+                "messageId": { "type": "string", "description": "Gmail message id." }
+              },
+              "required": ["messageId"]
+            }
+            """,
+            "Gmail message metadata and snippet.")
+    ];
+
+    private static IReadOnlyList<AgentToolDefinition> EmailDraftTools =>
+    [
+        new AgentToolDefinition(
+            "gmail_create_draft",
+            "Create a Gmail draft. Requires EmailDraft and should only be used when the user asked to draft an email.",
+            """
+            {
+              "type": "object",
+              "properties": {
+                "to": { "type": "string" },
+                "cc": { "type": "string" },
+                "bcc": { "type": "string" },
+                "subject": { "type": "string" },
+                "body": { "type": "string" }
+              },
+              "required": ["to", "subject", "body"]
+            }
+            """,
+            "Created Gmail draft id.")
+    ];
+
+    private static IReadOnlyList<AgentToolDefinition> EmailSendTools =>
+    [
+        new AgentToolDefinition(
+            "gmail_send_draft",
+            "Send an existing Gmail draft. Requires EmailSend and explicit user approval.",
+            """
+            {
+              "type": "object",
+              "properties": {
+                "draftId": { "type": "string" }
+              },
+              "required": ["draftId"]
+            }
+            """,
+            "Sent Gmail message id.")
+    ];
+
     public SubAgentCapabilities Parse(string? value, SubAgentCapabilities? fallback = null)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -296,13 +365,31 @@ public sealed class AgentCapabilityRegistry : IAgentCapabilityRegistry
 
     public IReadOnlyList<AgentToolDefinition> GetToolDefinitions(SubAgentCapabilities capabilities)
     {
+        List<AgentToolDefinition> tools = [.. DispatcherTools];
+
         if (capabilities == SubAgentCapabilities.None
             || capabilities.HasFlag(SubAgentCapabilities.CalendarRead))
         {
-            return [.. DispatcherTools, .. CalendarReadTools];
+            tools.AddRange(CalendarReadTools);
         }
 
-        return DispatcherTools;
+        if (capabilities == SubAgentCapabilities.None
+            || capabilities.HasFlag(SubAgentCapabilities.EmailRead))
+        {
+            tools.AddRange(EmailReadTools);
+        }
+
+        if (capabilities.HasFlag(SubAgentCapabilities.EmailDraft))
+        {
+            tools.AddRange(EmailDraftTools);
+        }
+
+        if (capabilities.HasFlag(SubAgentCapabilities.EmailSend))
+        {
+            tools.AddRange(EmailSendTools);
+        }
+
+        return tools;
     }
 
     public bool RequiresDraftForExternalSideEffects(SubAgentCapabilities capabilities)

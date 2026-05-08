@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, RefreshCcw } from "lucide-react";
+import { ChevronDown, ChevronRight, RefreshCcw, Wrench } from "lucide-react";
 import { useGetRuns } from "../../api/generated";
 import { EmptyState, ErrorState, formatLocalDateTime, formatLocalTime, IconButton, LoadingState, PageFrame, StatusChip } from "../components";
 
@@ -62,15 +62,19 @@ export function RunsPage() {
                   <span>{formatLocalDateTime(turn.startedAt)}</span>
                   <small>{turn.events.length} events</small>
                 </button>
-                {!collapsed && turn.events.map((event) => (
-                  <button className={`timeline-event ${event.isError ? "is-error" : ""}`} key={event.id} onClick={() => setSelectedEventId(event.id)} type="button">
-                    <span className={`status-square ${event.isError ? "error" : ""}`} />
-                    <time>{formatLocalTime(event.createdAt)}</time>
-                    <strong>{event.phase}</strong>
-                    <em>{event.kind}</em>
-                    <small>{event.summary}</small>
-                  </button>
-                ))}
+                {!collapsed && turn.events.map((event) => {
+                  const toolEvent = isToolEvent(event);
+
+                  return (
+                    <button className={`timeline-event ${event.isError ? "is-error" : ""} ${toolEvent ? "is-tool" : ""}`} key={event.id} onClick={() => setSelectedEventId(event.id)} type="button">
+                      <span className={`status-square ${event.isError ? "error" : toolEvent ? "active" : ""}`} />
+                      <time>{formatLocalTime(event.createdAt)}</time>
+                      <strong>{toolEvent ? getToolName(event) : event.phase}</strong>
+                      <em>{event.kind}</em>
+                      <small>{event.summary}</small>
+                    </button>
+                  );
+                })}
               </section>
             );
           })}
@@ -89,6 +93,7 @@ export function RunsPage() {
             <>
               <h3>{selectedEvent.kind}</h3>
               <p>{selectedEvent.summary}</p>
+              {isToolEvent(selectedEvent) && <ToolUseDetail event={selectedEvent} />}
               <dl className="metadata-grid">
                 <dt>Id</dt>
                 <dd>{selectedEvent.id}</dd>
@@ -109,4 +114,76 @@ export function RunsPage() {
       </div>
     </PageFrame>
   );
+}
+
+type RunEvent = {
+  id: string;
+  kind: string;
+  phase: string;
+  conversationId: string;
+  createdAt: string;
+  summary: string;
+  metadata: Record<string, string>;
+  isError: boolean;
+};
+
+function ToolUseDetail({ event }: { event: RunEvent }) {
+  const argumentsValue = event.metadata.arguments;
+  const output = event.metadata.output;
+  const error = event.metadata.error;
+  const itemCount = event.metadata.itemCount;
+
+  return (
+    <section className="tool-use-detail">
+      <header>
+        <Wrench size={14} />
+        <strong>{getToolName(event)}</strong>
+        {event.metadata.providerId && <span>{event.metadata.providerId}</span>}
+      </header>
+      {argumentsValue && (
+        <div>
+          <span>Arguments</span>
+          <pre>{formatJsonish(argumentsValue)}</pre>
+        </div>
+      )}
+      {output && (
+        <div>
+          <span>Output</span>
+          <pre>{output}</pre>
+        </div>
+      )}
+      {(itemCount || error) && (
+        <dl>
+          {itemCount && (
+            <>
+              <dt>Items</dt>
+              <dd>{itemCount}</dd>
+            </>
+          )}
+          {error && (
+            <>
+              <dt>Error</dt>
+              <dd>{error}</dd>
+            </>
+          )}
+        </dl>
+      )}
+    </section>
+  );
+}
+
+function isToolEvent(event: RunEvent) {
+  return event.phase === "Tool calls" || event.kind.startsWith("ToolCall") || Boolean(event.metadata.toolName);
+}
+
+function getToolName(event: RunEvent) {
+  return event.metadata.toolName || event.metadata.providerId || event.phase;
+}
+
+function formatJsonish(value: string) {
+  try {
+    return JSON.stringify(JSON.parse(value), null, 2);
+  } catch {
+    return value;
+  }
 }

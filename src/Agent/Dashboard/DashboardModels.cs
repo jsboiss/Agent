@@ -171,9 +171,16 @@ public sealed record SettingsDashboardSnapshot(
     IReadOnlyList<string> AppliedLayers,
     string MemoryConnectionString,
     WorkspaceStatus Workspace,
-    CalendarStatusResponse Calendar);
+    CalendarStatusResponse Calendar,
+    EmailStatusResponse Email);
 
 public sealed record CalendarStatusResponse(
+    bool Configured,
+    bool Connected,
+    string? AccountEmail,
+    DateTimeOffset? UpdatedAt);
+
+public sealed record EmailStatusResponse(
     bool Configured,
     bool Connected,
     string? AccountEmail,
@@ -322,9 +329,20 @@ public interface ICalendarDashboardService
 {
     Task<CalendarStatusResponse> GetStatus(CancellationToken cancellationToken);
 
-    string GetConnectUrl(HttpContext httpContext);
+    Task<string> GetConnectUrl(HttpContext httpContext, CancellationToken cancellationToken);
 
-    Task CompleteConnect(string code, CancellationToken cancellationToken);
+    Task CompleteConnect(string connectedAccountId, CancellationToken cancellationToken);
+
+    Task Disconnect(CancellationToken cancellationToken);
+}
+
+public interface IEmailDashboardService
+{
+    Task<EmailStatusResponse> GetStatus(CancellationToken cancellationToken);
+
+    Task<string> GetConnectUrl(HttpContext httpContext, CancellationToken cancellationToken);
+
+    Task CompleteConnect(string connectedAccountId, CancellationToken cancellationToken);
 
     Task Disconnect(CancellationToken cancellationToken);
 }

@@ -118,12 +118,13 @@ public sealed class GeminiContextPlanner(
     {
         return """
             You are a strict JSON context planner. Decide if the user message needs external context before the main assistant answers.
-            Available provider ids: memory, calendar.
+            Available provider ids: memory, calendar, email.
             Select memory for user preferences, durable history, personal facts, relationship/project context, or prior remembered information.
-            Select calendar for schedules, events, availability, planning around time, or questions like fitting an activity into a day.
+            Select calendar for schedules, events, availability, planning around time, temporal phrases like tomorrow or weekdays, or questions like fitting an activity into a day.
+            Select email for Gmail/inbox/sent/reply references, receipts, invoices, bookings, confirmations, attachments, or questions about whether someone emailed the user.
             Do not select providers for pure coding tasks, greetings, or date examples inside code snippets.
             Return only JSON with this schema:
-            {"needsContext":true|false,"providers":[{"providerId":"memory|calendar","query":"string","start":"ISO timestamp or null","end":"ISO timestamp or null","dateWindowLabel":"string or null","required":true|false,"confidence":0.0}],"confidence":0.0,"missingContextUserVisible":true|false}
+            {"needsContext":true|false,"providers":[{"providerId":"memory|calendar|email","query":"string","start":"ISO timestamp or null","end":"ISO timestamp or null","dateWindowLabel":"string or null","required":true|false,"confidence":0.0}],"confidence":0.0,"missingContextUserVisible":true|false}
             """;
     }
 

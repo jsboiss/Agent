@@ -9,6 +9,7 @@ using Agent.Conversations;
 using Agent.Channels.Telegram;
 using Agent.Drafts;
 using Agent.Events;
+using Agent.Email;
 using Agent.Memory;
 using Agent.Memory.MemoryGraph;
 using Agent.Messages;
@@ -416,12 +417,44 @@ public sealed class RunTimelineService(IAgentEventStore eventStore) : IRunTimeli
         {
             AgentEventKind.MemoryScoutCompleted => $"memories: {x.Data.GetValueOrDefault("memoryCount") ?? "0"}",
             AgentEventKind.MemoryExtractionCompleted => $"written: {x.Data.GetValueOrDefault("writtenCount") ?? "0"}, skipped: {x.Data.GetValueOrDefault("skippedCount") ?? "0"}",
-            AgentEventKind.ToolCallStarted => x.Data.GetValueOrDefault("toolName") ?? "tool started",
-            AgentEventKind.ToolCallCompleted => $"succeeded: {x.Data.GetValueOrDefault("succeeded") ?? string.Empty}",
+            AgentEventKind.ToolCallStarted => GetToolStartedSummary(x),
+            AgentEventKind.ToolCallOutput => GetToolOutputSummary(x),
+            AgentEventKind.ToolCallCompleted => GetToolCompletedSummary(x),
             AgentEventKind.ProviderTurnCompleted => GetProviderSummary(x),
             AgentEventKind.ProviderError => x.Data.GetValueOrDefault("error") ?? "provider error",
             _ => x.Data.GetValueOrDefault("message") ?? x.Data.GetValueOrDefault("text") ?? x.Kind.ToString()
         };
+    }
+
+    private static string GetToolStartedSummary(AgentEvent x)
+    {
+        var toolName = x.Data.GetValueOrDefault("toolName") ?? "tool";
+        var arguments = Shorten(x.Data.GetValueOrDefault("arguments") ?? string.Empty, 140);
+
+        return string.IsNullOrWhiteSpace(arguments)
+            ? toolName
+            : $"{toolName} {arguments}";
+    }
+
+    private static string GetToolOutputSummary(AgentEvent x)
+    {
+        var toolName = x.Data.GetValueOrDefault("toolName") ?? "tool";
+        var output = Shorten(x.Data.GetValueOrDefault("output") ?? string.Empty, 180);
+
+        return string.IsNullOrWhiteSpace(output)
+            ? toolName
+            : $"{toolName}: {output}";
+    }
+
+    private static string GetToolCompletedSummary(AgentEvent x)
+    {
+        var toolName = x.Data.GetValueOrDefault("toolName") ?? "tool";
+        var succeeded = x.Data.GetValueOrDefault("succeeded") ?? string.Empty;
+        var itemCount = x.Data.GetValueOrDefault("itemCount");
+
+        return string.IsNullOrWhiteSpace(itemCount)
+            ? $"{toolName} succeeded: {succeeded}"
+            : $"{toolName} succeeded: {succeeded}, items: {itemCount}";
     }
 
     private static string GetProviderSummary(AgentEvent x)
@@ -432,6 +465,22 @@ public sealed class RunTimelineService(IAgentEventStore eventStore) : IRunTimeli
         return string.IsNullOrWhiteSpace(tokens)
             ? baseSummary
             : $"{baseSummary}, tokens: {tokens}";
+    }
+
+    private static string Shorten(string value, int length)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var normalized = string.Join(
+            " ",
+            value.Split([' ', '\r', '\n', '\t'], StringSplitOptions.RemoveEmptyEntries));
+
+        return normalized.Length <= length
+            ? normalized
+            : normalized[..length] + "...";
     }
 }
 
@@ -1040,6 +1089,7 @@ public sealed class SettingsDashboardService(
     IOptions<SqliteMemoryOptions> memoryOptions,
     IAgentWorkspaceStore workspaceStore,
     IGoogleCalendarClient googleCalendarClient,
+    IEmailProvider emailProvider,
     IWebHostEnvironment environment) : ISettingsDashboardService
 {
     public async Task<SettingsDashboardSnapshot> Load(CancellationToken cancellationToken)
@@ -1066,7 +1116,8 @@ public sealed class SettingsDashboardService(
             settings.AppliedLayers,
             memoryOptions.Value.ConnectionString,
             ToStatus(workspaceResolution.Workspace, null),
-            ToCalendarStatus(await googleCalendarClient.GetStatus(cancellationToken)));
+            ToCalendarStatus(await googleCalendarClient.GetStatus(cancellationToken)),
+            ToEmailStatus(await emailProvider.GetStatus(cancellationToken)));
     }
 
     public async Task<WorkspaceStatus> UpdateWorkspacePermissions(
@@ -1123,6 +1174,15 @@ public sealed class SettingsDashboardService(
             status.UpdatedAt);
     }
 
+    private static EmailStatusResponse ToEmailStatus(EmailConnectionStatus status)
+    {
+        return new EmailStatusResponse(
+            status.Configured,
+            status.Connected,
+            status.AccountEmail,
+            status.UpdatedAt);
+    }
+
 }
 
 public sealed class CalendarDashboardService(IGoogleCalendarClient googleCalendarClient) : ICalendarDashboardService
@@ -1138,22 +1198,70 @@ public sealed class CalendarDashboardService(IGoogleCalendarClient googleCalenda
             status.UpdatedAt);
     }
 
-    public string GetConnectUrl(HttpContext httpContext)
+    public async Task<string> GetConnectUrl(HttpContext httpContext, CancellationToken cancellationToken)
     {
         var state = Guid.NewGuid().ToString("N");
         httpContext.Session.SetString("google-calendar-oauth-state", state);
 
-        return googleCalendarClient.GetAuthorizationUrl(state);
+        return await googleCalendarClient.GetAuthorizationUrl(
+            state,
+            GetCallbackUrl(httpContext, "/api/dashboard/calendar/oauth-callback"),
+            cancellationToken);
     }
 
-    public async Task CompleteConnect(string code, CancellationToken cancellationToken)
+    public async Task CompleteConnect(string connectedAccountId, CancellationToken cancellationToken)
     {
-        await googleCalendarClient.Connect(code, cancellationToken);
+        await googleCalendarClient.Connect(connectedAccountId, cancellationToken);
     }
 
     public async Task Disconnect(CancellationToken cancellationToken)
     {
         await googleCalendarClient.Disconnect(cancellationToken);
+    }
+
+    private static string GetCallbackUrl(HttpContext httpContext, string path)
+    {
+        return $"{httpContext.Request.Scheme}://{httpContext.Request.Host}{path}";
+    }
+}
+
+public sealed class EmailDashboardService(IEmailProvider emailProvider) : IEmailDashboardService
+{
+    public async Task<EmailStatusResponse> GetStatus(CancellationToken cancellationToken)
+    {
+        var status = await emailProvider.GetStatus(cancellationToken);
+
+        return new EmailStatusResponse(
+            status.Configured,
+            status.Connected,
+            status.AccountEmail,
+            status.UpdatedAt);
+    }
+
+    public async Task<string> GetConnectUrl(HttpContext httpContext, CancellationToken cancellationToken)
+    {
+        var state = Guid.NewGuid().ToString("N");
+        httpContext.Session.SetString("gmail-oauth-state", state);
+
+        return await emailProvider.GetAuthorizationUrl(
+            state,
+            GetCallbackUrl(httpContext, "/api/dashboard/email/oauth-callback"),
+            cancellationToken);
+    }
+
+    public async Task CompleteConnect(string connectedAccountId, CancellationToken cancellationToken)
+    {
+        await emailProvider.Connect(connectedAccountId, cancellationToken);
+    }
+
+    public async Task Disconnect(CancellationToken cancellationToken)
+    {
+        await emailProvider.Disconnect(cancellationToken);
+    }
+
+    private static string GetCallbackUrl(HttpContext httpContext, string path)
+    {
+        return $"{httpContext.Request.Scheme}://{httpContext.Request.Host}{path}";
     }
 }
 

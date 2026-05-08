@@ -350,6 +350,7 @@ public sealed class SubAgentRunWorker(
             sections.Add("""
                 Calendar policy: CalendarRead allows direct Google Calendar event, schedule, and availability reads.
                 Calendar access is read-only. Do not propose or perform calendar writes in this run.
+                Valid calendar tools are calendar_list_events, calendar_search_events, and calendar_get_availability. Never invent names like calendar_search.
                 Use explicit ISO 8601 date/time ranges when calling calendar tools.
                 """);
         }
@@ -381,6 +382,28 @@ public sealed class SubAgentRunWorker(
     {
         start = default;
         end = default;
+        var isoMatch = Regex.Match(
+            task,
+            @"\b(?<date>\d{4}-\d{2}-\d{2})\b",
+            RegexOptions.IgnoreCase);
+
+        if (isoMatch.Success
+            && DateOnly.TryParseExact(
+                isoMatch.Groups["date"].Value,
+                "yyyy-MM-dd",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var isoDate))
+        {
+            var isoTimeZone = GetTimeZone(task);
+            var dateTime = isoDate.ToDateTime(TimeOnly.MinValue);
+            var isoOffset = isoTimeZone.GetUtcOffset(dateTime);
+            start = new DateTimeOffset(dateTime, isoOffset);
+            end = start.AddDays(1);
+
+            return true;
+        }
+
         var match = Regex.Match(
             task,
             @"(?<month>January|February|March|April|May|June|July|August|September|October|November|December)\s+(?<day>\d{1,2}),\s+(?<year>\d{4})",

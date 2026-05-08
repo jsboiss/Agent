@@ -8,14 +8,22 @@ public sealed record EvidenceBundle(
 
     public string ToPromptSection()
     {
-        if (Items.Count == 0)
+        if (Items.Count == 0 && Metadata.Count == 0)
         {
             return string.Empty;
         }
 
-        var lines = Items
+        List<string> lines = [];
+
+        lines.AddRange(Items
             .GroupBy(x => x.Source, StringComparer.OrdinalIgnoreCase)
-            .SelectMany(x => new[] { $"Source: {x.Key}" }.Concat(x.Select(y => $"- {y.Label}: {y.Text}")));
+            .SelectMany(x => new[] { $"Source: {x.Key}" }.Concat(x.Select(y => $"- {y.Label}: {y.Text}"))));
+
+        foreach (var x in Metadata.Where(x => !string.Equals(x.Value, "ok", StringComparison.OrdinalIgnoreCase)))
+        {
+            lines.Add($"Source: {x.Key}");
+            lines.Add($"- Context unavailable: {x.Value}");
+        }
 
         return "Evidence context:" + Environment.NewLine + string.Join(Environment.NewLine, lines);
     }

@@ -947,6 +947,17 @@ td small,
   color: var(--red);
 }
 
+.timeline-event.is-tool {
+  border-left: 2px solid var(--green);
+  background: rgba(18, 183, 106, 0.07);
+}
+
+.timeline-event.is-tool strong {
+  color: var(--green);
+  font-family: "Space Grotesk", "Cascadia Mono", Consolas, monospace;
+  font-size: 12px;
+}
+
 .timeline-event em {
   font-style: normal;
   color: var(--muted);
@@ -978,6 +989,57 @@ dd {
   padding: 6px 8px;
   font-size: 12px;
   line-height: 16px;
+}
+
+.tool-use-detail {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0;
+  border: 1px solid rgba(18, 183, 106, 0.72);
+  background: rgba(18, 183, 106, 0.08);
+  padding: 8px;
+}
+
+.tool-use-detail header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--green);
+}
+
+.tool-use-detail header strong {
+  font-family: "Space Grotesk", "Cascadia Mono", Consolas, monospace;
+  font-size: 13px;
+}
+
+.tool-use-detail header span,
+.tool-use-detail div > span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.tool-use-detail pre {
+  max-height: 220px;
+  margin: 4px 0 0;
+  overflow: auto;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  padding: 8px;
+  color: var(--text);
+  font-family: "Space Grotesk", "Cascadia Mono", Consolas, monospace;
+  font-size: 12px;
+  line-height: 16px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.tool-use-detail dl {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px 8px;
+  margin: 0;
 }
 
 .graph-stage {
@@ -1097,6 +1159,90 @@ dd {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+
+.settings-grid-compact {
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 6px;
+  align-items: start;
+}
+
+.settings-grid-compact .panel {
+  padding: 8px;
+}
+
+.settings-grid-compact .panel-heading {
+  margin-bottom: 6px;
+}
+
+.settings-grid-compact .panel h2 {
+  font-size: 14px;
+  line-height: 18px;
+}
+
+.settings-grid-compact .settings-list {
+  grid-template-columns: minmax(112px, 0.34fr) minmax(0, 1fr);
+  gap: 3px 6px;
+}
+
+.settings-grid-compact .settings-list dt {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+  margin: 0;
+  font-size: 10px;
+  line-height: 11px;
+}
+
+.settings-grid-compact .settings-list dd {
+  min-height: 28px;
+  padding: 3px 5px;
+  font-size: 11px;
+  line-height: 14px;
+}
+
+.settings-grid-compact .settings-list code {
+  line-height: 14px;
+}
+
+.settings-grid-compact .icon-button {
+  width: 24px;
+  min-width: 24px;
+  min-height: 24px;
+}
+
+.settings-grid-compact .secondary-action {
+  min-height: 24px;
+  gap: 4px;
+  border-radius: 4px;
+  padding: 0 7px;
+  font-size: 11px;
+  line-height: 14px;
+}
+
+.settings-grid-compact .workspace-path-form {
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.settings-grid-compact .workspace-path-form input {
+  min-height: 28px;
+  padding: 3px 6px;
+  font-size: 11px;
+}
+
+.settings-grid-compact .row-actions {
+  gap: 5px;
+}
+
+.settings-grid-compact .tool-list {
+  gap: 4px;
+}
+
+.settings-grid-compact .tool-list span {
+  padding: 3px 5px;
+  font-size: 11px;
+  line-height: 14px;
 }
 
 .secondary-action {

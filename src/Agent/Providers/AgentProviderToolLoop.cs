@@ -88,6 +88,14 @@ public sealed class AgentProviderToolLoop(
             priorToolCalls.AddRange(effectiveToolCalls);
             providerToolResults.AddRange(toolResults);
 
+            if (ShouldReturnReadOnlyToolResult(effectiveToolCalls, providerToolResults))
+            {
+                return providerResult with
+                {
+                    AssistantMessage = FormatReadOnlyToolAnswer(providerToolResults)
+                };
+            }
+
             providerRequest = providerRequest with
             {
                 PriorToolCalls = priorToolCalls.ToArray(),
@@ -100,6 +108,7 @@ public sealed class AgentProviderToolLoop(
             : providerResult with
             {
                 AssistantMessage = string.IsNullOrWhiteSpace(providerResult.AssistantMessage)
+                    || IsOnlyToolCallMessage(providerResult.AssistantMessage)
                     ? GetToolLoopFallback(providerResult, providerToolResults)
                     : providerResult.AssistantMessage
             };
@@ -127,7 +136,8 @@ public sealed class AgentProviderToolLoop(
                     {
                         ["toolCallId"] = toolCall.Id,
                         ["toolName"] = toolCall.Name,
-                        ["ConversationEntryId"] = parentEntryId
+                        ["ConversationEntryId"] = parentEntryId,
+                        ["arguments"] = JsonSerializer.Serialize(toolCall.Arguments)
                     }),
                 cancellationToken);
 
@@ -327,9 +337,47 @@ public sealed class AgentProviderToolLoop(
             {
                 return toolCalls;
             }
+
+            toolCalls = TryGetSingleObjectToolCall(json);
+
+            if (toolCalls.Count > 0)
+            {
+                return toolCalls;
+            }
         }
 
         return [];
+    }
+
+    private static bool IsOnlyToolCallMessage(string assistantMessage)
+    {
+        var trimmed = assistantMessage.Trim();
+
+        if (string.IsNullOrWhiteSpace(trimmed))
+        {
+            return false;
+        }
+
+        foreach (var json in GetJsonCandidates(trimmed).Prepend(trimmed))
+        {
+            try
+            {
+                var node = JsonNode.Parse(json)?.AsObject();
+
+                if (node?["toolCalls"] is not null)
+                {
+                    return true;
+                }
+            }
+            catch (JsonException)
+            {
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        }
+
+        return false;
     }
 
     private static IReadOnlyList<AgentProviderToolCall> GetBulletTextToolCalls(string assistantMessage)
@@ -379,7 +427,7 @@ public sealed class AgentProviderToolLoop(
             {
                 result.Add(new AgentProviderToolCall(
                     $"text-tool-{Guid.NewGuid():N}",
-                    name,
+                    NormalizeToolName(name, arguments),
                     arguments));
             }
         }
@@ -457,7 +505,7 @@ public sealed class AgentProviderToolLoop(
 
                 result.Add(new AgentProviderToolCall(
                     $"text-tool-{Guid.NewGuid():N}",
-                    name,
+                    NormalizeToolName(name, GetArguments(arguments)),
                     GetArguments(arguments)));
             }
 
@@ -486,6 +534,104 @@ public sealed class AgentProviderToolLoop(
                 ? x.Value.GetValue<string>()
                 : x.Value?.ToJsonString() ?? string.Empty,
             StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static IReadOnlyList<AgentProviderToolCall> TryGetSingleObjectToolCall(string json)
+    {
+        try
+        {
+            var node = JsonNode.Parse(json)?.AsObject();
+
+            if (node is null || node.Count != 1)
+            {
+                return [];
+            }
+
+            var property = node.First();
+
+            if (property.Value is not JsonObject arguments)
+            {
+                return [];
+            }
+
+            var values = GetArguments(arguments);
+            var toolName = NormalizeToolName(property.Key, values);
+
+            if (!IsKnownTextTool(toolName))
+            {
+                return [];
+            }
+
+            return
+            [
+                new AgentProviderToolCall(
+                    $"text-tool-{Guid.NewGuid():N}",
+                    toolName,
+                    values)
+            ];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+        catch (InvalidOperationException)
+        {
+            return [];
+        }
+    }
+
+    private static string NormalizeToolName(
+        string name,
+        IReadOnlyDictionary<string, string> arguments)
+    {
+        if (string.Equals(name, "calendar_search", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.IsNullOrWhiteSpace(arguments.GetValueOrDefault("query"))
+                ? "calendar_list_events"
+                : "calendar_search_events";
+        }
+
+        return name;
+    }
+
+    private static bool IsKnownTextTool(string name)
+    {
+        return string.Equals(name, "calendar_list_events", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "calendar_search_events", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "calendar_get_availability", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "gmail_search_messages", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "gmail_get_message", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "gmail_create_draft", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "gmail_send_draft", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool ShouldReturnReadOnlyToolResult(
+        IReadOnlyList<AgentProviderToolCall> toolCalls,
+        IReadOnlyList<AgentProviderToolResult> toolResults)
+    {
+        return toolCalls.Count > 0
+            && toolCalls.All(x => IsReadOnlyPersonalContextTool(x.Name))
+            && toolResults.Count > 0
+            && toolResults.All(x => IsReadOnlyPersonalContextTool(x.Name));
+    }
+
+    private static bool IsReadOnlyPersonalContextTool(string name)
+    {
+        return string.Equals(name, "calendar_list_events", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "calendar_search_events", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "calendar_get_availability", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "gmail_search_messages", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "gmail_get_message", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string FormatReadOnlyToolAnswer(IReadOnlyList<AgentProviderToolResult> toolResults)
+    {
+        if (toolResults.Count == 1)
+        {
+            return toolResults[0].Content;
+        }
+
+        return string.Join(Environment.NewLine, toolResults.Select(x => x.Content));
     }
 
     private static IReadOnlyDictionary<string, string>? TryParseArguments(string json)

@@ -4,7 +4,10 @@ public interface IGoogleCalendarClient
 {
     Task<GoogleCalendarConnectionStatus> GetStatus(CancellationToken cancellationToken);
 
-    string GetAuthorizationUrl(string state);
+    Task<string> GetAuthorizationUrl(
+        string state,
+        string callbackUrl,
+        CancellationToken cancellationToken);
 
     Task Connect(string code, CancellationToken cancellationToken);
 

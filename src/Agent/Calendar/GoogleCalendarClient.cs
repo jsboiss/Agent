@@ -1,93 +1,43 @@
-using System.Net.Http.Headers;
 using System.Text.Json;
-using System.Text.Json.Serialization;
-using Microsoft.Extensions.Options;
+using Agent.Integrations.Composio;
 
 namespace Agent.Calendar;
 
-public sealed class GoogleCalendarClient(
-    HttpClient httpClient,
-    IOptions<GoogleCalendarOptions> options,
-    IGoogleCalendarAuthStore authStore) : IGoogleCalendarClient
+public sealed class GoogleCalendarClient(IComposioClient composioClient) : IGoogleCalendarClient
 {
-    private const string CalendarReadonlyScope = "https://www.googleapis.com/auth/calendar.readonly";
-
-    private GoogleCalendarOptions Options { get; } = options.Value;
-
-    private static JsonSerializerOptions JsonOptions { get; } = new(JsonSerializerDefaults.Web)
-    {
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-    };
-
     public async Task<GoogleCalendarConnectionStatus> GetStatus(CancellationToken cancellationToken)
     {
-        var token = await authStore.Get(cancellationToken);
+        var status = await composioClient.GetStatus(ComposioToolkits.GoogleCalendar, cancellationToken);
 
         return new GoogleCalendarConnectionStatus(
-            IsConfigured(),
-            token is not null,
-            token?.AccountEmail,
-            token?.UpdatedAt);
+            status.Configured,
+            status.Connected,
+            status.AccountEmail,
+            status.UpdatedAt);
     }
 
-    public string GetAuthorizationUrl(string state)
+    public async Task<string> GetAuthorizationUrl(
+        string state,
+        string callbackUrl,
+        CancellationToken cancellationToken)
     {
-        EnsureConfigured();
+        var separator = callbackUrl.Contains('?', StringComparison.Ordinal) ? "&" : "?";
+        var request = await composioClient.CreateConnectLink(
+            ComposioToolkits.GoogleCalendar,
+            $"{callbackUrl}{separator}state={Uri.EscapeDataString(state)}",
+            cancellationToken);
 
-        var values = new Dictionary<string, string?>
-        {
-            ["client_id"] = Options.ClientId,
-            ["redirect_uri"] = Options.RedirectUri,
-            ["response_type"] = "code",
-            ["scope"] = CalendarReadonlyScope,
-            ["access_type"] = "offline",
-            ["prompt"] = "consent",
-            ["state"] = state
-        };
-
-        return "https://accounts.google.com/o/oauth2/v2/auth?" + string.Join(
-            "&",
-            values.Select(x => $"{Uri.EscapeDataString(x.Key)}={Uri.EscapeDataString(x.Value ?? string.Empty)}"));
+        return request.RedirectUrl;
     }
 
     public async Task Connect(string code, CancellationToken cancellationToken)
     {
-        EnsureConfigured();
-
-        var response = await httpClient.PostAsync(
-            "https://oauth2.googleapis.com/token",
-            new FormUrlEncodedContent(new Dictionary<string, string>
-            {
-                ["client_id"] = Options.ClientId,
-                ["client_secret"] = Options.ClientSecret,
-                ["code"] = code,
-                ["grant_type"] = "authorization_code",
-                ["redirect_uri"] = Options.RedirectUri
-            }),
-            cancellationToken);
-        var body = await response.Content.ReadAsStringAsync(cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-        {
-            throw new InvalidOperationException($"Google OAuth token exchange failed: {(int)response.StatusCode} {body}");
-        }
-
-        var token = JsonSerializer.Deserialize<GoogleTokenResponse>(body, JsonOptions)
-            ?? throw new InvalidOperationException("Google OAuth token exchange returned no token body.");
-        var accountEmail = await GetAccountEmail(token.AccessToken, cancellationToken);
-        await authStore.Save(
-            new GoogleCalendarToken(
-                token.AccessToken,
-                token.RefreshToken,
-                DateTimeOffset.UtcNow.AddSeconds(Math.Max(60, token.ExpiresIn - 60)),
-                accountEmail,
-                DateTimeOffset.UtcNow),
-            cancellationToken);
+        await composioClient.CompleteConnect(ComposioToolkits.GoogleCalendar, code, cancellationToken);
     }
 
     public async Task Disconnect(CancellationToken cancellationToken)
     {
-        await authStore.Clear(cancellationToken);
+        await composioClient.Disconnect(ComposioToolkits.GoogleCalendar, cancellationToken);
     }
 
     public async Task<IReadOnlyList<GoogleCalendarEvent>> ListEvents(
@@ -96,40 +46,47 @@ public sealed class GoogleCalendarClient(
     {
         ValidateRange(query.Start, query.End);
 
-        var accessToken = await GetAccessToken(cancellationToken);
-        var parameters = new Dictionary<string, string?>
+        var arguments = new Dictionary<string, object?>
         {
-            ["timeMin"] = query.Start.ToUniversalTime().ToString("O"),
-            ["timeMax"] = query.End.ToUniversalTime().ToString("O"),
-            ["singleEvents"] = "true",
+            ["calendarId"] = query.CalendarId,
+            ["timeMin"] = ToComposioDateTime(query.Start),
+            ["timeMax"] = ToComposioDateTime(query.End),
+            ["singleEvents"] = true,
             ["orderBy"] = "startTime",
-            ["maxResults"] = Math.Clamp(query.Limit, 1, 50).ToString()
+            ["maxResults"] = Math.Clamp(query.Limit, 1, 50)
         };
 
         if (!string.IsNullOrWhiteSpace(query.Query))
         {
-            parameters["q"] = query.Query;
+            arguments["q"] = query.Query;
         }
 
-        using var request = new HttpRequestMessage(
-            HttpMethod.Get,
-            $"https://www.googleapis.com/calendar/v3/calendars/{Uri.EscapeDataString(query.CalendarId)}/events?{ToQueryString(parameters)}");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        var result = await composioClient.ExecuteTool(
+            ComposioToolkits.GoogleCalendar,
+            "GOOGLECALENDAR_EVENTS_LIST",
+            arguments,
+            cancellationToken);
 
-        using var response = await httpClient.SendAsync(request, cancellationToken);
-        var body = await response.Content.ReadAsStringAsync(cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
+        if (!result.Successful)
         {
-            throw new InvalidOperationException($"Google Calendar events request failed: {(int)response.StatusCode} {body}");
+            throw new InvalidOperationException(result.Content);
         }
 
-        var result = JsonSerializer.Deserialize<GoogleEventsResponse>(body, JsonOptions);
+        using var document = JsonDocument.Parse(result.Content);
+        var root = UnwrapData(document.RootElement);
 
-        return result?.Items?
-            .Where(x => x.Start is not null && x.End is not null)
+        var items = FindArray(root, "items");
+
+        if (items is null)
+        {
+            return [];
+        }
+
+        return items.Value
+            .EnumerateArray()
+            .Where(x => x.TryGetProperty("start", out _) && x.TryGetProperty("end", out _))
             .Select(x => ToEvent(query.CalendarId, x))
-            .ToArray() ?? [];
+            .ToArray();
     }
 
     public async Task<IReadOnlyList<CalendarAvailabilityWindow>> GetAvailability(
@@ -170,120 +127,105 @@ public sealed class GoogleCalendarClient(
         return windows;
     }
 
-    private async Task<string> GetAccessToken(CancellationToken cancellationToken)
+    private static GoogleCalendarEvent ToEvent(string calendarId, JsonElement item)
     {
-        var token = await authStore.Get(cancellationToken);
+        var start = GetDateTime(item.GetProperty("start"));
+        var end = GetDateTime(item.GetProperty("end"));
+        var attendees = item.TryGetProperty("attendees", out var attendeesElement) && attendeesElement.ValueKind == JsonValueKind.Array
+            ? attendeesElement
+                .EnumerateArray()
+                .Select(x => GetString(x, "email") ?? string.Empty)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToArray()
+            : [];
+        var meetingLink = GetString(item, "hangoutLink") ?? FindConferenceLink(item);
 
-        if (token is null)
-        {
-            throw new InvalidOperationException("Google Calendar is not connected. Connect it from Settings first.");
-        }
-
-        if (token.ExpiresAt > DateTimeOffset.UtcNow.AddMinutes(1))
-        {
-            return token.AccessToken;
-        }
-
-        if (string.IsNullOrWhiteSpace(token.RefreshToken))
-        {
-            throw new InvalidOperationException("Google Calendar access expired and no refresh token is stored. Reconnect calendar from Settings.");
-        }
-
-        EnsureConfigured();
-
-        var response = await httpClient.PostAsync(
-            "https://oauth2.googleapis.com/token",
-            new FormUrlEncodedContent(new Dictionary<string, string>
-            {
-                ["client_id"] = Options.ClientId,
-                ["client_secret"] = Options.ClientSecret,
-                ["refresh_token"] = token.RefreshToken,
-                ["grant_type"] = "refresh_token"
-            }),
-            cancellationToken);
-        var body = await response.Content.ReadAsStringAsync(cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-        {
-            throw new InvalidOperationException($"Google OAuth refresh failed: {(int)response.StatusCode} {body}");
-        }
-
-        var refreshed = JsonSerializer.Deserialize<GoogleTokenResponse>(body, JsonOptions)
-            ?? throw new InvalidOperationException("Google OAuth refresh returned no token body.");
-        var updated = token with
-        {
-            AccessToken = refreshed.AccessToken,
-            ExpiresAt = DateTimeOffset.UtcNow.AddSeconds(Math.Max(60, refreshed.ExpiresIn - 60)),
-            UpdatedAt = DateTimeOffset.UtcNow
-        };
-        await authStore.Save(updated, cancellationToken);
-
-        return updated.AccessToken;
+        return new GoogleCalendarEvent(
+            GetString(item, "id") ?? string.Empty,
+            calendarId,
+            string.IsNullOrWhiteSpace(GetString(item, "summary")) ? "(No title)" : GetString(item, "summary")!,
+            start,
+            end,
+            GetString(item.GetProperty("start"), "timeZone") ?? GetString(item.GetProperty("end"), "timeZone") ?? TimeZoneInfo.Local.Id,
+            GetString(item, "location"),
+            attendees,
+            meetingLink);
     }
 
-    private async Task<string?> GetAccountEmail(string accessToken, CancellationToken cancellationToken)
+    private static JsonElement UnwrapData(JsonElement root)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, "https://www.googleapis.com/oauth2/v2/userinfo");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        return root.ValueKind == JsonValueKind.Object
+            && root.TryGetProperty("data", out var data)
+            && data.ValueKind == JsonValueKind.Object
+                ? data
+                : root;
+    }
 
-        using var response = await httpClient.SendAsync(request, cancellationToken);
+    private static DateTimeOffset GetDateTime(JsonElement value)
+    {
+        var dateTime = GetString(value, "dateTime");
 
-        if (!response.IsSuccessStatusCode)
+        if (!string.IsNullOrWhiteSpace(dateTime))
+        {
+            return DateTimeOffset.Parse(dateTime);
+        }
+
+        var date = GetString(value, "date");
+
+        if (!string.IsNullOrWhiteSpace(date))
+        {
+            return DateTimeOffset.Parse(date);
+        }
+
+        throw new InvalidOperationException("Google Calendar event was missing start or end time.");
+    }
+
+    private static JsonElement? FindArray(JsonElement root, string propertyName)
+    {
+        if (root.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in root.EnumerateObject())
+            {
+                if (string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase)
+                    && property.Value.ValueKind == JsonValueKind.Array)
+                {
+                    return property.Value;
+                }
+
+                var nested = FindArray(property.Value, propertyName);
+
+                if (nested is not null)
+                {
+                    return nested;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static string? FindConferenceLink(JsonElement item)
+    {
+        if (!item.TryGetProperty("conferenceData", out var conferenceData)
+            || !conferenceData.TryGetProperty("entryPoints", out var entryPoints)
+            || entryPoints.ValueKind != JsonValueKind.Array)
         {
             return null;
         }
 
-        var body = await response.Content.ReadAsStringAsync(cancellationToken);
-        var user = JsonSerializer.Deserialize<GoogleUserInfoResponse>(body, JsonOptions);
-
-        return user?.Email;
+        return entryPoints
+            .EnumerateArray()
+            .Select(x => GetString(x, "uri"))
+            .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x));
     }
 
-    private bool IsConfigured()
+    private static string? GetString(JsonElement root, string name)
     {
-        return !string.IsNullOrWhiteSpace(Options.ClientId)
-            && !string.IsNullOrWhiteSpace(Options.ClientSecret)
-            && !string.IsNullOrWhiteSpace(Options.RedirectUri);
-    }
-
-    private void EnsureConfigured()
-    {
-        if (!IsConfigured())
-        {
-            throw new InvalidOperationException("Google Calendar OAuth is not configured. Set Integrations:GoogleCalendar:ClientId, ClientSecret, and RedirectUri.");
-        }
-    }
-
-    private static GoogleCalendarEvent ToEvent(string calendarId, GoogleEventItem item)
-    {
-        var start = GetDateTime(item.Start);
-        var end = GetDateTime(item.End);
-
-        return new GoogleCalendarEvent(
-            item.Id ?? string.Empty,
-            calendarId,
-            string.IsNullOrWhiteSpace(item.Summary) ? "(No title)" : item.Summary,
-            start,
-            end,
-            item.Start?.TimeZone ?? item.End?.TimeZone ?? TimeZoneInfo.Local.Id,
-            item.Location,
-            item.Attendees?.Select(x => x.Email ?? string.Empty).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray() ?? [],
-            item.HangoutLink ?? item.ConferenceData?.EntryPoints?.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x.Uri))?.Uri);
-    }
-
-    private static DateTimeOffset GetDateTime(GoogleEventDateTime? value)
-    {
-        if (!string.IsNullOrWhiteSpace(value?.DateTime))
-        {
-            return DateTimeOffset.Parse(value.DateTime);
-        }
-
-        if (!string.IsNullOrWhiteSpace(value?.Date))
-        {
-            return DateTimeOffset.Parse(value.Date);
-        }
-
-        throw new InvalidOperationException("Google Calendar event was missing start or end time.");
+        return root.ValueKind == JsonValueKind.Object
+            && root.TryGetProperty(name, out var property)
+            && property.ValueKind == JsonValueKind.String
+                ? property.GetString()
+                : null;
     }
 
     private static void ValidateRange(DateTimeOffset start, DateTimeOffset end)
@@ -294,13 +236,9 @@ public sealed class GoogleCalendarClient(
         }
     }
 
-    private static string ToQueryString(IReadOnlyDictionary<string, string?> values)
+    private static string ToComposioDateTime(DateTimeOffset value)
     {
-        return string.Join(
-            "&",
-            values
-                .Where(x => !string.IsNullOrWhiteSpace(x.Value))
-                .Select(x => $"{Uri.EscapeDataString(x.Key)}={Uri.EscapeDataString(x.Value ?? string.Empty)}"));
+        return value.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'");
     }
 
     private static DateTimeOffset Max(DateTimeOffset a, DateTimeOffset b)
@@ -312,34 +250,4 @@ public sealed class GoogleCalendarClient(
     {
         return a < b ? a : b;
     }
-
-    private sealed record GoogleTokenResponse(
-        [property: JsonPropertyName("access_token")] string AccessToken,
-        [property: JsonPropertyName("refresh_token")] string? RefreshToken,
-        [property: JsonPropertyName("expires_in")] int ExpiresIn);
-
-    private sealed record GoogleUserInfoResponse(string? Email);
-
-    private sealed record GoogleEventsResponse(IReadOnlyList<GoogleEventItem>? Items);
-
-    private sealed record GoogleEventItem(
-        string? Id,
-        string? Summary,
-        GoogleEventDateTime? Start,
-        GoogleEventDateTime? End,
-        string? Location,
-        IReadOnlyList<GoogleEventAttendee>? Attendees,
-        string? HangoutLink,
-        GoogleConferenceData? ConferenceData);
-
-    private sealed record GoogleEventDateTime(
-        string? Date,
-        string? DateTime,
-        string? TimeZone);
-
-    private sealed record GoogleEventAttendee(string? Email);
-
-    private sealed record GoogleConferenceData(IReadOnlyList<GoogleConferenceEntryPoint>? EntryPoints);
-
-    private sealed record GoogleConferenceEntryPoint(string? Uri);
 }

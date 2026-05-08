@@ -32,7 +32,24 @@ $env:Dashboard__Auth__Password="<your-password>"
 
 Provider and integration secrets should use the same pattern, for example
 `Providers:Gemini:ApiKey`, `Channels:Telegram:BotToken`, and
-`Integrations:GoogleCalendar:ClientSecret`.
+`Integrations:Composio:ApiKey`.
+
+## Composio Gmail and Calendar
+
+Gmail and Google Calendar use Composio connected accounts. Create Composio auth
+configs for Gmail and Google Calendar, then configure the local app:
+
+```powershell
+cd src/Agent
+dotnet user-secrets set "Integrations:Composio:ApiKey" "<composio-api-key>"
+dotnet user-secrets set "Integrations:Composio:UserId" "main-agent-owner"
+dotnet user-secrets set "Integrations:Composio:GmailAuthConfigId" "<gmail-auth-config-id>"
+dotnet user-secrets set "Integrations:Composio:GoogleCalendarAuthConfigId" "<calendar-auth-config-id>"
+```
+
+After configuration, open Settings in the dashboard and connect Gmail and
+Calendar. The app stores Composio connected account ids locally; it no longer
+stores Google OAuth access or refresh tokens for new Calendar connections.
 
 ## Local Wi-Fi Access
 

@@ -113,23 +113,24 @@ public static class DashboardEndpoints
             .WithName("GetCalendarStatus");
         group.MapGet(
             "/calendar/connect",
-            (ICalendarDashboardService service, HttpContext context) =>
-                Results.Redirect(service.GetConnectUrl(context)))
+            async (ICalendarDashboardService service, HttpContext context, CancellationToken cancellationToken) =>
+                Results.Redirect(await service.GetConnectUrl(context, cancellationToken)))
             .WithName("ConnectCalendar");
         group.MapGet(
             "/calendar/oauth-callback",
-            async (string? code, string? state, ICalendarDashboardService service, HttpContext context, CancellationToken cancellationToken) =>
+            async (string? connected_account_id, string? code, string? state, ICalendarDashboardService service, HttpContext context, CancellationToken cancellationToken) =>
             {
                 var expectedState = context.Session.GetString("google-calendar-oauth-state");
+                var connectedAccountId = connected_account_id ?? code;
 
-                if (string.IsNullOrWhiteSpace(code)
+                if (string.IsNullOrWhiteSpace(connectedAccountId)
                     || string.IsNullOrWhiteSpace(state)
                     || !string.Equals(expectedState, state, StringComparison.Ordinal))
                 {
-                    return Results.BadRequest("Invalid Google Calendar OAuth callback.");
+                    return Results.BadRequest("Invalid Google Calendar Composio callback.");
                 }
 
-                await service.CompleteConnect(code, cancellationToken);
+                await service.CompleteConnect(connectedAccountId, cancellationToken);
                 context.Session.Remove("google-calendar-oauth-state");
 
                 return Results.Redirect("/settings");
@@ -144,6 +145,45 @@ public static class DashboardEndpoints
                 return Results.NoContent();
             })
             .WithName("DisconnectCalendar");
+        group.MapGet(
+            "/email/status",
+            async (IEmailDashboardService service, CancellationToken cancellationToken) =>
+                await service.GetStatus(cancellationToken))
+            .WithName("GetEmailStatus");
+        group.MapGet(
+            "/email/connect",
+            async (IEmailDashboardService service, HttpContext context, CancellationToken cancellationToken) =>
+                Results.Redirect(await service.GetConnectUrl(context, cancellationToken)))
+            .WithName("ConnectEmail");
+        group.MapGet(
+            "/email/oauth-callback",
+            async (string? connected_account_id, string? code, string? state, IEmailDashboardService service, HttpContext context, CancellationToken cancellationToken) =>
+            {
+                var expectedState = context.Session.GetString("gmail-oauth-state");
+                var connectedAccountId = connected_account_id ?? code;
+
+                if (string.IsNullOrWhiteSpace(connectedAccountId)
+                    || string.IsNullOrWhiteSpace(state)
+                    || !string.Equals(expectedState, state, StringComparison.Ordinal))
+                {
+                    return Results.BadRequest("Invalid Gmail Composio callback.");
+                }
+
+                await service.CompleteConnect(connectedAccountId, cancellationToken);
+                context.Session.Remove("gmail-oauth-state");
+
+                return Results.Redirect("/settings");
+            })
+            .WithName("CompleteEmailOAuth");
+        group.MapPost(
+            "/email/disconnect",
+            async (IEmailDashboardService service, CancellationToken cancellationToken) =>
+            {
+                await service.Disconnect(cancellationToken);
+
+                return Results.NoContent();
+            })
+            .WithName("DisconnectEmail");
         group.MapPost(
             "/settings/workspace-permissions",
             async (WorkspacePermissionUpdateDto request, ISettingsDashboardService service, CancellationToken cancellationToken) =>

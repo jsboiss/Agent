@@ -18,5 +18,5 @@ public sealed class ContextPlannerOptions
 
     public bool FallbackOnTransientFailure { get; init; } = true;
 
-    public IReadOnlyList<string> EnabledProviders { get; init; } = ["Memory", "Calendar"];
+    public IReadOnlyList<string> EnabledProviders { get; init; } = ["Memory", "Calendar", "Email"];
 }

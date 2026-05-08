@@ -13,6 +13,7 @@ type WorkspaceSettings = {
 type SettingsSnapshotWithWorkspace = {
   workspace?: WorkspaceSettings;
   calendar?: CalendarSettings;
+  email?: CalendarSettings;
 };
 
 type CalendarSettings = {
@@ -27,6 +28,7 @@ export function SettingsPage() {
   const snapshot = settingsQuery.data?.data;
   const workspace = (snapshot as (typeof snapshot & SettingsSnapshotWithWorkspace) | undefined)?.workspace;
   const calendar = (snapshot as (typeof snapshot & SettingsSnapshotWithWorkspace) | undefined)?.calendar;
+  const email = (snapshot as (typeof snapshot & SettingsSnapshotWithWorkspace) | undefined)?.email;
   const values = snapshot?.values ?? {};
   const appliedLayers = snapshot?.appliedLayers ?? [];
   const [isCompacting, setIsCompacting] = useState(false);
@@ -38,6 +40,8 @@ export function SettingsPage() {
   const [workspaceRootPath, setWorkspaceRootPath] = useState("");
   const [calendarError, setCalendarError] = useState<string | null>(null);
   const [isUpdatingCalendar, setIsUpdatingCalendar] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
 
   async function compactMain() {
     setIsCompacting(true);
@@ -173,6 +177,25 @@ export function SettingsPage() {
     }
   }
 
+  async function disconnectEmail() {
+    setIsUpdatingEmail(true);
+    setEmailError(null);
+
+    try {
+      const response = await fetch("/api/dashboard/email/disconnect", { method: "POST" });
+
+      if (!response.ok) {
+        throw new Error(`Gmail disconnect failed: ${response.status}`);
+      }
+
+      await settingsQuery.refetch();
+    } catch (error) {
+      setEmailError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsUpdatingEmail(false);
+    }
+  }
+
   return (
     <PageFrame
       eyebrow="Read-only configuration"
@@ -191,8 +214,9 @@ export function SettingsPage() {
       {compactionError && <ErrorState error={new Error(compactionError)} />}
       {workspaceError && <ErrorState error={new Error(workspaceError)} />}
       {calendarError && <ErrorState error={new Error(calendarError)} />}
+      {emailError && <ErrorState error={new Error(emailError)} />}
       {snapshot && (
-        <div className="settings-grid">
+        <div className="settings-grid settings-grid-compact">
           {workspace && (
             <Panel title="Workspace">
               <dl className="settings-list">
@@ -252,40 +276,29 @@ export function SettingsPage() {
               ["SQLite", snapshot.memoryConnectionString]
             ]}
           />
-          {calendar && (
-            <Panel title="Google Calendar">
+          {(calendar || email) && (
+            <Panel title="Google Integrations">
               <dl className="settings-list">
-                <div className="settings-row">
-                  <dt>Status</dt>
-                  <dd>
-                    <code>{calendar.connected ? "connected" : calendar.configured ? "not connected" : "not configured"}</code>
-                    {calendar.connected ? (
-                      <button className="secondary-action" disabled={isUpdatingCalendar} onClick={() => void disconnectCalendar()} type="button">
-                        <ShieldOff size={14} />
-                        Disconnect
-                      </button>
-                    ) : !calendar.configured ? (
-                      <button className="secondary-action" disabled type="button">
-                        <CalendarDays size={14} />
-                        Connect
-                      </button>
-                    ) : (
-                      <a className="secondary-action" href="/api/dashboard/calendar/connect">
-                        <CalendarDays size={14} />
-                        Connect
-                      </a>
-                    )}
-                  </dd>
-                </div>
-                <div className="settings-row">
-                  <dt>Account</dt>
-                  <dd>
-                    <code>{calendar.accountEmail ?? "unset"}</code>
-                    <IconButton onClick={() => navigator.clipboard.writeText(calendar.accountEmail ?? "")} title="Copy calendar account" type="button">
-                      <Copy size={13} />
-                    </IconButton>
-                  </dd>
-                </div>
+                {calendar && (
+                  <IntegrationRow
+                    accountTitle="Copy calendar account"
+                    connectHref="/api/dashboard/calendar/connect"
+                    integration={calendar}
+                    isUpdating={isUpdatingCalendar}
+                    label="Calendar"
+                    onDisconnect={() => void disconnectCalendar()}
+                  />
+                )}
+                {email && (
+                  <IntegrationRow
+                    accountTitle="Copy Gmail account"
+                    connectHref="/api/dashboard/email/connect"
+                    integration={email}
+                    isUpdating={isUpdatingEmail}
+                    label="Gmail"
+                    onDisconnect={() => void disconnectEmail()}
+                  />
+                )}
               </dl>
             </Panel>
           )}
@@ -322,6 +335,58 @@ export function SettingsPage() {
         </div>
       )}
     </PageFrame>
+  );
+}
+
+function IntegrationRow({
+  accountTitle,
+  connectHref,
+  integration,
+  isUpdating,
+  label,
+  onDisconnect
+}: {
+  accountTitle: string;
+  connectHref: string;
+  integration: CalendarSettings;
+  isUpdating: boolean;
+  label: string;
+  onDisconnect: () => void;
+}) {
+  return (
+    <>
+      <div className="settings-row">
+        <dt>{label}</dt>
+        <dd>
+          <code>{integration.connected ? "connected" : integration.configured ? "not connected" : "not configured"}</code>
+          {integration.connected ? (
+            <button className="secondary-action" disabled={isUpdating} onClick={onDisconnect} type="button">
+              <ShieldOff size={14} />
+              Disconnect
+            </button>
+          ) : !integration.configured ? (
+            <button className="secondary-action" disabled type="button">
+              <CalendarDays size={14} />
+              Connect
+            </button>
+          ) : (
+            <a className="secondary-action" href={connectHref}>
+              <CalendarDays size={14} />
+              Connect
+            </a>
+          )}
+        </dd>
+      </div>
+      <div className="settings-row">
+        <dt>{label} account</dt>
+        <dd>
+          <code>{integration.accountEmail ?? "unset"}</code>
+          <IconButton onClick={() => navigator.clipboard.writeText(integration.accountEmail ?? "")} title={accountTitle} type="button">
+            <Copy size={13} />
+          </IconButton>
+        </dd>
+      </div>
+    </>
   );
 }
 
