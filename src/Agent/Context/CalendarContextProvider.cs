@@ -34,7 +34,7 @@ public sealed class CalendarContextProvider(ICalendarProvider calendarProvider) 
                 new GoogleCalendarEventQuery(
                     request.Plan.Start.Value,
                     request.Plan.End.Value,
-                    request.Plan.Query,
+                    null,
                     "primary",
                     20),
                 cancellationToken);

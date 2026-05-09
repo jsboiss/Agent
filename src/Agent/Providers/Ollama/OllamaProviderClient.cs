@@ -89,7 +89,7 @@ public sealed class OllamaProviderClient(HttpClient httpClient, IOptions<OllamaP
         if (request.ToolResults.Count > 0)
         {
             prompt.AppendLine();
-            prompt.AppendLine("Use the tool results to produce a concise final answer for the user. Do not call the same tool again unless the user provides new information that requires it.");
+            prompt.AppendLine("Use the tool results as evidence to answer the user's actual question. Do not dump raw tool rows unless the user explicitly asked for raw output. For Gmail/calendar results, summarize the relevant facts, mention uncertainty when the evidence is only a snippet, and include only useful sender/date/subject/time details. Do not call the same tool again unless the user provides new information that requires it.");
         }
 
         return prompt.ToString();

@@ -350,6 +350,18 @@ public sealed class AgentToolExecutor(
                 new Dictionary<string, string>());
         }
 
+        if (IsSimplePersonalContextLookup(task))
+        {
+            return new AgentToolResult(
+                request.Name,
+                false,
+                "Do not spawn a sub-agent for simple read-only Gmail, email, calendar, schedule, event, availability, receipt, invoice, booking, confirmation, or ticket lookups. Use the direct Gmail/calendar tools or prefetched evidence, then answer the user in this same turn.",
+                new Dictionary<string, string>
+                {
+                    ["blockedDelegation"] = "personal-context-read"
+                });
+        }
+
         var result = await subAgentCoordinator.CreateAndReport(
             new SubAgentRunRequest(
                 request.ConversationId,
@@ -373,6 +385,54 @@ public sealed class AgentToolExecutor(
                 ["codexThreadId"] = result.CodexThreadId ?? string.Empty,
                 ["status"] = result.Status
             });
+    }
+
+    private static bool IsSimplePersonalContextLookup(string task)
+    {
+        if (ContainsAny(
+            task,
+            "code",
+            "file",
+            "build",
+            "test",
+            "fix",
+            "implement",
+            "refactor",
+            "debug",
+            "shell",
+            "command",
+            "run ",
+            "launch",
+            "open ",
+            "start ",
+            "automation",
+            "scheduled task"))
+        {
+            return false;
+        }
+
+        return ContainsAny(
+            task,
+            "gmail",
+            "email",
+            "inbox",
+            "mail",
+            "calendar",
+            "schedule",
+            "agenda",
+            "event",
+            "availability",
+            "available",
+            "receipt",
+            "invoice",
+            "booking",
+            "confirmation",
+            "ticket");
+    }
+
+    private static bool ContainsAny(string value, params string[] needles)
+    {
+        return needles.Any(x => value.Contains(x, StringComparison.OrdinalIgnoreCase));
     }
 
     private async Task<AgentToolResult> SendAck(

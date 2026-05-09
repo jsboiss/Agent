@@ -68,6 +68,19 @@ public sealed class GeminiProviderClient(HttpClient httpClient, IOptions<GeminiP
         prompt.AppendLine("User message:");
         prompt.AppendLine(request.UserMessage);
 
+        if (request.ToolResults.Count > 0)
+        {
+            prompt.AppendLine();
+            prompt.AppendLine("Tool results:");
+            foreach (var toolResult in request.ToolResults)
+            {
+                prompt.AppendLine($"- {toolResult.Name} ({toolResult.ToolCallId}): {toolResult.Content}");
+            }
+
+            prompt.AppendLine();
+            prompt.AppendLine("Use the tool results as evidence to answer the user's actual question. Do not dump raw tool rows unless the user explicitly asked for raw output. For Gmail/calendar results, summarize the relevant facts, mention uncertainty when the evidence is only a snippet, and include only useful sender/date/subject/time details.");
+        }
+
         return prompt.ToString();
     }
 

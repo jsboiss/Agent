@@ -51,7 +51,7 @@ public sealed class AgentProviderToolLoop(
             if (effectiveToolCalls.Count == 0 && delegationToolCall is not null)
             {
                 await SendDelegationAck(channel, notificationTarget, cancellationToken);
-                await ExecuteToolCalls(
+                var delegationResults = await ExecuteToolCalls(
                     [delegationToolCall],
                     providerRequest.ConversationId,
                     channel,
@@ -59,6 +59,19 @@ public sealed class AgentProviderToolLoop(
                     notificationTarget,
                     executedToolKeys,
                     cancellationToken);
+
+                if (delegationResults.Any(IsBlockedPersonalContextDelegation))
+                {
+                    priorToolCalls.Add(delegationToolCall);
+                    providerToolResults.AddRange(delegationResults);
+                    providerRequest = providerRequest with
+                    {
+                        PriorToolCalls = priorToolCalls.ToArray(),
+                        ToolResults = providerToolResults.ToArray()
+                    };
+                    continue;
+                }
+
                 var assistantMessage = StripDelegationDirective(providerResult.AssistantMessage);
 
                 return providerResult with
@@ -87,14 +100,6 @@ public sealed class AgentProviderToolLoop(
 
             priorToolCalls.AddRange(effectiveToolCalls);
             providerToolResults.AddRange(toolResults);
-
-            if (ShouldReturnReadOnlyToolResult(effectiveToolCalls, providerToolResults))
-            {
-                return providerResult with
-                {
-                    AssistantMessage = FormatReadOnlyToolAnswer(providerToolResults)
-                };
-            }
 
             providerRequest = providerRequest with
             {
@@ -605,35 +610,6 @@ public sealed class AgentProviderToolLoop(
             || string.Equals(name, "gmail_send_draft", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool ShouldReturnReadOnlyToolResult(
-        IReadOnlyList<AgentProviderToolCall> toolCalls,
-        IReadOnlyList<AgentProviderToolResult> toolResults)
-    {
-        return toolCalls.Count > 0
-            && toolCalls.All(x => IsReadOnlyPersonalContextTool(x.Name))
-            && toolResults.Count > 0
-            && toolResults.All(x => IsReadOnlyPersonalContextTool(x.Name));
-    }
-
-    private static bool IsReadOnlyPersonalContextTool(string name)
-    {
-        return string.Equals(name, "calendar_list_events", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(name, "calendar_search_events", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(name, "calendar_get_availability", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(name, "gmail_search_messages", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(name, "gmail_get_message", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string FormatReadOnlyToolAnswer(IReadOnlyList<AgentProviderToolResult> toolResults)
-    {
-        if (toolResults.Count == 1)
-        {
-            return toolResults[0].Content;
-        }
-
-        return string.Join(Environment.NewLine, toolResults.Select(x => x.Content));
-    }
-
     private static IReadOnlyDictionary<string, string>? TryParseArguments(string json)
     {
         try
@@ -745,6 +721,12 @@ public sealed class AgentProviderToolLoop(
     {
         return string.Equals(channel, "telegram", StringComparison.OrdinalIgnoreCase)
             || string.Equals(channel, "imessage", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsBlockedPersonalContextDelegation(AgentProviderToolResult result)
+    {
+        return string.Equals(result.Name, "spawn_agent", StringComparison.OrdinalIgnoreCase)
+            && result.Content.Contains("Do not spawn a sub-agent for simple read-only", StringComparison.OrdinalIgnoreCase);
     }
 
     private static AgentEvent GetProviderRequestStartedEvent(

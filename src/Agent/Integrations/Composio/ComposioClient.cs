@@ -128,7 +128,7 @@ public sealed class ComposioClient(
 
         return new ComposioToolExecutionResult(
             successful,
-            body,
+            successful ? body : GetToolError(body, $"Composio tool {toolSlug} failed."),
             new Dictionary<string, string> { ["tool"] = toolSlug, ["connectedAccountId"] = connection.ConnectedAccountId });
     }
 
@@ -242,6 +242,23 @@ public sealed class ComposioClient(
         catch (JsonException)
         {
             return true;
+        }
+    }
+
+    private static string GetToolError(string body, string fallback)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            var root = document.RootElement;
+            var error = GetString(root, "error", "message")
+                ?? (root.TryGetProperty("data", out var data) ? GetString(data, "error", "message") : null);
+
+            return string.IsNullOrWhiteSpace(error) ? fallback : error;
+        }
+        catch (JsonException)
+        {
+            return string.IsNullOrWhiteSpace(body) ? fallback : body;
         }
     }
 

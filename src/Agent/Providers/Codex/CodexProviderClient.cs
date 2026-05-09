@@ -391,9 +391,24 @@ public sealed class CodexProviderClient(IOptions<CodexProviderOptions> options) 
             sections.Add("Recent mirrored transcript:" + Environment.NewLine + request.RecentMirroredContext);
         }
 
+        if (request.ToolResults.Count > 0)
+        {
+            sections.Add("""
+                Tool results:
+                Use these results as evidence to answer the user's actual question. Do not dump raw tool rows unless the user explicitly asked for raw output. For Gmail/calendar results, summarize the relevant facts, mention uncertainty when the evidence is only a snippet, and include only useful sender/date/subject/time details.
+                """ + Environment.NewLine + FormatToolResults(request.ToolResults));
+        }
+
         sections.Add("User request:" + Environment.NewLine + request.UserMessage);
 
         return string.Join(Environment.NewLine + Environment.NewLine, sections);
+    }
+
+    private static string FormatToolResults(IReadOnlyList<AgentProviderToolResult> toolResults)
+    {
+        return string.Join(
+            Environment.NewLine,
+            toolResults.Select(x => $"- {x.Name} ({x.ToolCallId}): {x.Content}"));
     }
 
     private static AgentProviderResult GetProviderResult(JsonObject response, string? fallbackThreadId)
