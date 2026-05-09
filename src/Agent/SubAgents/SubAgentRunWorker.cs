@@ -357,7 +357,11 @@ public sealed class SubAgentRunWorker(
 
         if (item.Capabilities.HasFlag(SubAgentCapabilities.EmailRead))
         {
-            sections.Add("EmailRead is reserved for future provider tools. No email tools are available in this run yet.");
+            sections.Add("""
+                Email policy: EmailRead allows direct Gmail metadata, snippet, and message lookups.
+                Gmail read access is read-only. Do not create drafts, send messages, delete messages, or modify labels unless the run also has the matching write capability and the user explicitly authorized that action.
+                Valid Gmail read tools are gmail_search_messages and gmail_get_message. Use targeted Gmail search queries instead of broad inbox scans.
+                """);
         }
 
         if (item.Capabilities.HasFlag(SubAgentCapabilities.EmailDraft)

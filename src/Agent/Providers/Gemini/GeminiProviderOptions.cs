@@ -6,7 +6,7 @@ public sealed class GeminiProviderOptions
 
     public Uri BaseUri { get; init; } = new("https://generativelanguage.googleapis.com/v1beta/");
 
-    public string Model { get; init; } = "gemini-2.5-flash-lite";
+    public string Model { get; init; } = "gemini-3.1-flash-lite";
 
     public string? ApiKey { get; init; }
 }

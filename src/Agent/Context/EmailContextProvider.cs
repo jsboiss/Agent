@@ -1,8 +1,9 @@
 using Agent.Email;
+using System.Text.RegularExpressions;
 
 namespace Agent.Context;
 
-public sealed class EmailContextProvider(IEmailProvider emailProvider) : IContextProvider
+public sealed partial class EmailContextProvider(IEmailProvider emailProvider) : IContextProvider
 {
     public string Id => "email";
 
@@ -25,8 +26,9 @@ public sealed class EmailContextProvider(IEmailProvider emailProvider) : IContex
     {
         try
         {
+            var query = BuildGmailSearchQuery(request.Plan.Query ?? request.UserMessage);
             var messages = await emailProvider.SearchMessages(
-                new GmailMessageQuery(request.Plan.Query ?? request.UserMessage, 5),
+                new GmailMessageQuery(query, 5),
                 cancellationToken);
             var items = messages
                 .Select(x => new EvidenceItem(
@@ -41,7 +43,8 @@ public sealed class EmailContextProvider(IEmailProvider emailProvider) : IContex
                         ["id"] = x.Id,
                         ["threadId"] = x.ThreadId,
                         ["from"] = x.From,
-                        ["to"] = x.To
+                        ["to"] = x.To,
+                        ["query"] = query
                     }))
                 .ToArray();
 
@@ -52,7 +55,7 @@ public sealed class EmailContextProvider(IEmailProvider emailProvider) : IContex
                     new EvidenceItem(
                         Id,
                         "gmail-search",
-                        $"No Gmail messages found for query: {request.Plan.Query ?? request.UserMessage}.",
+                        $"No Gmail messages found for query: {query}.",
                         null,
                         null,
                         0.7,
@@ -68,6 +71,46 @@ public sealed class EmailContextProvider(IEmailProvider emailProvider) : IContex
         }
     }
 
+    public static string BuildGmailSearchQuery(string value)
+    {
+        var message = NormalizeQueryText(value);
+
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return value;
+        }
+
+        var emailAddress = EmailAddressWords().Match(message);
+
+        if (emailAddress.Success)
+        {
+            return $"from:{emailAddress.Value} {GetTopic(message, emailAddress.Value)}".Trim();
+        }
+
+        var fromAbout = FromAboutWords().Match(message);
+
+        if (fromAbout.Success)
+        {
+            return $"from:{CleanTerm(fromAbout.Groups["sender"].Value)} {CleanTerm(fromAbout.Groups["topic"].Value)}".Trim();
+        }
+
+        var personEmailedAbout = PersonEmailedAboutWords().Match(message);
+
+        if (personEmailedAbout.Success)
+        {
+            return $"from:{CleanTerm(personEmailedAbout.Groups["sender"].Value)} {CleanTerm(personEmailedAbout.Groups["topic"].Value)}".Trim();
+        }
+
+        var documentFrom = DocumentFromWords().Match(message);
+
+        if (documentFrom.Success)
+        {
+            return $"from:{CleanTerm(documentFrom.Groups["sender"].Value)} {CleanTerm(documentFrom.Groups["kind"].Value)}".Trim();
+        }
+
+        return CleanTerm(message);
+    }
+
     private static string FormatMessage(GmailMessageSummary message)
     {
         var date = message.Date is null ? string.Empty : $" Date: {message.Date:O}.";
@@ -77,4 +120,53 @@ public sealed class EmailContextProvider(IEmailProvider emailProvider) : IContex
 
         return $"Subject: {message.Subject}.{date}{from}{to} Message id: {message.Id}. Thread id: {message.ThreadId}.{snippet}";
     }
+
+    private static string GetTopic(string message, string matchedAddress)
+    {
+        var withoutAddress = message.Replace(matchedAddress, string.Empty, StringComparison.OrdinalIgnoreCase);
+        var about = AboutWords().Match(withoutAddress);
+
+        return about.Success
+            ? CleanTerm(about.Groups["topic"].Value)
+            : CleanTerm(withoutAddress);
+    }
+
+    private static string NormalizeQueryText(string value)
+    {
+        return WhitespaceWords().Replace(value
+            .Replace("?", " ", StringComparison.Ordinal)
+            .Replace(",", " ", StringComparison.Ordinal)
+            .Replace("'", string.Empty, StringComparison.Ordinal), " ")
+            .Trim();
+    }
+
+    private static string CleanTerm(string value)
+    {
+        var cleaned = FillerWords()
+            .Replace(value, " ")
+            .Trim();
+
+        return WhitespaceWords().Replace(cleaned, " ");
+    }
+
+    [GeneratedRegex(@"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", RegexOptions.IgnoreCase)]
+    private static partial Regex EmailAddressWords();
+
+    [GeneratedRegex(@"\bfrom\s+(?<sender>[A-Z0-9._%+-][A-Z0-9._%+\-\s]{1,80}?)\s+about\s+(?<topic>.+)\b", RegexOptions.IgnoreCase)]
+    private static partial Regex FromAboutWords();
+
+    [GeneratedRegex(@"\b(?:(what|when)\s+did\s+|did\s+|has\s+|have\s+)?(?<sender>[A-Z][A-Z0-9._%+\-\s]{1,80}?)\s+(email|emailed|sent|messaged)\s+(me\s+)?about\s+(?<topic>.+)\b", RegexOptions.IgnoreCase)]
+    private static partial Regex PersonEmailedAboutWords();
+
+    [GeneratedRegex(@"\b(?<kind>receipt|invoice|booking|confirmation|confirmations|attachment|newsletter)\s+from\s+(?<sender>[A-Z0-9._%+-][A-Z0-9._%+\-\s]{1,80})\b", RegexOptions.IgnoreCase)]
+    private static partial Regex DocumentFromWords();
+
+    [GeneratedRegex(@"\babout\s+(?<topic>.+)\b", RegexOptions.IgnoreCase)]
+    private static partial Regex AboutWords();
+
+    [GeneratedRegex(@"\b(did|do|does|can|could|check|my|the|an|a|email|emails|gmail|inbox|message|messages|mail|me|i|get|got|have|has|received|sent|was|were|any|anything|if|whether|please)\b", RegexOptions.IgnoreCase)]
+    private static partial Regex FillerWords();
+
+    [GeneratedRegex(@"\s+")]
+    private static partial Regex WhitespaceWords();
 }

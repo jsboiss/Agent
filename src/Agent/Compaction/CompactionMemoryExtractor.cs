@@ -182,8 +182,7 @@ public sealed class CompactionMemoryExtractor(
         try
         {
             var provider = providerSelector.Get(providerType);
-            var result = await provider.Send(
-                new AgentProviderRequest(
+            var providerRequest = new AgentProviderRequest(
                     providerType,
                     conversation.Id,
                     GetExtractionPrompt(conversation, entries),
@@ -192,7 +191,20 @@ public sealed class CompactionMemoryExtractor(
                     [],
                     [],
                     [],
-                    []),
+                    []);
+            var result = await provider.Send(providerRequest, cancellationToken);
+            await eventSink.Publish(
+                ProviderUsageEventFactory.Create(
+                    string.IsNullOrWhiteSpace(result.Error)
+                        ? AgentEventKind.ProviderTurnCompleted
+                        : AgentEventKind.ProviderError,
+                    conversation.Id,
+                    providerType,
+                    result,
+                    new Dictionary<string, string>
+                    {
+                        ["usageScope"] = "compaction-memory-extraction"
+                    }),
                 cancellationToken);
 
             if (!string.IsNullOrWhiteSpace(result.Error) || string.IsNullOrWhiteSpace(result.AssistantMessage))

@@ -1,12 +1,15 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Agent.Events;
 using Agent.Providers;
 using Agent.Resources;
 using Agent.Tools;
 
 namespace Agent.Memory;
 
-public sealed class LlmMemoryExtractor(IAgentProviderSelector providerSelector) : IMemoryExtractor
+public sealed class LlmMemoryExtractor(
+    IAgentProviderSelector providerSelector,
+    IAgentEventSink eventSink) : IMemoryExtractor
 {
     private static JsonSerializerOptions JsonOptions { get; } = new(JsonSerializerDefaults.Web)
     {
@@ -30,6 +33,20 @@ public sealed class LlmMemoryExtractor(IAgentProviderSelector providerSelector) 
             [],
             []);
         var result = await provider.Send(providerRequest, cancellationToken);
+        await eventSink.Publish(
+            ProviderUsageEventFactory.Create(
+                string.IsNullOrWhiteSpace(result.Error)
+                    ? AgentEventKind.ProviderTurnCompleted
+                    : AgentEventKind.ProviderError,
+                request.ConversationId,
+                providerType,
+                result,
+                new Dictionary<string, string>
+                {
+                    ["usageScope"] = "memory-extraction",
+                    ["ConversationEntryId"] = request.UserEntry.Id
+                }),
+            cancellationToken);
 
         var model = result.UsageMetadata.GetValueOrDefault("model") ?? string.Empty;
 

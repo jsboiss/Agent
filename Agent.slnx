@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="src/Agent/Agent.csproj" />
+  <Project Path="tests/Agent.Tests/Agent.Tests.csproj" />
   <Folder Name="/tools/ClaudeCode/">
     <File Path="tools/ClaudeCode/package.json" />
     <File Path="tools/ClaudeCode/package-lock.json" />

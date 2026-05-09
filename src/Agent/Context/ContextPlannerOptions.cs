@@ -8,7 +8,7 @@ public sealed class ContextPlannerOptions
 
     public AgentProviderType Provider { get; init; } = AgentProviderType.Gemini;
 
-    public string Model { get; init; } = "gemini-2.5-flash-lite";
+    public string Model { get; init; } = "gemini-3.1-flash-lite";
 
     public int TimeoutMs { get; init; } = 1500;
 

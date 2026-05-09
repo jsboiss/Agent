@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Agent.Events;
 using Agent.Providers;
 using Agent.Resources;
 using Microsoft.Extensions.Options;
@@ -8,6 +9,7 @@ namespace Agent.Context;
 public sealed class GeminiContextPlanner(
     IAgentProviderSelector providerSelector,
     RuleBasedContextPlanner ruleBasedPlanner,
+    IAgentEventSink eventSink,
     IOptions<ContextPlannerOptions> options) : IContextPlanner
 {
     private ContextPlannerOptions Options { get; } = options.Value;
@@ -36,6 +38,7 @@ public sealed class GeminiContextPlanner(
                 [],
                 []);
             var result = await provider.Send(providerRequest, timeout.Token);
+            await PublishProviderUsage(providerRequest, result, "context-planner", timeout.Token);
 
             if (IsRateLimitOrTransient(result.Error))
             {
@@ -77,6 +80,7 @@ public sealed class GeminiContextPlanner(
                 [],
                 []);
             var result = await provider.Send(providerRequest, cancellationToken);
+            await PublishProviderUsage(providerRequest, result, "context-planner-fallback", cancellationToken);
 
             return string.IsNullOrWhiteSpace(result.Error)
                 ? Normalize(Parse(result.AssistantMessage), request)
@@ -97,7 +101,7 @@ public sealed class GeminiContextPlanner(
             [],
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["model"] = request.Settings.Get("contextPlanner.model") ?? "gemini-2.5-flash-lite"
+                ["model"] = request.Settings.Get("contextPlanner.model") ?? "gemini-3.1-flash-lite"
             },
             []);
 
@@ -112,6 +116,27 @@ public sealed class GeminiContextPlanner(
             string.Empty,
             string.Empty,
             string.Empty);
+    }
+
+    private async Task PublishProviderUsage(
+        AgentProviderRequest request,
+        AgentProviderResult result,
+        string usageScope,
+        CancellationToken cancellationToken)
+    {
+        await eventSink.Publish(
+            ProviderUsageEventFactory.Create(
+                string.IsNullOrWhiteSpace(result.Error)
+                    ? AgentEventKind.ProviderTurnCompleted
+                    : AgentEventKind.ProviderError,
+                request.ConversationId,
+                request.Kind,
+                result,
+                new Dictionary<string, string>
+                {
+                    ["usageScope"] = usageScope
+                }),
+            cancellationToken);
     }
 
     private static string GetPlannerPrompt()
