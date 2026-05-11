@@ -20,4 +20,6 @@ public sealed record CodexProviderOptions : AgentProviderOptions
     public int TimeoutSeconds { get; init; } = 600;
 
     public string Model { get; init; } = "gpt-5.5";
+
+    public string ReasoningEffort { get; init; } = "low";
 }

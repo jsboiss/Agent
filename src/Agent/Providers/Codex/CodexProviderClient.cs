@@ -228,6 +228,12 @@ public sealed class CodexProviderClient(IOptions<CodexProviderOptions> options) 
 
         startInfo.ArgumentList.Add("mcp-server");
 
+        if (!string.IsNullOrWhiteSpace(Options.ReasoningEffort))
+        {
+            startInfo.ArgumentList.Add("-c");
+            startInfo.ArgumentList.Add($"model_reasoning_effort=\"{Options.ReasoningEffort}\"");
+        }
+
         foreach (var variable in Options.BlockedEnvironmentVariables)
         {
             startInfo.Environment.Remove(variable);
