@@ -161,6 +161,88 @@ public sealed record RunEventRow(
     IReadOnlyDictionary<string, string> Metadata,
     bool IsError);
 
+public sealed record TraceListSnapshot(
+    string ConversationId,
+    IReadOnlyList<TraceTurnRow> Turns);
+
+public sealed record TraceTurnRow(
+    string Id,
+    string ConversationId,
+    string Title,
+    string Status,
+    DateTimeOffset StartedAt,
+    DateTimeOffset? CompletedAt,
+    int StepCount,
+    int ToolCallCount,
+    int MemoryCount,
+    int AgentRunCount,
+    int ErrorCount,
+    string Summary);
+
+public sealed record TraceDetailSnapshot(
+    TraceTurnRow Turn,
+    string Provider,
+    string Model,
+    TokenUsageSummary Tokens,
+    IReadOnlyList<TraceStepRow> Steps,
+    IReadOnlyList<TracePromptSection> PromptSections,
+    IReadOnlyList<TraceMemoryRow> Memories,
+    IReadOnlyList<TraceToolCallRow> Tools,
+    IReadOnlyList<TraceAgentRunRow> Agents,
+    IReadOnlyList<RunEventRow> RawEvents,
+    DateTimeOffset UpdatedAt);
+
+public sealed record TraceStepRow(
+    string Id,
+    string Kind,
+    string Phase,
+    string Title,
+    string Summary,
+    DateTimeOffset CreatedAt,
+    string Status,
+    bool IsError);
+
+public sealed record TracePromptSection(
+    string Id,
+    string Title,
+    string RedactionState,
+    string Summary,
+    string? Content);
+
+public sealed record TraceMemoryRow(
+    string Id,
+    string Action,
+    string Segment,
+    string Tier,
+    string RedactionState,
+    string Summary,
+    string? Text,
+    string Reason);
+
+public sealed record TraceToolCallRow(
+    string Id,
+    string Name,
+    string Status,
+    string RedactionState,
+    string ArgumentsSummary,
+    string? Arguments,
+    string OutputSummary,
+    string? Output,
+    bool IsError);
+
+public sealed record TraceAgentRunRow(
+    string Id,
+    string Status,
+    string Kind,
+    string Channel,
+    string RedactionState,
+    string TaskSummary,
+    string? Task,
+    string? FinalResponse,
+    string? Error,
+    DateTimeOffset StartedAt,
+    DateTimeOffset? CompletedAt);
+
 public sealed record MemoryGraphSnapshot(
     IReadOnlyList<MemoryGraphNode> Nodes,
     IReadOnlyList<MemoryGraphEdge> Edges,
@@ -248,7 +330,21 @@ public sealed record AutomationRow(
     string? LastRunId,
     string? LastResult,
     string? WorkspaceRootPath,
-    string? SkillIds);
+    string? SkillIds,
+    IReadOnlyList<AutomationRunRow> RecentRuns);
+
+public sealed record AutomationRunRow(
+    string Id,
+    string AutomationId,
+    string? SubAgentRunId,
+    string Status,
+    string Trigger,
+    string? OutputSummary,
+    string? Error,
+    string? WorkspaceRootPath,
+    string? SkillIds,
+    DateTimeOffset StartedAt,
+    DateTimeOffset? CompletedAt);
 
 public sealed record AutomationCreateDto(
     string Name,
@@ -258,7 +354,21 @@ public sealed record AutomationCreateDto(
     string? ConversationId,
     string? NotificationTarget,
     string? Capabilities,
-    string? Mode);
+    string? Mode,
+    string? WorkspaceRootPath,
+    string? SkillIds);
+
+public sealed record AutomationUpdateDto(
+    string Name,
+    string Task,
+    string Schedule,
+    string Channel,
+    string? ConversationId,
+    string? NotificationTarget,
+    string? Capabilities,
+    string? Mode,
+    string? WorkspaceRootPath,
+    string? SkillIds);
 
 public sealed record AutomationToggleDto(bool Enabled);
 
@@ -309,6 +419,25 @@ public interface IRunTimelineService
     Task<RunTimelineSnapshot> List(
         string? conversationId,
         string filter,
+        CancellationToken cancellationToken);
+}
+
+public interface ITraceDashboardService
+{
+    Task<TraceListSnapshot> List(
+        string? conversationId,
+        int limit,
+        CancellationToken cancellationToken);
+
+    Task<TraceDetailSnapshot> GetDetail(
+        string turnId,
+        bool exact,
+        CancellationToken cancellationToken);
+
+    Task StreamDetail(
+        string turnId,
+        bool exact,
+        Stream responseStream,
         CancellationToken cancellationToken);
 }
 
@@ -388,7 +517,11 @@ public interface IOperationsDashboardService
 
     Task<AutomationRow> CreateAutomation(AutomationCreateDto request, CancellationToken cancellationToken);
 
+    Task<AutomationRow> UpdateAutomation(string id, AutomationUpdateDto request, CancellationToken cancellationToken);
+
     Task<AutomationRow> ToggleAutomation(string id, AutomationToggleDto request, CancellationToken cancellationToken);
+
+    Task<AutomationRow> RunAutomation(string id, CancellationToken cancellationToken);
 
     Task DeleteAutomation(string id, CancellationToken cancellationToken);
 

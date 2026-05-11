@@ -123,6 +123,7 @@ public sealed class SubAgentRunWorker(
                 ["toolsetProfile"] = resources.Workspace.ToolsetProfile.ToString(),
                 ["availableToolCount"] = resources.Workspace.AvailableTools.Count.ToString(),
                 ["instructionSources"] = string.Join(";", resources.Workspace.LoadedInstructionSources),
+                ["systemPrompt"] = resources.BuildSystemPrompt(),
                 ["message"] = "Sub-agent background run started."
             },
             cancellationToken);

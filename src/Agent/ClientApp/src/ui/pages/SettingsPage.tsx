@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useState } from "react";
-import { CalendarDays, Copy, DatabaseZap, FolderInput, Palette, ShieldCheck, ShieldOff, SlidersHorizontal, Sparkles, Trash2 } from "lucide-react";
+import { CalendarDays, Copy, DatabaseZap, FolderInput, Palette, Search, ShieldCheck, ShieldOff, SlidersHorizontal, Sparkles, Trash2 } from "lucide-react";
 import { useGetSettings } from "../../api/generated";
 import { ErrorState, IconButton, LoadingState, PageFrame, Panel } from "../components";
 
@@ -160,6 +160,7 @@ export function SettingsPage() {
   const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
   const [personalityError, setPersonalityError] = useState<string | null>(null);
   const [isUpdatingPersonality, setIsUpdatingPersonality] = useState(false);
+  const [settingsSearch, setSettingsSearch] = useState("");
 
   useEffect(() => {
     setSliderDraftValues(sliderValues);
@@ -420,10 +421,15 @@ export function SettingsPage() {
       {personalityError && <ErrorState error={new Error(personalityError)} />}
       {snapshot && (
         <div className="settings-page-layout">
-          <section className="settings-section">
+          <label className="search-field settings-search">
+            <Search size={15} />
+            <input onChange={(event) => setSettingsSearch(event.target.value)} placeholder="Search settings" value={settingsSearch} />
+          </label>
+
+          {matchesSettingsSection(settingsSearch, "workspace model personality assistant runtime") && <section className="settings-section">
             <header>
-              <p className="eyebrow">Assistant</p>
-              <h2>Runtime</h2>
+              <p className="eyebrow">Common</p>
+              <h2>Workspace, Model, Personality</h2>
             </header>
             <div className="settings-section-grid">
               {workspace && (
@@ -557,9 +563,9 @@ export function SettingsPage() {
                 </Panel>
               )}
             </div>
-          </section>
+          </section>}
 
-          <section className="settings-section">
+          {matchesSettingsSection(settingsSearch, "memory integrations context google gmail calendar email") && <section className="settings-section">
             <header>
               <p className="eyebrow">Context</p>
               <h2>Memory and Integrations</h2>
@@ -601,12 +607,12 @@ export function SettingsPage() {
                 </Panel>
               )}
             </div>
-          </section>
+          </section>}
 
-          <section className="settings-section">
+          {matchesSettingsSection(settingsSearch, "safety maintenance advanced compaction cleanup layers") && <section className="settings-section">
             <header>
-              <p className="eyebrow">Maintenance</p>
-              <h2>Operations</h2>
+              <p className="eyebrow">Safety and Advanced</p>
+              <h2>Maintenance</h2>
             </header>
             <div className="settings-section-grid">
               <Panel title="Memory Maintenance">
@@ -632,19 +638,42 @@ export function SettingsPage() {
                   ["Extraction max entries", values["memory.compactionExtraction.maxEntries"] ?? "unset"]
                 ]}
               />
-              <Panel title="Applied Layers">
-                <div className="tool-list">
-                  {appliedLayers.map((layer) => (
-                    <span key={layer}>{layer}</span>
-                  ))}
-                </div>
+              <Panel title="Advanced Values">
+                <details className="advanced-settings">
+                  <summary>Show raw applied layers and resolved settings</summary>
+                  <div className="tool-list">
+                    {appliedLayers.map((layer) => (
+                      <span key={layer}>{layer}</span>
+                    ))}
+                  </div>
+                  <dl className="settings-list settings-list-comfortable">
+                    {Object.entries(values).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => (
+                      <div className="settings-row" key={key}>
+                        <dt>{key}</dt>
+                        <dd><code>{value}</code></dd>
+                      </div>
+                    ))}
+                  </dl>
+                </details>
               </Panel>
             </div>
-          </section>
+          </section>}
         </div>
       )}
     </PageFrame>
   );
+}
+
+function matchesSettingsSection(query: string, text: string) {
+  if (!query.trim()) {
+    return true;
+  }
+
+  return query
+    .toLowerCase()
+    .split(" ")
+    .filter(Boolean)
+    .every((x) => text.includes(x.toLowerCase()));
 }
 
 function getPersonalitySliderValues(values: Record<string, string>) {

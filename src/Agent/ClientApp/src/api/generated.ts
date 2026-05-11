@@ -21,6 +21,139 @@ import type {
   UseQueryResult
 } from '@tanstack/react-query';
 
+export interface AgentPersonalityProfileDto {
+  id: string;
+  name: string;
+  description: string;
+  personality: string;
+  responseStyle: string;
+}
+
+export type AutomationCreateDtoConversationId = null | string;
+
+export type AutomationCreateDtoNotificationTarget = null | string;
+
+export type AutomationCreateDtoCapabilities = null | string;
+
+export type AutomationCreateDtoMode = null | string;
+
+export type AutomationCreateDtoWorkspaceRootPath = null | string;
+
+export type AutomationCreateDtoSkillIds = null | string;
+
+export interface AutomationCreateDto {
+  name: string;
+  task: string;
+  schedule: string;
+  channel: string;
+  conversationId: AutomationCreateDtoConversationId;
+  notificationTarget: AutomationCreateDtoNotificationTarget;
+  capabilities: AutomationCreateDtoCapabilities;
+  mode: AutomationCreateDtoMode;
+  workspaceRootPath: AutomationCreateDtoWorkspaceRootPath;
+  skillIds: AutomationCreateDtoSkillIds;
+}
+
+export type AutomationRowNotificationTarget = null | string;
+
+export type AutomationRowNextRunAt = null | string;
+
+export type AutomationRowLastRunAt = null | string;
+
+export type AutomationRowLastRunId = null | string;
+
+export type AutomationRowLastResult = null | string;
+
+export type AutomationRowWorkspaceRootPath = null | string;
+
+export type AutomationRowSkillIds = null | string;
+
+export interface AutomationRow {
+  id: string;
+  name: string;
+  task: string;
+  schedule: string;
+  status: string;
+  mode: string;
+  conversationId: string;
+  channel: string;
+  notificationTarget: AutomationRowNotificationTarget;
+  capabilities: string;
+  nextRunAt: AutomationRowNextRunAt;
+  lastRunAt: AutomationRowLastRunAt;
+  lastRunId: AutomationRowLastRunId;
+  lastResult: AutomationRowLastResult;
+  workspaceRootPath: AutomationRowWorkspaceRootPath;
+  skillIds: AutomationRowSkillIds;
+  recentRuns: AutomationRunRow[];
+}
+
+export type AutomationRunRowSubAgentRunId = null | string;
+
+export type AutomationRunRowOutputSummary = null | string;
+
+export type AutomationRunRowError = null | string;
+
+export type AutomationRunRowWorkspaceRootPath = null | string;
+
+export type AutomationRunRowSkillIds = null | string;
+
+export type AutomationRunRowCompletedAt = null | string;
+
+export interface AutomationRunRow {
+  id: string;
+  automationId: string;
+  subAgentRunId: AutomationRunRowSubAgentRunId;
+  status: string;
+  trigger: string;
+  outputSummary: AutomationRunRowOutputSummary;
+  error: AutomationRunRowError;
+  workspaceRootPath: AutomationRunRowWorkspaceRootPath;
+  skillIds: AutomationRunRowSkillIds;
+  startedAt: string;
+  completedAt: AutomationRunRowCompletedAt;
+}
+
+export interface AutomationToggleDto {
+  enabled: boolean;
+}
+
+export type AutomationUpdateDtoConversationId = null | string;
+
+export type AutomationUpdateDtoNotificationTarget = null | string;
+
+export type AutomationUpdateDtoCapabilities = null | string;
+
+export type AutomationUpdateDtoMode = null | string;
+
+export type AutomationUpdateDtoWorkspaceRootPath = null | string;
+
+export type AutomationUpdateDtoSkillIds = null | string;
+
+export interface AutomationUpdateDto {
+  name: string;
+  task: string;
+  schedule: string;
+  channel: string;
+  conversationId: AutomationUpdateDtoConversationId;
+  notificationTarget: AutomationUpdateDtoNotificationTarget;
+  capabilities: AutomationUpdateDtoCapabilities;
+  mode: AutomationUpdateDtoMode;
+  workspaceRootPath: AutomationUpdateDtoWorkspaceRootPath;
+  skillIds: AutomationUpdateDtoSkillIds;
+}
+
+export type CalendarStatusResponseAccountEmail = null | string;
+
+export type CalendarStatusResponseUpdatedAt = null | string;
+
+export interface CalendarStatusResponse {
+  configured: boolean;
+  connected: boolean;
+  accountEmail: CalendarStatusResponseAccountEmail;
+  updatedAt: CalendarStatusResponseUpdatedAt;
+}
+
 export interface ChatDashboardMessage {
   id: string;
   role: string;
@@ -46,6 +179,87 @@ export interface ChatDashboardSnapshot {
   workspace: ChatDashboardSnapshotWorkspace;
   tokens: TokenUsageSummary;
   tokenUsage: TokenUsageBreakdown[];
+}
+
+export interface DebugTranscriptExport {
+  path: string;
+  content: string;
+}
+
+export type DraftRowSourceRunId = null | string;
+
+export interface DraftRow {
+  id: string;
+  kind: string;
+  summary: string;
+  payload: string;
+  sourceRunId: DraftRowSourceRunId;
+  conversationId: string;
+  channel: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type EmailStatusResponseAccountEmail = null | string;
+
+export type EmailStatusResponseUpdatedAt = null | string;
+
+export interface EmailStatusResponse {
+  configured: boolean;
+  connected: boolean;
+  accountEmail: EmailStatusResponseAccountEmail;
+  updatedAt: EmailStatusResponseUpdatedAt;
+}
+
+export type ManualCompactionResponseThroughEntryId = null | string;
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type ManualCompactionResponseExactEntryCount = number | string;
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type ManualCompactionResponseNewlyCompactedEntryCount = number | string;
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type ManualCompactionResponseMemoryExtractionEntryCount = number | string;
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type ManualCompactionResponseProposedMemoryCount = number | string;
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type ManualCompactionResponseWrittenMemoryCount = number | string;
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type ManualCompactionResponseSkippedMemoryCount = number | string;
+
+export interface ManualCompactionResponse {
+  conversationId: string;
+  throughEntryId: ManualCompactionResponseThroughEntryId;
+  /** @pattern ^-?(?:0|[1-9]\d*)$ */
+  exactEntryCount: ManualCompactionResponseExactEntryCount;
+  /** @pattern ^-?(?:0|[1-9]\d*)$ */
+  newlyCompactedEntryCount: ManualCompactionResponseNewlyCompactedEntryCount;
+  /** @pattern ^-?(?:0|[1-9]\d*)$ */
+  memoryExtractionEntryCount: ManualCompactionResponseMemoryExtractionEntryCount;
+  /** @pattern ^-?(?:0|[1-9]\d*)$ */
+  proposedMemoryCount: ManualCompactionResponseProposedMemoryCount;
+  /** @pattern ^-?(?:0|[1-9]\d*)$ */
+  writtenMemoryCount: ManualCompactionResponseWrittenMemoryCount;
+  /** @pattern ^-?(?:0|[1-9]\d*)$ */
+  skippedMemoryCount: ManualCompactionResponseSkippedMemoryCount;
+  updatedAt: string;
 }
 
 export interface MemoryGraphEdge {
@@ -98,6 +312,45 @@ export interface MemoryGraphSnapshot {
 
 export interface MemoryLifecycleUpdateDto {
   lifecycle: string;
+}
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type MemoryMaintenanceResponseScanned = number | string;
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type MemoryMaintenanceResponseArchived = number | string;
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type MemoryMaintenanceResponsePruned = number | string;
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type MemoryMaintenanceResponseMerged = number | string;
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type MemoryMaintenanceResponseSuperseded = number | string;
+
+export interface MemoryMaintenanceResponse {
+  /** @pattern ^-?(?:0|[1-9]\d*)$ */
+  scanned: MemoryMaintenanceResponseScanned;
+  /** @pattern ^-?(?:0|[1-9]\d*)$ */
+  archived: MemoryMaintenanceResponseArchived;
+  /** @pattern ^-?(?:0|[1-9]\d*)$ */
+  pruned: MemoryMaintenanceResponsePruned;
+  /** @pattern ^-?(?:0|[1-9]\d*)$ */
+  merged: MemoryMaintenanceResponseMerged;
+  /** @pattern ^-?(?:0|[1-9]\d*)$ */
+  superseded: MemoryMaintenanceResponseSuperseded;
+  summary: string;
 }
 
 /**
@@ -168,6 +421,12 @@ export interface MemoryWriteDto {
   confidence: MemoryWriteDtoConfidence;
 }
 
+export interface RunActionResponse {
+  runId: string;
+  status: string;
+  message: string;
+}
+
 export type RunEventRowMetadata = {[key: string]: string};
 
 export interface RunEventRow {
@@ -212,6 +471,23 @@ export interface SettingsDashboardSnapshot {
   values: SettingsDashboardSnapshotValues;
   appliedLayers: string[];
   memoryConnectionString: string;
+  workspace: WorkspaceStatus;
+  calendar: CalendarStatusResponse;
+  email: EmailStatusResponse;
+  personalities: AgentPersonalityProfileDto[];
+}
+
+export type SubAgentRunDetailSnapshotChildConversationId = null | string;
+
+export type SubAgentRunDetailSnapshotTranscriptUnavailableReason = null | string;
+
+export interface SubAgentRunDetailSnapshot {
+  run: SubAgentRunRow;
+  childConversationId: SubAgentRunDetailSnapshotChildConversationId;
+  transcriptAvailable: boolean;
+  transcriptUnavailableReason: SubAgentRunDetailSnapshotTranscriptUnavailableReason;
+  transcript: SubAgentTranscriptEntry[];
+  updatedAt: string;
 }
 
 export type SubAgentRunRowCodexThreadId = null | string;
@@ -219,6 +495,8 @@ export type SubAgentRunRowCodexThreadId = null | string;
 export type SubAgentRunRowParentRunId = null | string;
 
 export type SubAgentRunRowParentCodexThreadId = null | string;
+
+export type SubAgentRunRowChildConversationId = null | string;
 
 export type SubAgentRunRowCompletedAt = null | string;
 
@@ -236,6 +514,7 @@ export interface SubAgentRunRow {
   codexThreadId: SubAgentRunRowCodexThreadId;
   parentRunId: SubAgentRunRowParentRunId;
   parentCodexThreadId: SubAgentRunRowParentCodexThreadId;
+  childConversationId: SubAgentRunRowChildConversationId;
   startedAt: string;
   completedAt: SubAgentRunRowCompletedAt;
   finalResponse: SubAgentRunRowFinalResponse;
@@ -246,6 +525,63 @@ export interface SubAgentRunRow {
 export interface SubAgentRunsSnapshot {
   runs: SubAgentRunRow[];
   tokens: TokenUsageSummary;
+}
+
+export type SubAgentTranscriptEntryMetadata = {[key: string]: string};
+
+export interface SubAgentTranscriptEntry {
+  id: string;
+  kind: string;
+  role: string;
+  title: string;
+  content: string;
+  createdAt: string;
+  isError: boolean;
+  metadata: SubAgentTranscriptEntryMetadata;
+}
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type TelegramStatusResponseTrustedChatCount = number | string;
+
+export interface TelegramStatusResponse {
+  enabled: boolean;
+  /** @pattern ^-?(?:0|[1-9]\d*)$ */
+  trustedChatCount: TelegramStatusResponseTrustedChatCount;
+}
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type TokenUsageBreakdownPromptTokens = number | string;
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type TokenUsageBreakdownCompletionTokens = number | string;
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type TokenUsageBreakdownTotalTokens = number | string;
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type TokenUsageBreakdownRequestCount = number | string;
+
+export interface TokenUsageBreakdown {
+  provider: string;
+  /** @pattern ^-?(?:0|[1-9]\d*)$ */
+  promptTokens: TokenUsageBreakdownPromptTokens;
+  /** @pattern ^-?(?:0|[1-9]\d*)$ */
+  completionTokens: TokenUsageBreakdownCompletionTokens;
+  /** @pattern ^-?(?:0|[1-9]\d*)$ */
+  totalTokens: TokenUsageBreakdownTotalTokens;
+  /** @pattern ^-?(?:0|[1-9]\d*)$ */
+  requestCount: TokenUsageBreakdownRequestCount;
+  source: string;
 }
 
 /**
@@ -308,37 +644,156 @@ export interface TokenUsageSummary {
   source: string;
 }
 
-/**
- * @pattern ^-?(?:0|[1-9]\d*)$
- */
-export type TokenUsageBreakdownPromptTokens = number | string;
+export type TraceAgentRunRowTask = null | string;
 
-/**
- * @pattern ^-?(?:0|[1-9]\d*)$
- */
-export type TokenUsageBreakdownCompletionTokens = number | string;
+export type TraceAgentRunRowFinalResponse = null | string;
 
-/**
- * @pattern ^-?(?:0|[1-9]\d*)$
- */
-export type TokenUsageBreakdownTotalTokens = number | string;
+export type TraceAgentRunRowError = null | string;
 
-/**
- * @pattern ^-?(?:0|[1-9]\d*)$
- */
-export type TokenUsageBreakdownRequestCount = number | string;
+export type TraceAgentRunRowCompletedAt = null | string;
 
-export interface TokenUsageBreakdown {
+export interface TraceAgentRunRow {
+  id: string;
+  status: string;
+  kind: string;
+  channel: string;
+  redactionState: string;
+  taskSummary: string;
+  task: TraceAgentRunRowTask;
+  finalResponse: TraceAgentRunRowFinalResponse;
+  error: TraceAgentRunRowError;
+  startedAt: string;
+  completedAt: TraceAgentRunRowCompletedAt;
+}
+
+export interface TraceDetailSnapshot {
+  turn: TraceTurnRow;
   provider: string;
+  model: string;
+  tokens: TokenUsageSummary;
+  steps: TraceStepRow[];
+  promptSections: TracePromptSection[];
+  memories: TraceMemoryRow[];
+  tools: TraceToolCallRow[];
+  agents: TraceAgentRunRow[];
+  rawEvents: RunEventRow[];
+  updatedAt: string;
+}
+
+export interface TraceListSnapshot {
+  conversationId: string;
+  turns: TraceTurnRow[];
+}
+
+export type TraceMemoryRowText = null | string;
+
+export interface TraceMemoryRow {
+  id: string;
+  action: string;
+  segment: string;
+  tier: string;
+  redactionState: string;
+  summary: string;
+  text: TraceMemoryRowText;
+  reason: string;
+}
+
+export type TracePromptSectionContent = null | string;
+
+export interface TracePromptSection {
+  id: string;
+  title: string;
+  redactionState: string;
+  summary: string;
+  content: TracePromptSectionContent;
+}
+
+export interface TraceStepRow {
+  id: string;
+  kind: string;
+  phase: string;
+  title: string;
+  summary: string;
+  createdAt: string;
+  status: string;
+  isError: boolean;
+}
+
+export type TraceToolCallRowArguments = null | string;
+
+export type TraceToolCallRowOutput = null | string;
+
+export interface TraceToolCallRow {
+  id: string;
+  name: string;
+  status: string;
+  redactionState: string;
+  argumentsSummary: string;
+  arguments: TraceToolCallRowArguments;
+  outputSummary: string;
+  output: TraceToolCallRowOutput;
+  isError: boolean;
+}
+
+export type TraceTurnRowCompletedAt = null | string;
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type TraceTurnRowStepCount = number | string;
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type TraceTurnRowToolCallCount = number | string;
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type TraceTurnRowMemoryCount = number | string;
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type TraceTurnRowAgentRunCount = number | string;
+
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+export type TraceTurnRowErrorCount = number | string;
+
+export interface TraceTurnRow {
+  id: string;
+  conversationId: string;
+  title: string;
+  status: string;
+  startedAt: string;
+  completedAt: TraceTurnRowCompletedAt;
   /** @pattern ^-?(?:0|[1-9]\d*)$ */
-  promptTokens: TokenUsageBreakdownPromptTokens;
+  stepCount: TraceTurnRowStepCount;
   /** @pattern ^-?(?:0|[1-9]\d*)$ */
-  completionTokens: TokenUsageBreakdownCompletionTokens;
+  toolCallCount: TraceTurnRowToolCallCount;
   /** @pattern ^-?(?:0|[1-9]\d*)$ */
-  totalTokens: TokenUsageBreakdownTotalTokens;
+  memoryCount: TraceTurnRowMemoryCount;
   /** @pattern ^-?(?:0|[1-9]\d*)$ */
-  requestCount: TokenUsageBreakdownRequestCount;
-  source: string;
+  agentRunCount: TraceTurnRowAgentRunCount;
+  /** @pattern ^-?(?:0|[1-9]\d*)$ */
+  errorCount: TraceTurnRowErrorCount;
+  summary: string;
+}
+
+export interface WorkspacePermissionUpdateDto {
+  remoteExecutionAllowed: boolean;
+}
+
+export interface WorkspaceRootPathUpdateDto {
+  rootPath: string;
+}
+
+export type WorkspaceSettingsUpdateDtoValues = {[key: string]: string};
+
+export interface WorkspaceSettingsUpdateDto {
+  values: WorkspaceSettingsUpdateDtoValues;
 }
 
 export type WorkspaceStatusChatThreadId = null | string;
@@ -363,9 +818,29 @@ export interface WorkspaceStatus {
   activeRunKind: WorkspaceStatusActiveRunKind;
 }
 
+export type GetLoginParams = {
+returnUrl?: string;
+};
+
 export type GetRunsParams = {
 conversationId?: string;
 filter?: string;
+};
+
+export type GetTracesParams = {
+conversationId?: string;
+/**
+ * @pattern ^-?(?:0|[1-9]\d*)$
+ */
+limit?: number | string;
+};
+
+export type GetTraceDetailParams = {
+exact?: boolean;
+};
+
+export type StreamTraceDetailParams = {
+exact?: boolean;
 };
 
 export type GetMemoriesParams = {
@@ -375,11 +850,539 @@ segment?: string;
 tier?: string;
 };
 
+export type CompleteCalendarOAuthParams = {
+connected_account_id?: string;
+code?: string;
+state?: string;
+};
+
+export type CompleteEmailOAuthParams = {
+connected_account_id?: string;
+code?: string;
+state?: string;
+};
+
+export type GetDraftsParams = {
+status?: string;
+};
+
+export type getLoginResponse200 = {
+  data: void
+  status: 200
+}
+
+export type getLoginResponseSuccess = (getLoginResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getLoginResponse = (getLoginResponseSuccess)
+
+export const getGetLoginUrl = (params?: GetLoginParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/login?${stringifiedParams}` : `/login`
+}
+
+export const getLogin = async (params?: GetLoginParams, options?: RequestInit): Promise<getLoginResponse> => {
+
+  const res = await fetch(getGetLoginUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getLoginResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getLoginResponse
+}
+
+
+
+
+
+export const getGetLoginQueryKey = (params?: GetLoginParams,) => {
+    return [
+    `/login`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+
+export const getGetLoginQueryOptions = <TData = Awaited<ReturnType<typeof getLogin>>, TError = unknown>(params?: GetLoginParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLogin>>, TError, TData>>, fetch?: RequestInit}
+) => {
+
+const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetLoginQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getLogin>>> = ({ signal }) => getLogin(params, { signal, ...fetchOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLogin>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetLoginQueryResult = NonNullable<Awaited<ReturnType<typeof getLogin>>>
+export type GetLoginQueryError = unknown
+
+
+export function useGetLogin<TData = Awaited<ReturnType<typeof getLogin>>, TError = unknown>(
+ params: undefined |  GetLoginParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLogin>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getLogin>>,
+          TError,
+          Awaited<ReturnType<typeof getLogin>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetLogin<TData = Awaited<ReturnType<typeof getLogin>>, TError = unknown>(
+ params?: GetLoginParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLogin>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getLogin>>,
+          TError,
+          Awaited<ReturnType<typeof getLogin>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetLogin<TData = Awaited<ReturnType<typeof getLogin>>, TError = unknown>(
+ params?: GetLoginParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLogin>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useGetLogin<TData = Awaited<ReturnType<typeof getLogin>>, TError = unknown>(
+ params?: GetLoginParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLogin>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetLoginQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+
+export type postLoginResponse200 = {
+  data: void
+  status: 200
+}
+
+export type postLoginResponseSuccess = (postLoginResponse200) & {
+  headers: Headers;
+};
+;
+
+export type postLoginResponse = (postLoginResponseSuccess)
+
+export const getPostLoginUrl = () => {
+
+
+
+
+  return `/login`
+}
+
+export const postLogin = async ( options?: RequestInit): Promise<postLoginResponse> => {
+
+  const res = await fetch(getPostLoginUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: postLoginResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as postLoginResponse
+}
+
+
+
+
+export const getPostLoginMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postLogin>>, TError,void, TContext>, fetch?: RequestInit}
+): UseMutationOptions<Awaited<ReturnType<typeof postLogin>>, TError,void, TContext> => {
+
+const mutationKey = ['postLogin'];
+const {mutation: mutationOptions, fetch: fetchOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, fetch: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postLogin>>, void> = () => {
+
+
+          return  postLogin(fetchOptions)
+        }
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostLoginMutationResult = NonNullable<Awaited<ReturnType<typeof postLogin>>>
+
+    export type PostLoginMutationError = unknown
+
+    export const usePostLogin = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postLogin>>, TError,void, TContext>, fetch?: RequestInit}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postLogin>>,
+        TError,
+        void,
+        TContext
+      > => {
+
+      const mutationOptions = getPostLoginMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+
+export type postLogoutResponse200 = {
+  data: void
+  status: 200
+}
+
+export type postLogoutResponseSuccess = (postLogoutResponse200) & {
+  headers: Headers;
+};
+;
+
+export type postLogoutResponse = (postLogoutResponseSuccess)
+
+export const getPostLogoutUrl = () => {
+
+
+
+
+  return `/logout`
+}
+
+export const postLogout = async ( options?: RequestInit): Promise<postLogoutResponse> => {
+
+  const res = await fetch(getPostLogoutUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: postLogoutResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as postLogoutResponse
+}
+
+
+
+
+export const getPostLogoutMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postLogout>>, TError,void, TContext>, fetch?: RequestInit}
+): UseMutationOptions<Awaited<ReturnType<typeof postLogout>>, TError,void, TContext> => {
+
+const mutationKey = ['postLogout'];
+const {mutation: mutationOptions, fetch: fetchOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, fetch: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postLogout>>, void> = () => {
+
+
+          return  postLogout(fetchOptions)
+        }
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostLogoutMutationResult = NonNullable<Awaited<ReturnType<typeof postLogout>>>
+
+    export type PostLogoutMutationError = unknown
+
+    export const usePostLogout = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postLogout>>, TError,void, TContext>, fetch?: RequestInit}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postLogout>>,
+        TError,
+        void,
+        TContext
+      > => {
+
+      const mutationOptions = getPostLogoutMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+
+export type getLogoutResponse200 = {
+  data: void
+  status: 200
+}
+
+export type getLogoutResponseSuccess = (getLogoutResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getLogoutResponse = (getLogoutResponseSuccess)
+
+export const getGetLogoutUrl = () => {
+
+
+
+
+  return `/logout`
+}
+
+export const getLogout = async ( options?: RequestInit): Promise<getLogoutResponse> => {
+
+  const res = await fetch(getGetLogoutUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getLogoutResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getLogoutResponse
+}
+
+
+
+
+
+export const getGetLogoutQueryKey = () => {
+    return [
+    `/logout`
+    ] as const;
+    }
+
+
+export const getGetLogoutQueryOptions = <TData = Awaited<ReturnType<typeof getLogout>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLogout>>, TError, TData>>, fetch?: RequestInit}
+) => {
+
+const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetLogoutQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getLogout>>> = ({ signal }) => getLogout({ signal, ...fetchOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLogout>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetLogoutQueryResult = NonNullable<Awaited<ReturnType<typeof getLogout>>>
+export type GetLogoutQueryError = unknown
+
+
+export function useGetLogout<TData = Awaited<ReturnType<typeof getLogout>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLogout>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getLogout>>,
+          TError,
+          Awaited<ReturnType<typeof getLogout>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetLogout<TData = Awaited<ReturnType<typeof getLogout>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLogout>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getLogout>>,
+          TError,
+          Awaited<ReturnType<typeof getLogout>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetLogout<TData = Awaited<ReturnType<typeof getLogout>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLogout>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useGetLogout<TData = Awaited<ReturnType<typeof getLogout>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLogout>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetLogoutQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+
+export type getApiHealthResponse200 = {
+  data: void
+  status: 200
+}
+
+export type getApiHealthResponseSuccess = (getApiHealthResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getApiHealthResponse = (getApiHealthResponseSuccess)
+
+export const getGetApiHealthUrl = () => {
+
+
+
+
+  return `/api/health`
+}
+
+export const getApiHealth = async ( options?: RequestInit): Promise<getApiHealthResponse> => {
+
+  const res = await fetch(getGetApiHealthUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getApiHealthResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getApiHealthResponse
+}
+
+
+
+
+
+export const getGetApiHealthQueryKey = () => {
+    return [
+    `/api/health`
+    ] as const;
+    }
+
+
+export const getGetApiHealthQueryOptions = <TData = Awaited<ReturnType<typeof getApiHealth>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getApiHealth>>, TError, TData>>, fetch?: RequestInit}
+) => {
+
+const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetApiHealthQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getApiHealth>>> = ({ signal }) => getApiHealth({ signal, ...fetchOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getApiHealth>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetApiHealthQueryResult = NonNullable<Awaited<ReturnType<typeof getApiHealth>>>
+export type GetApiHealthQueryError = unknown
+
+
+export function useGetApiHealth<TData = Awaited<ReturnType<typeof getApiHealth>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getApiHealth>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getApiHealth>>,
+          TError,
+          Awaited<ReturnType<typeof getApiHealth>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetApiHealth<TData = Awaited<ReturnType<typeof getApiHealth>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getApiHealth>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getApiHealth>>,
+          TError,
+          Awaited<ReturnType<typeof getApiHealth>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetApiHealth<TData = Awaited<ReturnType<typeof getApiHealth>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getApiHealth>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useGetApiHealth<TData = Awaited<ReturnType<typeof getApiHealth>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getApiHealth>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetApiHealthQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+
 export type getMainChatResponse200 = {
   data: ChatDashboardSnapshot
   status: 200
 }
-    
+
 export type getMainChatResponseSuccess = (getMainChatResponse200) & {
   headers: Headers;
 };
@@ -390,24 +1393,24 @@ export type getMainChatResponse = (getMainChatResponseSuccess)
 export const getGetMainChatUrl = () => {
 
 
-  
+
 
   return `/api/dashboard/chat/main`
 }
 
 export const getMainChat = async ( options?: RequestInit): Promise<getMainChatResponse> => {
-  
+
   const res = await fetch(getGetMainChatUrl(),
-  {      
+  {
     ...options,
     method: 'GET'
-    
-    
+
+
   }
 )
 
   const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
+
   const data: getMainChatResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as getMainChatResponse
 }
@@ -422,7 +1425,7 @@ export const getGetMainChatQueryKey = () => {
     ] as const;
     }
 
-    
+
 export const getGetMainChatQueryOptions = <TData = Awaited<ReturnType<typeof getMainChat>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMainChat>>, TError, TData>>, fetch?: RequestInit}
 ) => {
 
@@ -430,13 +1433,13 @@ const {query: queryOptions, fetch: fetchOptions} = options ?? {};
 
   const queryKey =  queryOptions?.queryKey ?? getGetMainChatQueryKey();
 
-  
+
 
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getMainChat>>> = ({ signal }) => getMainChat({ signal, ...fetchOptions });
 
-      
 
-      
+
+
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMainChat>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
@@ -472,7 +1475,7 @@ export function useGetMainChat<TData = Awaited<ReturnType<typeof getMainChat>>, 
 
 export function useGetMainChat<TData = Awaited<ReturnType<typeof getMainChat>>, TError = unknown>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMainChat>>, TError, TData>>, fetch?: RequestInit}
- , queryClient?: QueryClient 
+ , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetMainChatQueryOptions(options)
@@ -492,7 +1495,7 @@ export type sendMainChatMessageResponse200 = {
   data: SendChatMessageResponse
   status: 200
 }
-    
+
 export type sendMainChatMessageResponseSuccess = (sendMainChatMessageResponse200) & {
   headers: Headers;
 };
@@ -503,15 +1506,15 @@ export type sendMainChatMessageResponse = (sendMainChatMessageResponseSuccess)
 export const getSendMainChatMessageUrl = () => {
 
 
-  
+
 
   return `/api/dashboard/chat/main/messages`
 }
 
 export const sendMainChatMessage = async (sendChatMessageRequest: SendChatMessageRequest, options?: RequestInit): Promise<sendMainChatMessageResponse> => {
-  
+
   const res = await fetch(getSendMainChatMessageUrl(),
-  {      
+  {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
@@ -521,7 +1524,7 @@ export const sendMainChatMessage = async (sendChatMessageRequest: SendChatMessag
 )
 
   const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
+
   const data: sendMainChatMessageResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as sendMainChatMessageResponse
 }
@@ -540,7 +1543,7 @@ const {mutation: mutationOptions, fetch: fetchOptions} = options ?
       : {...options, mutation: {...options.mutation, mutationKey}}
       : {mutation: { mutationKey, }, fetch: undefined};
 
-      
+
 
 
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendMainChatMessage>>, {data: SendChatMessageRequest}> = (props) => {
@@ -549,7 +1552,7 @@ const {mutation: mutationOptions, fetch: fetchOptions} = options ?
           return  sendMainChatMessage(data,fetchOptions)
         }
 
-        
+
 
 
   return  { mutationFn, ...mutationOptions }}
@@ -571,12 +1574,12 @@ const {mutation: mutationOptions, fetch: fetchOptions} = options ?
 
       return useMutation(mutationOptions, queryClient);
     }
-    
+
 export type streamMainChatMessageResponse200 = {
   data: void
   status: 200
 }
-    
+
 export type streamMainChatMessageResponseSuccess = (streamMainChatMessageResponse200) & {
   headers: Headers;
 };
@@ -587,15 +1590,15 @@ export type streamMainChatMessageResponse = (streamMainChatMessageResponseSucces
 export const getStreamMainChatMessageUrl = () => {
 
 
-  
+
 
   return `/api/dashboard/chat/main/stream`
 }
 
 export const streamMainChatMessage = async (sendChatMessageRequest: SendChatMessageRequest, options?: RequestInit): Promise<streamMainChatMessageResponse> => {
-  
+
   const res = await fetch(getStreamMainChatMessageUrl(),
-  {      
+  {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
@@ -605,7 +1608,7 @@ export const streamMainChatMessage = async (sendChatMessageRequest: SendChatMess
 )
 
   const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
+
   const data: streamMainChatMessageResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as streamMainChatMessageResponse
 }
@@ -624,7 +1627,7 @@ const {mutation: mutationOptions, fetch: fetchOptions} = options ?
       : {...options, mutation: {...options.mutation, mutationKey}}
       : {mutation: { mutationKey, }, fetch: undefined};
 
-      
+
 
 
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof streamMainChatMessage>>, {data: SendChatMessageRequest}> = (props) => {
@@ -633,7 +1636,7 @@ const {mutation: mutationOptions, fetch: fetchOptions} = options ?
           return  streamMainChatMessage(data,fetchOptions)
         }
 
-        
+
 
 
   return  { mutationFn, ...mutationOptions }}
@@ -655,12 +1658,125 @@ const {mutation: mutationOptions, fetch: fetchOptions} = options ?
 
       return useMutation(mutationOptions, queryClient);
     }
-    
+
+export type exportMainChatTranscriptResponse200 = {
+  data: DebugTranscriptExport
+  status: 200
+}
+
+export type exportMainChatTranscriptResponseSuccess = (exportMainChatTranscriptResponse200) & {
+  headers: Headers;
+};
+;
+
+export type exportMainChatTranscriptResponse = (exportMainChatTranscriptResponseSuccess)
+
+export const getExportMainChatTranscriptUrl = () => {
+
+
+
+
+  return `/api/dashboard/debug/main-transcript`
+}
+
+export const exportMainChatTranscript = async ( options?: RequestInit): Promise<exportMainChatTranscriptResponse> => {
+
+  const res = await fetch(getExportMainChatTranscriptUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: exportMainChatTranscriptResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as exportMainChatTranscriptResponse
+}
+
+
+
+
+
+export const getExportMainChatTranscriptQueryKey = () => {
+    return [
+    `/api/dashboard/debug/main-transcript`
+    ] as const;
+    }
+
+
+export const getExportMainChatTranscriptQueryOptions = <TData = Awaited<ReturnType<typeof exportMainChatTranscript>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportMainChatTranscript>>, TError, TData>>, fetch?: RequestInit}
+) => {
+
+const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportMainChatTranscriptQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportMainChatTranscript>>> = ({ signal }) => exportMainChatTranscript({ signal, ...fetchOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportMainChatTranscript>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ExportMainChatTranscriptQueryResult = NonNullable<Awaited<ReturnType<typeof exportMainChatTranscript>>>
+export type ExportMainChatTranscriptQueryError = unknown
+
+
+export function useExportMainChatTranscript<TData = Awaited<ReturnType<typeof exportMainChatTranscript>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportMainChatTranscript>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof exportMainChatTranscript>>,
+          TError,
+          Awaited<ReturnType<typeof exportMainChatTranscript>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useExportMainChatTranscript<TData = Awaited<ReturnType<typeof exportMainChatTranscript>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportMainChatTranscript>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof exportMainChatTranscript>>,
+          TError,
+          Awaited<ReturnType<typeof exportMainChatTranscript>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useExportMainChatTranscript<TData = Awaited<ReturnType<typeof exportMainChatTranscript>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportMainChatTranscript>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useExportMainChatTranscript<TData = Awaited<ReturnType<typeof exportMainChatTranscript>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportMainChatTranscript>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getExportMainChatTranscriptQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+
 export type getRunsResponse200 = {
   data: RunTimelineSnapshot
   status: 200
 }
-    
+
 export type getRunsResponseSuccess = (getRunsResponse200) & {
   headers: Headers;
 };
@@ -672,7 +1788,7 @@ export const getGetRunsUrl = (params?: GetRunsParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
-    
+
     if (value !== undefined) {
       normalizedParams.append(key, value === null ? 'null' : value.toString())
     }
@@ -684,18 +1800,18 @@ export const getGetRunsUrl = (params?: GetRunsParams,) => {
 }
 
 export const getRuns = async (params?: GetRunsParams, options?: RequestInit): Promise<getRunsResponse> => {
-  
+
   const res = await fetch(getGetRunsUrl(params),
-  {      
+  {
     ...options,
     method: 'GET'
-    
-    
+
+
   }
 )
 
   const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
+
   const data: getRunsResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as getRunsResponse
 }
@@ -710,7 +1826,7 @@ export const getGetRunsQueryKey = (params?: GetRunsParams,) => {
     ] as const;
     }
 
-    
+
 export const getGetRunsQueryOptions = <TData = Awaited<ReturnType<typeof getRuns>>, TError = unknown>(params?: GetRunsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRuns>>, TError, TData>>, fetch?: RequestInit}
 ) => {
 
@@ -718,13 +1834,13 @@ const {query: queryOptions, fetch: fetchOptions} = options ?? {};
 
   const queryKey =  queryOptions?.queryKey ?? getGetRunsQueryKey(params);
 
-  
+
 
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getRuns>>> = ({ signal }) => getRuns(params, { signal, ...fetchOptions });
 
-      
 
-      
+
+
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRuns>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
@@ -760,10 +1876,386 @@ export function useGetRuns<TData = Awaited<ReturnType<typeof getRuns>>, TError =
 
 export function useGetRuns<TData = Awaited<ReturnType<typeof getRuns>>, TError = unknown>(
  params?: GetRunsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRuns>>, TError, TData>>, fetch?: RequestInit}
- , queryClient?: QueryClient 
+ , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetRunsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+
+export type getTracesResponse200 = {
+  data: TraceListSnapshot
+  status: 200
+}
+
+export type getTracesResponseSuccess = (getTracesResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getTracesResponse = (getTracesResponseSuccess)
+
+export const getGetTracesUrl = (params?: GetTracesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/dashboard/traces?${stringifiedParams}` : `/api/dashboard/traces`
+}
+
+export const getTraces = async (params?: GetTracesParams, options?: RequestInit): Promise<getTracesResponse> => {
+
+  const res = await fetch(getGetTracesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getTracesResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getTracesResponse
+}
+
+
+
+
+
+export const getGetTracesQueryKey = (params?: GetTracesParams,) => {
+    return [
+    `/api/dashboard/traces`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+
+export const getGetTracesQueryOptions = <TData = Awaited<ReturnType<typeof getTraces>>, TError = unknown>(params?: GetTracesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTraces>>, TError, TData>>, fetch?: RequestInit}
+) => {
+
+const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTracesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTraces>>> = ({ signal }) => getTraces(params, { signal, ...fetchOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTraces>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetTracesQueryResult = NonNullable<Awaited<ReturnType<typeof getTraces>>>
+export type GetTracesQueryError = unknown
+
+
+export function useGetTraces<TData = Awaited<ReturnType<typeof getTraces>>, TError = unknown>(
+ params: undefined |  GetTracesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTraces>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTraces>>,
+          TError,
+          Awaited<ReturnType<typeof getTraces>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTraces<TData = Awaited<ReturnType<typeof getTraces>>, TError = unknown>(
+ params?: GetTracesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTraces>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTraces>>,
+          TError,
+          Awaited<ReturnType<typeof getTraces>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTraces<TData = Awaited<ReturnType<typeof getTraces>>, TError = unknown>(
+ params?: GetTracesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTraces>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useGetTraces<TData = Awaited<ReturnType<typeof getTraces>>, TError = unknown>(
+ params?: GetTracesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTraces>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetTracesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+
+export type getTraceDetailResponse200 = {
+  data: TraceDetailSnapshot
+  status: 200
+}
+
+export type getTraceDetailResponseSuccess = (getTraceDetailResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getTraceDetailResponse = (getTraceDetailResponseSuccess)
+
+export const getGetTraceDetailUrl = (id: string,
+    params?: GetTraceDetailParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/dashboard/traces/${id}?${stringifiedParams}` : `/api/dashboard/traces/${id}`
+}
+
+export const getTraceDetail = async (id: string,
+    params?: GetTraceDetailParams, options?: RequestInit): Promise<getTraceDetailResponse> => {
+
+  const res = await fetch(getGetTraceDetailUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getTraceDetailResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getTraceDetailResponse
+}
+
+
+
+
+
+export const getGetTraceDetailQueryKey = (id?: string,
+    params?: GetTraceDetailParams,) => {
+    return [
+    `/api/dashboard/traces/${id}`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+
+export const getGetTraceDetailQueryOptions = <TData = Awaited<ReturnType<typeof getTraceDetail>>, TError = unknown>(id: string,
+    params?: GetTraceDetailParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTraceDetail>>, TError, TData>>, fetch?: RequestInit}
+) => {
+
+const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTraceDetailQueryKey(id,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTraceDetail>>> = ({ signal }) => getTraceDetail(id,params, { signal, ...fetchOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTraceDetail>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetTraceDetailQueryResult = NonNullable<Awaited<ReturnType<typeof getTraceDetail>>>
+export type GetTraceDetailQueryError = unknown
+
+
+export function useGetTraceDetail<TData = Awaited<ReturnType<typeof getTraceDetail>>, TError = unknown>(
+ id: string,
+    params: undefined |  GetTraceDetailParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTraceDetail>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTraceDetail>>,
+          TError,
+          Awaited<ReturnType<typeof getTraceDetail>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTraceDetail<TData = Awaited<ReturnType<typeof getTraceDetail>>, TError = unknown>(
+ id: string,
+    params?: GetTraceDetailParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTraceDetail>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTraceDetail>>,
+          TError,
+          Awaited<ReturnType<typeof getTraceDetail>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTraceDetail<TData = Awaited<ReturnType<typeof getTraceDetail>>, TError = unknown>(
+ id: string,
+    params?: GetTraceDetailParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTraceDetail>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useGetTraceDetail<TData = Awaited<ReturnType<typeof getTraceDetail>>, TError = unknown>(
+ id: string,
+    params?: GetTraceDetailParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTraceDetail>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetTraceDetailQueryOptions(id,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+
+export type streamTraceDetailResponse200 = {
+  data: void
+  status: 200
+}
+
+export type streamTraceDetailResponseSuccess = (streamTraceDetailResponse200) & {
+  headers: Headers;
+};
+;
+
+export type streamTraceDetailResponse = (streamTraceDetailResponseSuccess)
+
+export const getStreamTraceDetailUrl = (id: string,
+    params?: StreamTraceDetailParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/dashboard/traces/${id}/stream?${stringifiedParams}` : `/api/dashboard/traces/${id}/stream`
+}
+
+export const streamTraceDetail = async (id: string,
+    params?: StreamTraceDetailParams, options?: RequestInit): Promise<streamTraceDetailResponse> => {
+
+  const res = await fetch(getStreamTraceDetailUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: streamTraceDetailResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as streamTraceDetailResponse
+}
+
+
+
+
+
+export const getStreamTraceDetailQueryKey = (id?: string,
+    params?: StreamTraceDetailParams,) => {
+    return [
+    `/api/dashboard/traces/${id}/stream`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+
+export const getStreamTraceDetailQueryOptions = <TData = Awaited<ReturnType<typeof streamTraceDetail>>, TError = unknown>(id: string,
+    params?: StreamTraceDetailParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof streamTraceDetail>>, TError, TData>>, fetch?: RequestInit}
+) => {
+
+const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getStreamTraceDetailQueryKey(id,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof streamTraceDetail>>> = ({ signal }) => streamTraceDetail(id,params, { signal, ...fetchOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof streamTraceDetail>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type StreamTraceDetailQueryResult = NonNullable<Awaited<ReturnType<typeof streamTraceDetail>>>
+export type StreamTraceDetailQueryError = unknown
+
+
+export function useStreamTraceDetail<TData = Awaited<ReturnType<typeof streamTraceDetail>>, TError = unknown>(
+ id: string,
+    params: undefined |  StreamTraceDetailParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof streamTraceDetail>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof streamTraceDetail>>,
+          TError,
+          Awaited<ReturnType<typeof streamTraceDetail>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useStreamTraceDetail<TData = Awaited<ReturnType<typeof streamTraceDetail>>, TError = unknown>(
+ id: string,
+    params?: StreamTraceDetailParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof streamTraceDetail>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof streamTraceDetail>>,
+          TError,
+          Awaited<ReturnType<typeof streamTraceDetail>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useStreamTraceDetail<TData = Awaited<ReturnType<typeof streamTraceDetail>>, TError = unknown>(
+ id: string,
+    params?: StreamTraceDetailParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof streamTraceDetail>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useStreamTraceDetail<TData = Awaited<ReturnType<typeof streamTraceDetail>>, TError = unknown>(
+ id: string,
+    params?: StreamTraceDetailParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof streamTraceDetail>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getStreamTraceDetailQueryOptions(id,params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -780,7 +2272,7 @@ export type getSubAgentsResponse200 = {
   data: SubAgentRunsSnapshot
   status: 200
 }
-    
+
 export type getSubAgentsResponseSuccess = (getSubAgentsResponse200) & {
   headers: Headers;
 };
@@ -791,24 +2283,24 @@ export type getSubAgentsResponse = (getSubAgentsResponseSuccess)
 export const getGetSubAgentsUrl = () => {
 
 
-  
+
 
   return `/api/dashboard/subagents`
 }
 
 export const getSubAgents = async ( options?: RequestInit): Promise<getSubAgentsResponse> => {
-  
+
   const res = await fetch(getGetSubAgentsUrl(),
-  {      
+  {
     ...options,
     method: 'GET'
-    
-    
+
+
   }
 )
 
   const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
+
   const data: getSubAgentsResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as getSubAgentsResponse
 }
@@ -823,7 +2315,7 @@ export const getGetSubAgentsQueryKey = () => {
     ] as const;
     }
 
-    
+
 export const getGetSubAgentsQueryOptions = <TData = Awaited<ReturnType<typeof getSubAgents>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSubAgents>>, TError, TData>>, fetch?: RequestInit}
 ) => {
 
@@ -831,13 +2323,13 @@ const {query: queryOptions, fetch: fetchOptions} = options ?? {};
 
   const queryKey =  queryOptions?.queryKey ?? getGetSubAgentsQueryKey();
 
-  
+
 
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getSubAgents>>> = ({ signal }) => getSubAgents({ signal, ...fetchOptions });
 
-      
 
-      
+
+
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSubAgents>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
@@ -873,10 +2365,236 @@ export function useGetSubAgents<TData = Awaited<ReturnType<typeof getSubAgents>>
 
 export function useGetSubAgents<TData = Awaited<ReturnType<typeof getSubAgents>>, TError = unknown>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSubAgents>>, TError, TData>>, fetch?: RequestInit}
- , queryClient?: QueryClient 
+ , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetSubAgentsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+
+export type getSubAgentDetailResponse200 = {
+  data: SubAgentRunDetailSnapshot
+  status: 200
+}
+
+export type getSubAgentDetailResponseSuccess = (getSubAgentDetailResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getSubAgentDetailResponse = (getSubAgentDetailResponseSuccess)
+
+export const getGetSubAgentDetailUrl = (id: string,) => {
+
+
+
+
+  return `/api/dashboard/subagents/${id}`
+}
+
+export const getSubAgentDetail = async (id: string, options?: RequestInit): Promise<getSubAgentDetailResponse> => {
+
+  const res = await fetch(getGetSubAgentDetailUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getSubAgentDetailResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getSubAgentDetailResponse
+}
+
+
+
+
+
+export const getGetSubAgentDetailQueryKey = (id?: string,) => {
+    return [
+    `/api/dashboard/subagents/${id}`
+    ] as const;
+    }
+
+
+export const getGetSubAgentDetailQueryOptions = <TData = Awaited<ReturnType<typeof getSubAgentDetail>>, TError = unknown>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSubAgentDetail>>, TError, TData>>, fetch?: RequestInit}
+) => {
+
+const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSubAgentDetailQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSubAgentDetail>>> = ({ signal }) => getSubAgentDetail(id, { signal, ...fetchOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSubAgentDetail>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetSubAgentDetailQueryResult = NonNullable<Awaited<ReturnType<typeof getSubAgentDetail>>>
+export type GetSubAgentDetailQueryError = unknown
+
+
+export function useGetSubAgentDetail<TData = Awaited<ReturnType<typeof getSubAgentDetail>>, TError = unknown>(
+ id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSubAgentDetail>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getSubAgentDetail>>,
+          TError,
+          Awaited<ReturnType<typeof getSubAgentDetail>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetSubAgentDetail<TData = Awaited<ReturnType<typeof getSubAgentDetail>>, TError = unknown>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSubAgentDetail>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getSubAgentDetail>>,
+          TError,
+          Awaited<ReturnType<typeof getSubAgentDetail>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetSubAgentDetail<TData = Awaited<ReturnType<typeof getSubAgentDetail>>, TError = unknown>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSubAgentDetail>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useGetSubAgentDetail<TData = Awaited<ReturnType<typeof getSubAgentDetail>>, TError = unknown>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSubAgentDetail>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetSubAgentDetailQueryOptions(id,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+
+export type streamSubAgentDetailResponse200 = {
+  data: void
+  status: 200
+}
+
+export type streamSubAgentDetailResponseSuccess = (streamSubAgentDetailResponse200) & {
+  headers: Headers;
+};
+;
+
+export type streamSubAgentDetailResponse = (streamSubAgentDetailResponseSuccess)
+
+export const getStreamSubAgentDetailUrl = (id: string,) => {
+
+
+
+
+  return `/api/dashboard/subagents/${id}/stream`
+}
+
+export const streamSubAgentDetail = async (id: string, options?: RequestInit): Promise<streamSubAgentDetailResponse> => {
+
+  const res = await fetch(getStreamSubAgentDetailUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: streamSubAgentDetailResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as streamSubAgentDetailResponse
+}
+
+
+
+
+
+export const getStreamSubAgentDetailQueryKey = (id?: string,) => {
+    return [
+    `/api/dashboard/subagents/${id}/stream`
+    ] as const;
+    }
+
+
+export const getStreamSubAgentDetailQueryOptions = <TData = Awaited<ReturnType<typeof streamSubAgentDetail>>, TError = unknown>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof streamSubAgentDetail>>, TError, TData>>, fetch?: RequestInit}
+) => {
+
+const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getStreamSubAgentDetailQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof streamSubAgentDetail>>> = ({ signal }) => streamSubAgentDetail(id, { signal, ...fetchOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof streamSubAgentDetail>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type StreamSubAgentDetailQueryResult = NonNullable<Awaited<ReturnType<typeof streamSubAgentDetail>>>
+export type StreamSubAgentDetailQueryError = unknown
+
+
+export function useStreamSubAgentDetail<TData = Awaited<ReturnType<typeof streamSubAgentDetail>>, TError = unknown>(
+ id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof streamSubAgentDetail>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof streamSubAgentDetail>>,
+          TError,
+          Awaited<ReturnType<typeof streamSubAgentDetail>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useStreamSubAgentDetail<TData = Awaited<ReturnType<typeof streamSubAgentDetail>>, TError = unknown>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof streamSubAgentDetail>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof streamSubAgentDetail>>,
+          TError,
+          Awaited<ReturnType<typeof streamSubAgentDetail>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useStreamSubAgentDetail<TData = Awaited<ReturnType<typeof streamSubAgentDetail>>, TError = unknown>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof streamSubAgentDetail>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useStreamSubAgentDetail<TData = Awaited<ReturnType<typeof streamSubAgentDetail>>, TError = unknown>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof streamSubAgentDetail>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getStreamSubAgentDetailQueryOptions(id,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -893,7 +2611,7 @@ export type getMemoriesResponse200 = {
   data: MemoryWorkspaceSnapshot
   status: 200
 }
-    
+
 export type getMemoriesResponseSuccess = (getMemoriesResponse200) & {
   headers: Headers;
 };
@@ -905,7 +2623,7 @@ export const getGetMemoriesUrl = (params?: GetMemoriesParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
-    
+
     if (value !== undefined) {
       normalizedParams.append(key, value === null ? 'null' : value.toString())
     }
@@ -917,18 +2635,18 @@ export const getGetMemoriesUrl = (params?: GetMemoriesParams,) => {
 }
 
 export const getMemories = async (params?: GetMemoriesParams, options?: RequestInit): Promise<getMemoriesResponse> => {
-  
+
   const res = await fetch(getGetMemoriesUrl(params),
-  {      
+  {
     ...options,
     method: 'GET'
-    
-    
+
+
   }
 )
 
   const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
+
   const data: getMemoriesResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as getMemoriesResponse
 }
@@ -943,7 +2661,7 @@ export const getGetMemoriesQueryKey = (params?: GetMemoriesParams,) => {
     ] as const;
     }
 
-    
+
 export const getGetMemoriesQueryOptions = <TData = Awaited<ReturnType<typeof getMemories>>, TError = unknown>(params?: GetMemoriesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMemories>>, TError, TData>>, fetch?: RequestInit}
 ) => {
 
@@ -951,13 +2669,13 @@ const {query: queryOptions, fetch: fetchOptions} = options ?? {};
 
   const queryKey =  queryOptions?.queryKey ?? getGetMemoriesQueryKey(params);
 
-  
+
 
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getMemories>>> = ({ signal }) => getMemories(params, { signal, ...fetchOptions });
 
-      
 
-      
+
+
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMemories>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
@@ -993,7 +2711,7 @@ export function useGetMemories<TData = Awaited<ReturnType<typeof getMemories>>, 
 
 export function useGetMemories<TData = Awaited<ReturnType<typeof getMemories>>, TError = unknown>(
  params?: GetMemoriesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMemories>>, TError, TData>>, fetch?: RequestInit}
- , queryClient?: QueryClient 
+ , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetMemoriesQueryOptions(params,options)
@@ -1013,7 +2731,7 @@ export type writeMemoryResponse200 = {
   data: MemoryRow
   status: 200
 }
-    
+
 export type writeMemoryResponseSuccess = (writeMemoryResponse200) & {
   headers: Headers;
 };
@@ -1024,15 +2742,15 @@ export type writeMemoryResponse = (writeMemoryResponseSuccess)
 export const getWriteMemoryUrl = () => {
 
 
-  
+
 
   return `/api/dashboard/memories`
 }
 
 export const writeMemory = async (memoryWriteDto: MemoryWriteDto, options?: RequestInit): Promise<writeMemoryResponse> => {
-  
+
   const res = await fetch(getWriteMemoryUrl(),
-  {      
+  {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
@@ -1042,7 +2760,7 @@ export const writeMemory = async (memoryWriteDto: MemoryWriteDto, options?: Requ
 )
 
   const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
+
   const data: writeMemoryResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as writeMemoryResponse
 }
@@ -1061,7 +2779,7 @@ const {mutation: mutationOptions, fetch: fetchOptions} = options ?
       : {...options, mutation: {...options.mutation, mutationKey}}
       : {mutation: { mutationKey, }, fetch: undefined};
 
-      
+
 
 
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof writeMemory>>, {data: MemoryWriteDto}> = (props) => {
@@ -1070,7 +2788,7 @@ const {mutation: mutationOptions, fetch: fetchOptions} = options ?
           return  writeMemory(data,fetchOptions)
         }
 
-        
+
 
 
   return  { mutationFn, ...mutationOptions }}
@@ -1092,12 +2810,12 @@ const {mutation: mutationOptions, fetch: fetchOptions} = options ?
 
       return useMutation(mutationOptions, queryClient);
     }
-    
+
 export type updateMemoryLifecycleResponse200 = {
   data: MemoryRow
   status: 200
 }
-    
+
 export type updateMemoryLifecycleResponseSuccess = (updateMemoryLifecycleResponse200) & {
   headers: Headers;
 };
@@ -1108,16 +2826,16 @@ export type updateMemoryLifecycleResponse = (updateMemoryLifecycleResponseSucces
 export const getUpdateMemoryLifecycleUrl = (id: string,) => {
 
 
-  
+
 
   return `/api/dashboard/memories/${id}/lifecycle`
 }
 
 export const updateMemoryLifecycle = async (id: string,
     memoryLifecycleUpdateDto: MemoryLifecycleUpdateDto, options?: RequestInit): Promise<updateMemoryLifecycleResponse> => {
-  
+
   const res = await fetch(getUpdateMemoryLifecycleUrl(id),
-  {      
+  {
     ...options,
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
@@ -1127,7 +2845,7 @@ export const updateMemoryLifecycle = async (id: string,
 )
 
   const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
+
   const data: updateMemoryLifecycleResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as updateMemoryLifecycleResponse
 }
@@ -1146,7 +2864,7 @@ const {mutation: mutationOptions, fetch: fetchOptions} = options ?
       : {...options, mutation: {...options.mutation, mutationKey}}
       : {mutation: { mutationKey, }, fetch: undefined};
 
-      
+
 
 
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateMemoryLifecycle>>, {id: string;data: MemoryLifecycleUpdateDto}> = (props) => {
@@ -1155,7 +2873,7 @@ const {mutation: mutationOptions, fetch: fetchOptions} = options ?
           return  updateMemoryLifecycle(id,data,fetchOptions)
         }
 
-        
+
 
 
   return  { mutationFn, ...mutationOptions }}
@@ -1177,12 +2895,12 @@ const {mutation: mutationOptions, fetch: fetchOptions} = options ?
 
       return useMutation(mutationOptions, queryClient);
     }
-    
+
 export type deleteMemoryResponse200 = {
   data: void
   status: 200
 }
-    
+
 export type deleteMemoryResponseSuccess = (deleteMemoryResponse200) & {
   headers: Headers;
 };
@@ -1193,24 +2911,24 @@ export type deleteMemoryResponse = (deleteMemoryResponseSuccess)
 export const getDeleteMemoryUrl = (id: string,) => {
 
 
-  
+
 
   return `/api/dashboard/memories/${id}`
 }
 
 export const deleteMemory = async (id: string, options?: RequestInit): Promise<deleteMemoryResponse> => {
-  
+
   const res = await fetch(getDeleteMemoryUrl(id),
-  {      
+  {
     ...options,
     method: 'DELETE'
-    
-    
+
+
   }
 )
 
   const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
+
   const data: deleteMemoryResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as deleteMemoryResponse
 }
@@ -1229,7 +2947,7 @@ const {mutation: mutationOptions, fetch: fetchOptions} = options ?
       : {...options, mutation: {...options.mutation, mutationKey}}
       : {mutation: { mutationKey, }, fetch: undefined};
 
-      
+
 
 
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteMemory>>, {id: string}> = (props) => {
@@ -1238,13 +2956,13 @@ const {mutation: mutationOptions, fetch: fetchOptions} = options ?
           return  deleteMemory(id,fetchOptions)
         }
 
-        
+
 
 
   return  { mutationFn, ...mutationOptions }}
 
     export type DeleteMemoryMutationResult = NonNullable<Awaited<ReturnType<typeof deleteMemory>>>
-    
+
     export type DeleteMemoryMutationError = unknown
 
     export const useDeleteMemory = <TError = unknown,
@@ -1260,12 +2978,12 @@ const {mutation: mutationOptions, fetch: fetchOptions} = options ?
 
       return useMutation(mutationOptions, queryClient);
     }
-    
+
 export type getGraphResponse200 = {
   data: MemoryGraphSnapshot
   status: 200
 }
-    
+
 export type getGraphResponseSuccess = (getGraphResponse200) & {
   headers: Headers;
 };
@@ -1276,24 +2994,24 @@ export type getGraphResponse = (getGraphResponseSuccess)
 export const getGetGraphUrl = () => {
 
 
-  
+
 
   return `/api/dashboard/graph`
 }
 
 export const getGraph = async ( options?: RequestInit): Promise<getGraphResponse> => {
-  
+
   const res = await fetch(getGetGraphUrl(),
-  {      
+  {
     ...options,
     method: 'GET'
-    
-    
+
+
   }
 )
 
   const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
+
   const data: getGraphResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as getGraphResponse
 }
@@ -1308,7 +3026,7 @@ export const getGetGraphQueryKey = () => {
     ] as const;
     }
 
-    
+
 export const getGetGraphQueryOptions = <TData = Awaited<ReturnType<typeof getGraph>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getGraph>>, TError, TData>>, fetch?: RequestInit}
 ) => {
 
@@ -1316,13 +3034,13 @@ const {query: queryOptions, fetch: fetchOptions} = options ?? {};
 
   const queryKey =  queryOptions?.queryKey ?? getGetGraphQueryKey();
 
-  
+
 
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getGraph>>> = ({ signal }) => getGraph({ signal, ...fetchOptions });
 
-      
 
-      
+
+
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getGraph>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
@@ -1358,7 +3076,7 @@ export function useGetGraph<TData = Awaited<ReturnType<typeof getGraph>>, TError
 
 export function useGetGraph<TData = Awaited<ReturnType<typeof getGraph>>, TError = unknown>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getGraph>>, TError, TData>>, fetch?: RequestInit}
- , queryClient?: QueryClient 
+ , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetGraphQueryOptions(options)
@@ -1378,7 +3096,7 @@ export type getSettingsResponse200 = {
   data: SettingsDashboardSnapshot
   status: 200
 }
-    
+
 export type getSettingsResponseSuccess = (getSettingsResponse200) & {
   headers: Headers;
 };
@@ -1389,24 +3107,24 @@ export type getSettingsResponse = (getSettingsResponseSuccess)
 export const getGetSettingsUrl = () => {
 
 
-  
+
 
   return `/api/dashboard/settings`
 }
 
 export const getSettings = async ( options?: RequestInit): Promise<getSettingsResponse> => {
-  
+
   const res = await fetch(getGetSettingsUrl(),
-  {      
+  {
     ...options,
     method: 'GET'
-    
-    
+
+
   }
 )
 
   const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-  
+
   const data: getSettingsResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as getSettingsResponse
 }
@@ -1421,7 +3139,7 @@ export const getGetSettingsQueryKey = () => {
     ] as const;
     }
 
-    
+
 export const getGetSettingsQueryOptions = <TData = Awaited<ReturnType<typeof getSettings>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSettings>>, TError, TData>>, fetch?: RequestInit}
 ) => {
 
@@ -1429,13 +3147,13 @@ const {query: queryOptions, fetch: fetchOptions} = options ?? {};
 
   const queryKey =  queryOptions?.queryKey ?? getGetSettingsQueryKey();
 
-  
+
 
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getSettings>>> = ({ signal }) => getSettings({ signal, ...fetchOptions });
 
-      
 
-      
+
+
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSettings>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
@@ -1471,7 +3189,7 @@ export function useGetSettings<TData = Awaited<ReturnType<typeof getSettings>>, 
 
 export function useGetSettings<TData = Awaited<ReturnType<typeof getSettings>>, TError = unknown>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSettings>>, TError, TData>>, fetch?: RequestInit}
- , queryClient?: QueryClient 
+ , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetSettingsQueryOptions(options)
@@ -1482,3 +3200,2464 @@ export function useGetSettings<TData = Awaited<ReturnType<typeof getSettings>>, 
 
   return query;
 }
+
+
+
+
+
+export type getCalendarStatusResponse200 = {
+  data: CalendarStatusResponse
+  status: 200
+}
+
+export type getCalendarStatusResponseSuccess = (getCalendarStatusResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getCalendarStatusResponse = (getCalendarStatusResponseSuccess)
+
+export const getGetCalendarStatusUrl = () => {
+
+
+
+
+  return `/api/dashboard/calendar/status`
+}
+
+export const getCalendarStatus = async ( options?: RequestInit): Promise<getCalendarStatusResponse> => {
+
+  const res = await fetch(getGetCalendarStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getCalendarStatusResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getCalendarStatusResponse
+}
+
+
+
+
+
+export const getGetCalendarStatusQueryKey = () => {
+    return [
+    `/api/dashboard/calendar/status`
+    ] as const;
+    }
+
+
+export const getGetCalendarStatusQueryOptions = <TData = Awaited<ReturnType<typeof getCalendarStatus>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalendarStatus>>, TError, TData>>, fetch?: RequestInit}
+) => {
+
+const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCalendarStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCalendarStatus>>> = ({ signal }) => getCalendarStatus({ signal, ...fetchOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCalendarStatus>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetCalendarStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getCalendarStatus>>>
+export type GetCalendarStatusQueryError = unknown
+
+
+export function useGetCalendarStatus<TData = Awaited<ReturnType<typeof getCalendarStatus>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalendarStatus>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCalendarStatus>>,
+          TError,
+          Awaited<ReturnType<typeof getCalendarStatus>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCalendarStatus<TData = Awaited<ReturnType<typeof getCalendarStatus>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalendarStatus>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCalendarStatus>>,
+          TError,
+          Awaited<ReturnType<typeof getCalendarStatus>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCalendarStatus<TData = Awaited<ReturnType<typeof getCalendarStatus>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalendarStatus>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useGetCalendarStatus<TData = Awaited<ReturnType<typeof getCalendarStatus>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalendarStatus>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetCalendarStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+
+export type connectCalendarResponse200 = {
+  data: void
+  status: 200
+}
+
+export type connectCalendarResponseSuccess = (connectCalendarResponse200) & {
+  headers: Headers;
+};
+;
+
+export type connectCalendarResponse = (connectCalendarResponseSuccess)
+
+export const getConnectCalendarUrl = () => {
+
+
+
+
+  return `/api/dashboard/calendar/connect`
+}
+
+export const connectCalendar = async ( options?: RequestInit): Promise<connectCalendarResponse> => {
+
+  const res = await fetch(getConnectCalendarUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: connectCalendarResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as connectCalendarResponse
+}
+
+
+
+
+
+export const getConnectCalendarQueryKey = () => {
+    return [
+    `/api/dashboard/calendar/connect`
+    ] as const;
+    }
+
+
+export const getConnectCalendarQueryOptions = <TData = Awaited<ReturnType<typeof connectCalendar>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof connectCalendar>>, TError, TData>>, fetch?: RequestInit}
+) => {
+
+const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getConnectCalendarQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof connectCalendar>>> = ({ signal }) => connectCalendar({ signal, ...fetchOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof connectCalendar>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ConnectCalendarQueryResult = NonNullable<Awaited<ReturnType<typeof connectCalendar>>>
+export type ConnectCalendarQueryError = unknown
+
+
+export function useConnectCalendar<TData = Awaited<ReturnType<typeof connectCalendar>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof connectCalendar>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof connectCalendar>>,
+          TError,
+          Awaited<ReturnType<typeof connectCalendar>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useConnectCalendar<TData = Awaited<ReturnType<typeof connectCalendar>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof connectCalendar>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof connectCalendar>>,
+          TError,
+          Awaited<ReturnType<typeof connectCalendar>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useConnectCalendar<TData = Awaited<ReturnType<typeof connectCalendar>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof connectCalendar>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useConnectCalendar<TData = Awaited<ReturnType<typeof connectCalendar>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof connectCalendar>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getConnectCalendarQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+
+export type completeCalendarOAuthResponse200 = {
+  data: void
+  status: 200
+}
+
+export type completeCalendarOAuthResponseSuccess = (completeCalendarOAuthResponse200) & {
+  headers: Headers;
+};
+;
+
+export type completeCalendarOAuthResponse = (completeCalendarOAuthResponseSuccess)
+
+export const getCompleteCalendarOAuthUrl = (params?: CompleteCalendarOAuthParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/dashboard/calendar/oauth-callback?${stringifiedParams}` : `/api/dashboard/calendar/oauth-callback`
+}
+
+export const completeCalendarOAuth = async (params?: CompleteCalendarOAuthParams, options?: RequestInit): Promise<completeCalendarOAuthResponse> => {
+
+  const res = await fetch(getCompleteCalendarOAuthUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: completeCalendarOAuthResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as completeCalendarOAuthResponse
+}
+
+
+
+
+
+export const getCompleteCalendarOAuthQueryKey = (params?: CompleteCalendarOAuthParams,) => {
+    return [
+    `/api/dashboard/calendar/oauth-callback`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+
+export const getCompleteCalendarOAuthQueryOptions = <TData = Awaited<ReturnType<typeof completeCalendarOAuth>>, TError = unknown>(params?: CompleteCalendarOAuthParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof completeCalendarOAuth>>, TError, TData>>, fetch?: RequestInit}
+) => {
+
+const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getCompleteCalendarOAuthQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof completeCalendarOAuth>>> = ({ signal }) => completeCalendarOAuth(params, { signal, ...fetchOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof completeCalendarOAuth>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type CompleteCalendarOAuthQueryResult = NonNullable<Awaited<ReturnType<typeof completeCalendarOAuth>>>
+export type CompleteCalendarOAuthQueryError = unknown
+
+
+export function useCompleteCalendarOAuth<TData = Awaited<ReturnType<typeof completeCalendarOAuth>>, TError = unknown>(
+ params: undefined |  CompleteCalendarOAuthParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof completeCalendarOAuth>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof completeCalendarOAuth>>,
+          TError,
+          Awaited<ReturnType<typeof completeCalendarOAuth>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useCompleteCalendarOAuth<TData = Awaited<ReturnType<typeof completeCalendarOAuth>>, TError = unknown>(
+ params?: CompleteCalendarOAuthParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof completeCalendarOAuth>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof completeCalendarOAuth>>,
+          TError,
+          Awaited<ReturnType<typeof completeCalendarOAuth>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useCompleteCalendarOAuth<TData = Awaited<ReturnType<typeof completeCalendarOAuth>>, TError = unknown>(
+ params?: CompleteCalendarOAuthParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof completeCalendarOAuth>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useCompleteCalendarOAuth<TData = Awaited<ReturnType<typeof completeCalendarOAuth>>, TError = unknown>(
+ params?: CompleteCalendarOAuthParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof completeCalendarOAuth>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getCompleteCalendarOAuthQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+
+export type disconnectCalendarResponse200 = {
+  data: void
+  status: 200
+}
+
+export type disconnectCalendarResponseSuccess = (disconnectCalendarResponse200) & {
+  headers: Headers;
+};
+;
+
+export type disconnectCalendarResponse = (disconnectCalendarResponseSuccess)
+
+export const getDisconnectCalendarUrl = () => {
+
+
+
+
+  return `/api/dashboard/calendar/disconnect`
+}
+
+export const disconnectCalendar = async ( options?: RequestInit): Promise<disconnectCalendarResponse> => {
+
+  const res = await fetch(getDisconnectCalendarUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: disconnectCalendarResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as disconnectCalendarResponse
+}
+
+
+
+
+export const getDisconnectCalendarMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof disconnectCalendar>>, TError,void, TContext>, fetch?: RequestInit}
+): UseMutationOptions<Awaited<ReturnType<typeof disconnectCalendar>>, TError,void, TContext> => {
+
+const mutationKey = ['disconnectCalendar'];
+const {mutation: mutationOptions, fetch: fetchOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, fetch: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof disconnectCalendar>>, void> = () => {
+
+
+          return  disconnectCalendar(fetchOptions)
+        }
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DisconnectCalendarMutationResult = NonNullable<Awaited<ReturnType<typeof disconnectCalendar>>>
+
+    export type DisconnectCalendarMutationError = unknown
+
+    export const useDisconnectCalendar = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof disconnectCalendar>>, TError,void, TContext>, fetch?: RequestInit}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof disconnectCalendar>>,
+        TError,
+        void,
+        TContext
+      > => {
+
+      const mutationOptions = getDisconnectCalendarMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+
+export type getEmailStatusResponse200 = {
+  data: EmailStatusResponse
+  status: 200
+}
+
+export type getEmailStatusResponseSuccess = (getEmailStatusResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getEmailStatusResponse = (getEmailStatusResponseSuccess)
+
+export const getGetEmailStatusUrl = () => {
+
+
+
+
+  return `/api/dashboard/email/status`
+}
+
+export const getEmailStatus = async ( options?: RequestInit): Promise<getEmailStatusResponse> => {
+
+  const res = await fetch(getGetEmailStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getEmailStatusResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getEmailStatusResponse
+}
+
+
+
+
+
+export const getGetEmailStatusQueryKey = () => {
+    return [
+    `/api/dashboard/email/status`
+    ] as const;
+    }
+
+
+export const getGetEmailStatusQueryOptions = <TData = Awaited<ReturnType<typeof getEmailStatus>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getEmailStatus>>, TError, TData>>, fetch?: RequestInit}
+) => {
+
+const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEmailStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEmailStatus>>> = ({ signal }) => getEmailStatus({ signal, ...fetchOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEmailStatus>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetEmailStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getEmailStatus>>>
+export type GetEmailStatusQueryError = unknown
+
+
+export function useGetEmailStatus<TData = Awaited<ReturnType<typeof getEmailStatus>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getEmailStatus>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getEmailStatus>>,
+          TError,
+          Awaited<ReturnType<typeof getEmailStatus>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetEmailStatus<TData = Awaited<ReturnType<typeof getEmailStatus>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getEmailStatus>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getEmailStatus>>,
+          TError,
+          Awaited<ReturnType<typeof getEmailStatus>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetEmailStatus<TData = Awaited<ReturnType<typeof getEmailStatus>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getEmailStatus>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useGetEmailStatus<TData = Awaited<ReturnType<typeof getEmailStatus>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getEmailStatus>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetEmailStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+
+export type connectEmailResponse200 = {
+  data: void
+  status: 200
+}
+
+export type connectEmailResponseSuccess = (connectEmailResponse200) & {
+  headers: Headers;
+};
+;
+
+export type connectEmailResponse = (connectEmailResponseSuccess)
+
+export const getConnectEmailUrl = () => {
+
+
+
+
+  return `/api/dashboard/email/connect`
+}
+
+export const connectEmail = async ( options?: RequestInit): Promise<connectEmailResponse> => {
+
+  const res = await fetch(getConnectEmailUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: connectEmailResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as connectEmailResponse
+}
+
+
+
+
+
+export const getConnectEmailQueryKey = () => {
+    return [
+    `/api/dashboard/email/connect`
+    ] as const;
+    }
+
+
+export const getConnectEmailQueryOptions = <TData = Awaited<ReturnType<typeof connectEmail>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof connectEmail>>, TError, TData>>, fetch?: RequestInit}
+) => {
+
+const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getConnectEmailQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof connectEmail>>> = ({ signal }) => connectEmail({ signal, ...fetchOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof connectEmail>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ConnectEmailQueryResult = NonNullable<Awaited<ReturnType<typeof connectEmail>>>
+export type ConnectEmailQueryError = unknown
+
+
+export function useConnectEmail<TData = Awaited<ReturnType<typeof connectEmail>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof connectEmail>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof connectEmail>>,
+          TError,
+          Awaited<ReturnType<typeof connectEmail>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useConnectEmail<TData = Awaited<ReturnType<typeof connectEmail>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof connectEmail>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof connectEmail>>,
+          TError,
+          Awaited<ReturnType<typeof connectEmail>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useConnectEmail<TData = Awaited<ReturnType<typeof connectEmail>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof connectEmail>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useConnectEmail<TData = Awaited<ReturnType<typeof connectEmail>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof connectEmail>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getConnectEmailQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+
+export type completeEmailOAuthResponse200 = {
+  data: void
+  status: 200
+}
+
+export type completeEmailOAuthResponseSuccess = (completeEmailOAuthResponse200) & {
+  headers: Headers;
+};
+;
+
+export type completeEmailOAuthResponse = (completeEmailOAuthResponseSuccess)
+
+export const getCompleteEmailOAuthUrl = (params?: CompleteEmailOAuthParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/dashboard/email/oauth-callback?${stringifiedParams}` : `/api/dashboard/email/oauth-callback`
+}
+
+export const completeEmailOAuth = async (params?: CompleteEmailOAuthParams, options?: RequestInit): Promise<completeEmailOAuthResponse> => {
+
+  const res = await fetch(getCompleteEmailOAuthUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: completeEmailOAuthResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as completeEmailOAuthResponse
+}
+
+
+
+
+
+export const getCompleteEmailOAuthQueryKey = (params?: CompleteEmailOAuthParams,) => {
+    return [
+    `/api/dashboard/email/oauth-callback`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+
+export const getCompleteEmailOAuthQueryOptions = <TData = Awaited<ReturnType<typeof completeEmailOAuth>>, TError = unknown>(params?: CompleteEmailOAuthParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof completeEmailOAuth>>, TError, TData>>, fetch?: RequestInit}
+) => {
+
+const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getCompleteEmailOAuthQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof completeEmailOAuth>>> = ({ signal }) => completeEmailOAuth(params, { signal, ...fetchOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof completeEmailOAuth>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type CompleteEmailOAuthQueryResult = NonNullable<Awaited<ReturnType<typeof completeEmailOAuth>>>
+export type CompleteEmailOAuthQueryError = unknown
+
+
+export function useCompleteEmailOAuth<TData = Awaited<ReturnType<typeof completeEmailOAuth>>, TError = unknown>(
+ params: undefined |  CompleteEmailOAuthParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof completeEmailOAuth>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof completeEmailOAuth>>,
+          TError,
+          Awaited<ReturnType<typeof completeEmailOAuth>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useCompleteEmailOAuth<TData = Awaited<ReturnType<typeof completeEmailOAuth>>, TError = unknown>(
+ params?: CompleteEmailOAuthParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof completeEmailOAuth>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof completeEmailOAuth>>,
+          TError,
+          Awaited<ReturnType<typeof completeEmailOAuth>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useCompleteEmailOAuth<TData = Awaited<ReturnType<typeof completeEmailOAuth>>, TError = unknown>(
+ params?: CompleteEmailOAuthParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof completeEmailOAuth>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useCompleteEmailOAuth<TData = Awaited<ReturnType<typeof completeEmailOAuth>>, TError = unknown>(
+ params?: CompleteEmailOAuthParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof completeEmailOAuth>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getCompleteEmailOAuthQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+
+export type disconnectEmailResponse200 = {
+  data: void
+  status: 200
+}
+
+export type disconnectEmailResponseSuccess = (disconnectEmailResponse200) & {
+  headers: Headers;
+};
+;
+
+export type disconnectEmailResponse = (disconnectEmailResponseSuccess)
+
+export const getDisconnectEmailUrl = () => {
+
+
+
+
+  return `/api/dashboard/email/disconnect`
+}
+
+export const disconnectEmail = async ( options?: RequestInit): Promise<disconnectEmailResponse> => {
+
+  const res = await fetch(getDisconnectEmailUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: disconnectEmailResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as disconnectEmailResponse
+}
+
+
+
+
+export const getDisconnectEmailMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof disconnectEmail>>, TError,void, TContext>, fetch?: RequestInit}
+): UseMutationOptions<Awaited<ReturnType<typeof disconnectEmail>>, TError,void, TContext> => {
+
+const mutationKey = ['disconnectEmail'];
+const {mutation: mutationOptions, fetch: fetchOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, fetch: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof disconnectEmail>>, void> = () => {
+
+
+          return  disconnectEmail(fetchOptions)
+        }
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DisconnectEmailMutationResult = NonNullable<Awaited<ReturnType<typeof disconnectEmail>>>
+
+    export type DisconnectEmailMutationError = unknown
+
+    export const useDisconnectEmail = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof disconnectEmail>>, TError,void, TContext>, fetch?: RequestInit}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof disconnectEmail>>,
+        TError,
+        void,
+        TContext
+      > => {
+
+      const mutationOptions = getDisconnectEmailMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+
+export type updateWorkspacePermissionsResponse200 = {
+  data: WorkspaceStatus
+  status: 200
+}
+
+export type updateWorkspacePermissionsResponseSuccess = (updateWorkspacePermissionsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type updateWorkspacePermissionsResponse = (updateWorkspacePermissionsResponseSuccess)
+
+export const getUpdateWorkspacePermissionsUrl = () => {
+
+
+
+
+  return `/api/dashboard/settings/workspace-permissions`
+}
+
+export const updateWorkspacePermissions = async (workspacePermissionUpdateDto: WorkspacePermissionUpdateDto, options?: RequestInit): Promise<updateWorkspacePermissionsResponse> => {
+
+  const res = await fetch(getUpdateWorkspacePermissionsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      workspacePermissionUpdateDto,)
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: updateWorkspacePermissionsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as updateWorkspacePermissionsResponse
+}
+
+
+
+
+export const getUpdateWorkspacePermissionsMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWorkspacePermissions>>, TError,{data: WorkspacePermissionUpdateDto}, TContext>, fetch?: RequestInit}
+): UseMutationOptions<Awaited<ReturnType<typeof updateWorkspacePermissions>>, TError,{data: WorkspacePermissionUpdateDto}, TContext> => {
+
+const mutationKey = ['updateWorkspacePermissions'];
+const {mutation: mutationOptions, fetch: fetchOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, fetch: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateWorkspacePermissions>>, {data: WorkspacePermissionUpdateDto}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateWorkspacePermissions(data,fetchOptions)
+        }
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateWorkspacePermissionsMutationResult = NonNullable<Awaited<ReturnType<typeof updateWorkspacePermissions>>>
+    export type UpdateWorkspacePermissionsMutationBody = WorkspacePermissionUpdateDto
+    export type UpdateWorkspacePermissionsMutationError = unknown
+
+    export const useUpdateWorkspacePermissions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWorkspacePermissions>>, TError,{data: WorkspacePermissionUpdateDto}, TContext>, fetch?: RequestInit}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateWorkspacePermissions>>,
+        TError,
+        {data: WorkspacePermissionUpdateDto},
+        TContext
+      > => {
+
+      const mutationOptions = getUpdateWorkspacePermissionsMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+
+export type updateWorkspaceRootPathResponse200 = {
+  data: WorkspaceStatus
+  status: 200
+}
+
+export type updateWorkspaceRootPathResponseSuccess = (updateWorkspaceRootPathResponse200) & {
+  headers: Headers;
+};
+;
+
+export type updateWorkspaceRootPathResponse = (updateWorkspaceRootPathResponseSuccess)
+
+export const getUpdateWorkspaceRootPathUrl = () => {
+
+
+
+
+  return `/api/dashboard/settings/workspace-root`
+}
+
+export const updateWorkspaceRootPath = async (workspaceRootPathUpdateDto: WorkspaceRootPathUpdateDto, options?: RequestInit): Promise<updateWorkspaceRootPathResponse> => {
+
+  const res = await fetch(getUpdateWorkspaceRootPathUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      workspaceRootPathUpdateDto,)
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: updateWorkspaceRootPathResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as updateWorkspaceRootPathResponse
+}
+
+
+
+
+export const getUpdateWorkspaceRootPathMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWorkspaceRootPath>>, TError,{data: WorkspaceRootPathUpdateDto}, TContext>, fetch?: RequestInit}
+): UseMutationOptions<Awaited<ReturnType<typeof updateWorkspaceRootPath>>, TError,{data: WorkspaceRootPathUpdateDto}, TContext> => {
+
+const mutationKey = ['updateWorkspaceRootPath'];
+const {mutation: mutationOptions, fetch: fetchOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, fetch: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateWorkspaceRootPath>>, {data: WorkspaceRootPathUpdateDto}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateWorkspaceRootPath(data,fetchOptions)
+        }
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateWorkspaceRootPathMutationResult = NonNullable<Awaited<ReturnType<typeof updateWorkspaceRootPath>>>
+    export type UpdateWorkspaceRootPathMutationBody = WorkspaceRootPathUpdateDto
+    export type UpdateWorkspaceRootPathMutationError = unknown
+
+    export const useUpdateWorkspaceRootPath = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWorkspaceRootPath>>, TError,{data: WorkspaceRootPathUpdateDto}, TContext>, fetch?: RequestInit}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateWorkspaceRootPath>>,
+        TError,
+        {data: WorkspaceRootPathUpdateDto},
+        TContext
+      > => {
+
+      const mutationOptions = getUpdateWorkspaceRootPathMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+
+export type updateWorkspaceSettingsResponse200 = {
+  data: SettingsDashboardSnapshot
+  status: 200
+}
+
+export type updateWorkspaceSettingsResponseSuccess = (updateWorkspaceSettingsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type updateWorkspaceSettingsResponse = (updateWorkspaceSettingsResponseSuccess)
+
+export const getUpdateWorkspaceSettingsUrl = () => {
+
+
+
+
+  return `/api/dashboard/settings/workspace-values`
+}
+
+export const updateWorkspaceSettings = async (workspaceSettingsUpdateDto: WorkspaceSettingsUpdateDto, options?: RequestInit): Promise<updateWorkspaceSettingsResponse> => {
+
+  const res = await fetch(getUpdateWorkspaceSettingsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      workspaceSettingsUpdateDto,)
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: updateWorkspaceSettingsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as updateWorkspaceSettingsResponse
+}
+
+
+
+
+export const getUpdateWorkspaceSettingsMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWorkspaceSettings>>, TError,{data: WorkspaceSettingsUpdateDto}, TContext>, fetch?: RequestInit}
+): UseMutationOptions<Awaited<ReturnType<typeof updateWorkspaceSettings>>, TError,{data: WorkspaceSettingsUpdateDto}, TContext> => {
+
+const mutationKey = ['updateWorkspaceSettings'];
+const {mutation: mutationOptions, fetch: fetchOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, fetch: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateWorkspaceSettings>>, {data: WorkspaceSettingsUpdateDto}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateWorkspaceSettings(data,fetchOptions)
+        }
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateWorkspaceSettingsMutationResult = NonNullable<Awaited<ReturnType<typeof updateWorkspaceSettings>>>
+    export type UpdateWorkspaceSettingsMutationBody = WorkspaceSettingsUpdateDto
+    export type UpdateWorkspaceSettingsMutationError = unknown
+
+    export const useUpdateWorkspaceSettings = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWorkspaceSettings>>, TError,{data: WorkspaceSettingsUpdateDto}, TContext>, fetch?: RequestInit}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateWorkspaceSettings>>,
+        TError,
+        {data: WorkspaceSettingsUpdateDto},
+        TContext
+      > => {
+
+      const mutationOptions = getUpdateWorkspaceSettingsMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+
+export type compactMainConversationResponse200 = {
+  data: ManualCompactionResponse
+  status: 200
+}
+
+export type compactMainConversationResponseSuccess = (compactMainConversationResponse200) & {
+  headers: Headers;
+};
+;
+
+export type compactMainConversationResponse = (compactMainConversationResponseSuccess)
+
+export const getCompactMainConversationUrl = () => {
+
+
+
+
+  return `/api/dashboard/compaction/main`
+}
+
+export const compactMainConversation = async ( options?: RequestInit): Promise<compactMainConversationResponse> => {
+
+  const res = await fetch(getCompactMainConversationUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: compactMainConversationResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as compactMainConversationResponse
+}
+
+
+
+
+export const getCompactMainConversationMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof compactMainConversation>>, TError,void, TContext>, fetch?: RequestInit}
+): UseMutationOptions<Awaited<ReturnType<typeof compactMainConversation>>, TError,void, TContext> => {
+
+const mutationKey = ['compactMainConversation'];
+const {mutation: mutationOptions, fetch: fetchOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, fetch: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof compactMainConversation>>, void> = () => {
+
+
+          return  compactMainConversation(fetchOptions)
+        }
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CompactMainConversationMutationResult = NonNullable<Awaited<ReturnType<typeof compactMainConversation>>>
+
+    export type CompactMainConversationMutationError = unknown
+
+    export const useCompactMainConversation = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof compactMainConversation>>, TError,void, TContext>, fetch?: RequestInit}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof compactMainConversation>>,
+        TError,
+        void,
+        TContext
+      > => {
+
+      const mutationOptions = getCompactMainConversationMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+
+export type getTelegramStatusResponse200 = {
+  data: TelegramStatusResponse
+  status: 200
+}
+
+export type getTelegramStatusResponseSuccess = (getTelegramStatusResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getTelegramStatusResponse = (getTelegramStatusResponseSuccess)
+
+export const getGetTelegramStatusUrl = () => {
+
+
+
+
+  return `/api/dashboard/telegram/status`
+}
+
+export const getTelegramStatus = async ( options?: RequestInit): Promise<getTelegramStatusResponse> => {
+
+  const res = await fetch(getGetTelegramStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getTelegramStatusResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getTelegramStatusResponse
+}
+
+
+
+
+
+export const getGetTelegramStatusQueryKey = () => {
+    return [
+    `/api/dashboard/telegram/status`
+    ] as const;
+    }
+
+
+export const getGetTelegramStatusQueryOptions = <TData = Awaited<ReturnType<typeof getTelegramStatus>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTelegramStatus>>, TError, TData>>, fetch?: RequestInit}
+) => {
+
+const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTelegramStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTelegramStatus>>> = ({ signal }) => getTelegramStatus({ signal, ...fetchOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTelegramStatus>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetTelegramStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getTelegramStatus>>>
+export type GetTelegramStatusQueryError = unknown
+
+
+export function useGetTelegramStatus<TData = Awaited<ReturnType<typeof getTelegramStatus>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTelegramStatus>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTelegramStatus>>,
+          TError,
+          Awaited<ReturnType<typeof getTelegramStatus>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTelegramStatus<TData = Awaited<ReturnType<typeof getTelegramStatus>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTelegramStatus>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTelegramStatus>>,
+          TError,
+          Awaited<ReturnType<typeof getTelegramStatus>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTelegramStatus<TData = Awaited<ReturnType<typeof getTelegramStatus>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTelegramStatus>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useGetTelegramStatus<TData = Awaited<ReturnType<typeof getTelegramStatus>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTelegramStatus>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetTelegramStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+
+export type cancelRunResponse200 = {
+  data: RunActionResponse
+  status: 200
+}
+
+export type cancelRunResponseSuccess = (cancelRunResponse200) & {
+  headers: Headers;
+};
+;
+
+export type cancelRunResponse = (cancelRunResponseSuccess)
+
+export const getCancelRunUrl = (id: string,) => {
+
+
+
+
+  return `/api/dashboard/runs/${id}/cancel`
+}
+
+export const cancelRun = async (id: string, options?: RequestInit): Promise<cancelRunResponse> => {
+
+  const res = await fetch(getCancelRunUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: cancelRunResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as cancelRunResponse
+}
+
+
+
+
+export const getCancelRunMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelRun>>, TError,{id: string}, TContext>, fetch?: RequestInit}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelRun>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['cancelRun'];
+const {mutation: mutationOptions, fetch: fetchOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, fetch: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelRun>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  cancelRun(id,fetchOptions)
+        }
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelRunMutationResult = NonNullable<Awaited<ReturnType<typeof cancelRun>>>
+
+    export type CancelRunMutationError = unknown
+
+    export const useCancelRun = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelRun>>, TError,{id: string}, TContext>, fetch?: RequestInit}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof cancelRun>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+
+      const mutationOptions = getCancelRunMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+
+export type retryRunResponse200 = {
+  data: RunActionResponse
+  status: 200
+}
+
+export type retryRunResponseSuccess = (retryRunResponse200) & {
+  headers: Headers;
+};
+;
+
+export type retryRunResponse = (retryRunResponseSuccess)
+
+export const getRetryRunUrl = (id: string,) => {
+
+
+
+
+  return `/api/dashboard/runs/${id}/retry`
+}
+
+export const retryRun = async (id: string, options?: RequestInit): Promise<retryRunResponse> => {
+
+  const res = await fetch(getRetryRunUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: retryRunResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as retryRunResponse
+}
+
+
+
+
+export const getRetryRunMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retryRun>>, TError,{id: string}, TContext>, fetch?: RequestInit}
+): UseMutationOptions<Awaited<ReturnType<typeof retryRun>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['retryRun'];
+const {mutation: mutationOptions, fetch: fetchOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, fetch: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof retryRun>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  retryRun(id,fetchOptions)
+        }
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RetryRunMutationResult = NonNullable<Awaited<ReturnType<typeof retryRun>>>
+
+    export type RetryRunMutationError = unknown
+
+    export const useRetryRun = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retryRun>>, TError,{id: string}, TContext>, fetch?: RequestInit}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof retryRun>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+
+      const mutationOptions = getRetryRunMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+
+export type getDraftsResponse200 = {
+  data: DraftRow[]
+  status: 200
+}
+
+export type getDraftsResponseSuccess = (getDraftsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getDraftsResponse = (getDraftsResponseSuccess)
+
+export const getGetDraftsUrl = (params?: GetDraftsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/dashboard/drafts?${stringifiedParams}` : `/api/dashboard/drafts`
+}
+
+export const getDrafts = async (params?: GetDraftsParams, options?: RequestInit): Promise<getDraftsResponse> => {
+
+  const res = await fetch(getGetDraftsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getDraftsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getDraftsResponse
+}
+
+
+
+
+
+export const getGetDraftsQueryKey = (params?: GetDraftsParams,) => {
+    return [
+    `/api/dashboard/drafts`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+
+export const getGetDraftsQueryOptions = <TData = Awaited<ReturnType<typeof getDrafts>>, TError = unknown>(params?: GetDraftsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDrafts>>, TError, TData>>, fetch?: RequestInit}
+) => {
+
+const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDraftsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDrafts>>> = ({ signal }) => getDrafts(params, { signal, ...fetchOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDrafts>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetDraftsQueryResult = NonNullable<Awaited<ReturnType<typeof getDrafts>>>
+export type GetDraftsQueryError = unknown
+
+
+export function useGetDrafts<TData = Awaited<ReturnType<typeof getDrafts>>, TError = unknown>(
+ params: undefined |  GetDraftsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDrafts>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getDrafts>>,
+          TError,
+          Awaited<ReturnType<typeof getDrafts>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetDrafts<TData = Awaited<ReturnType<typeof getDrafts>>, TError = unknown>(
+ params?: GetDraftsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDrafts>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getDrafts>>,
+          TError,
+          Awaited<ReturnType<typeof getDrafts>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetDrafts<TData = Awaited<ReturnType<typeof getDrafts>>, TError = unknown>(
+ params?: GetDraftsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDrafts>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useGetDrafts<TData = Awaited<ReturnType<typeof getDrafts>>, TError = unknown>(
+ params?: GetDraftsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDrafts>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetDraftsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+
+export type approveDraftResponse200 = {
+  data: DraftRow
+  status: 200
+}
+
+export type approveDraftResponseSuccess = (approveDraftResponse200) & {
+  headers: Headers;
+};
+;
+
+export type approveDraftResponse = (approveDraftResponseSuccess)
+
+export const getApproveDraftUrl = (id: string,) => {
+
+
+
+
+  return `/api/dashboard/drafts/${id}/approve`
+}
+
+export const approveDraft = async (id: string, options?: RequestInit): Promise<approveDraftResponse> => {
+
+  const res = await fetch(getApproveDraftUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: approveDraftResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as approveDraftResponse
+}
+
+
+
+
+export const getApproveDraftMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveDraft>>, TError,{id: string}, TContext>, fetch?: RequestInit}
+): UseMutationOptions<Awaited<ReturnType<typeof approveDraft>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['approveDraft'];
+const {mutation: mutationOptions, fetch: fetchOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, fetch: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof approveDraft>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  approveDraft(id,fetchOptions)
+        }
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApproveDraftMutationResult = NonNullable<Awaited<ReturnType<typeof approveDraft>>>
+
+    export type ApproveDraftMutationError = unknown
+
+    export const useApproveDraft = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveDraft>>, TError,{id: string}, TContext>, fetch?: RequestInit}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof approveDraft>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+
+      const mutationOptions = getApproveDraftMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+
+export type rejectDraftResponse200 = {
+  data: DraftRow
+  status: 200
+}
+
+export type rejectDraftResponseSuccess = (rejectDraftResponse200) & {
+  headers: Headers;
+};
+;
+
+export type rejectDraftResponse = (rejectDraftResponseSuccess)
+
+export const getRejectDraftUrl = (id: string,) => {
+
+
+
+
+  return `/api/dashboard/drafts/${id}/reject`
+}
+
+export const rejectDraft = async (id: string, options?: RequestInit): Promise<rejectDraftResponse> => {
+
+  const res = await fetch(getRejectDraftUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: rejectDraftResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as rejectDraftResponse
+}
+
+
+
+
+export const getRejectDraftMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rejectDraft>>, TError,{id: string}, TContext>, fetch?: RequestInit}
+): UseMutationOptions<Awaited<ReturnType<typeof rejectDraft>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['rejectDraft'];
+const {mutation: mutationOptions, fetch: fetchOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, fetch: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof rejectDraft>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  rejectDraft(id,fetchOptions)
+        }
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RejectDraftMutationResult = NonNullable<Awaited<ReturnType<typeof rejectDraft>>>
+
+    export type RejectDraftMutationError = unknown
+
+    export const useRejectDraft = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rejectDraft>>, TError,{id: string}, TContext>, fetch?: RequestInit}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof rejectDraft>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+
+      const mutationOptions = getRejectDraftMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+
+export type getAutomationsResponse200 = {
+  data: AutomationRow[]
+  status: 200
+}
+
+export type getAutomationsResponseSuccess = (getAutomationsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getAutomationsResponse = (getAutomationsResponseSuccess)
+
+export const getGetAutomationsUrl = () => {
+
+
+
+
+  return `/api/dashboard/automations`
+}
+
+export const getAutomations = async ( options?: RequestInit): Promise<getAutomationsResponse> => {
+
+  const res = await fetch(getGetAutomationsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getAutomationsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getAutomationsResponse
+}
+
+
+
+
+
+export const getGetAutomationsQueryKey = () => {
+    return [
+    `/api/dashboard/automations`
+    ] as const;
+    }
+
+
+export const getGetAutomationsQueryOptions = <TData = Awaited<ReturnType<typeof getAutomations>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAutomations>>, TError, TData>>, fetch?: RequestInit}
+) => {
+
+const {query: queryOptions, fetch: fetchOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAutomationsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAutomations>>> = ({ signal }) => getAutomations({ signal, ...fetchOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAutomations>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAutomationsQueryResult = NonNullable<Awaited<ReturnType<typeof getAutomations>>>
+export type GetAutomationsQueryError = unknown
+
+
+export function useGetAutomations<TData = Awaited<ReturnType<typeof getAutomations>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAutomations>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAutomations>>,
+          TError,
+          Awaited<ReturnType<typeof getAutomations>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAutomations<TData = Awaited<ReturnType<typeof getAutomations>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAutomations>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAutomations>>,
+          TError,
+          Awaited<ReturnType<typeof getAutomations>>
+        > , 'initialData'
+      >, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAutomations<TData = Awaited<ReturnType<typeof getAutomations>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAutomations>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useGetAutomations<TData = Awaited<ReturnType<typeof getAutomations>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAutomations>>, TError, TData>>, fetch?: RequestInit}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAutomationsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+
+
+export type createAutomationResponse200 = {
+  data: AutomationRow
+  status: 200
+}
+
+export type createAutomationResponseSuccess = (createAutomationResponse200) & {
+  headers: Headers;
+};
+;
+
+export type createAutomationResponse = (createAutomationResponseSuccess)
+
+export const getCreateAutomationUrl = () => {
+
+
+
+
+  return `/api/dashboard/automations`
+}
+
+export const createAutomation = async (automationCreateDto: AutomationCreateDto, options?: RequestInit): Promise<createAutomationResponse> => {
+
+  const res = await fetch(getCreateAutomationUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      automationCreateDto,)
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: createAutomationResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as createAutomationResponse
+}
+
+
+
+
+export const getCreateAutomationMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAutomation>>, TError,{data: AutomationCreateDto}, TContext>, fetch?: RequestInit}
+): UseMutationOptions<Awaited<ReturnType<typeof createAutomation>>, TError,{data: AutomationCreateDto}, TContext> => {
+
+const mutationKey = ['createAutomation'];
+const {mutation: mutationOptions, fetch: fetchOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, fetch: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createAutomation>>, {data: AutomationCreateDto}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createAutomation(data,fetchOptions)
+        }
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateAutomationMutationResult = NonNullable<Awaited<ReturnType<typeof createAutomation>>>
+    export type CreateAutomationMutationBody = AutomationCreateDto
+    export type CreateAutomationMutationError = unknown
+
+    export const useCreateAutomation = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAutomation>>, TError,{data: AutomationCreateDto}, TContext>, fetch?: RequestInit}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createAutomation>>,
+        TError,
+        {data: AutomationCreateDto},
+        TContext
+      > => {
+
+      const mutationOptions = getCreateAutomationMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+
+export type updateAutomationResponse200 = {
+  data: AutomationRow
+  status: 200
+}
+
+export type updateAutomationResponseSuccess = (updateAutomationResponse200) & {
+  headers: Headers;
+};
+;
+
+export type updateAutomationResponse = (updateAutomationResponseSuccess)
+
+export const getUpdateAutomationUrl = (id: string,) => {
+
+
+
+
+  return `/api/dashboard/automations/${id}`
+}
+
+export const updateAutomation = async (id: string,
+    automationUpdateDto: AutomationUpdateDto, options?: RequestInit): Promise<updateAutomationResponse> => {
+
+  const res = await fetch(getUpdateAutomationUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      automationUpdateDto,)
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: updateAutomationResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as updateAutomationResponse
+}
+
+
+
+
+export const getUpdateAutomationMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAutomation>>, TError,{id: string;data: AutomationUpdateDto}, TContext>, fetch?: RequestInit}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAutomation>>, TError,{id: string;data: AutomationUpdateDto}, TContext> => {
+
+const mutationKey = ['updateAutomation'];
+const {mutation: mutationOptions, fetch: fetchOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, fetch: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAutomation>>, {id: string;data: AutomationUpdateDto}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateAutomation(id,data,fetchOptions)
+        }
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAutomationMutationResult = NonNullable<Awaited<ReturnType<typeof updateAutomation>>>
+    export type UpdateAutomationMutationBody = AutomationUpdateDto
+    export type UpdateAutomationMutationError = unknown
+
+    export const useUpdateAutomation = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAutomation>>, TError,{id: string;data: AutomationUpdateDto}, TContext>, fetch?: RequestInit}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateAutomation>>,
+        TError,
+        {id: string;data: AutomationUpdateDto},
+        TContext
+      > => {
+
+      const mutationOptions = getUpdateAutomationMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+
+export type deleteAutomationResponse200 = {
+  data: void
+  status: 200
+}
+
+export type deleteAutomationResponseSuccess = (deleteAutomationResponse200) & {
+  headers: Headers;
+};
+;
+
+export type deleteAutomationResponse = (deleteAutomationResponseSuccess)
+
+export const getDeleteAutomationUrl = (id: string,) => {
+
+
+
+
+  return `/api/dashboard/automations/${id}`
+}
+
+export const deleteAutomation = async (id: string, options?: RequestInit): Promise<deleteAutomationResponse> => {
+
+  const res = await fetch(getDeleteAutomationUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: deleteAutomationResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as deleteAutomationResponse
+}
+
+
+
+
+export const getDeleteAutomationMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAutomation>>, TError,{id: string}, TContext>, fetch?: RequestInit}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteAutomation>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['deleteAutomation'];
+const {mutation: mutationOptions, fetch: fetchOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, fetch: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteAutomation>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteAutomation(id,fetchOptions)
+        }
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteAutomationMutationResult = NonNullable<Awaited<ReturnType<typeof deleteAutomation>>>
+
+    export type DeleteAutomationMutationError = unknown
+
+    export const useDeleteAutomation = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAutomation>>, TError,{id: string}, TContext>, fetch?: RequestInit}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteAutomation>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+
+      const mutationOptions = getDeleteAutomationMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+
+export type toggleAutomationResponse200 = {
+  data: AutomationRow
+  status: 200
+}
+
+export type toggleAutomationResponseSuccess = (toggleAutomationResponse200) & {
+  headers: Headers;
+};
+;
+
+export type toggleAutomationResponse = (toggleAutomationResponseSuccess)
+
+export const getToggleAutomationUrl = (id: string,) => {
+
+
+
+
+  return `/api/dashboard/automations/${id}/toggle`
+}
+
+export const toggleAutomation = async (id: string,
+    automationToggleDto: AutomationToggleDto, options?: RequestInit): Promise<toggleAutomationResponse> => {
+
+  const res = await fetch(getToggleAutomationUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      automationToggleDto,)
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: toggleAutomationResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as toggleAutomationResponse
+}
+
+
+
+
+export const getToggleAutomationMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof toggleAutomation>>, TError,{id: string;data: AutomationToggleDto}, TContext>, fetch?: RequestInit}
+): UseMutationOptions<Awaited<ReturnType<typeof toggleAutomation>>, TError,{id: string;data: AutomationToggleDto}, TContext> => {
+
+const mutationKey = ['toggleAutomation'];
+const {mutation: mutationOptions, fetch: fetchOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, fetch: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof toggleAutomation>>, {id: string;data: AutomationToggleDto}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  toggleAutomation(id,data,fetchOptions)
+        }
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ToggleAutomationMutationResult = NonNullable<Awaited<ReturnType<typeof toggleAutomation>>>
+    export type ToggleAutomationMutationBody = AutomationToggleDto
+    export type ToggleAutomationMutationError = unknown
+
+    export const useToggleAutomation = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof toggleAutomation>>, TError,{id: string;data: AutomationToggleDto}, TContext>, fetch?: RequestInit}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof toggleAutomation>>,
+        TError,
+        {id: string;data: AutomationToggleDto},
+        TContext
+      > => {
+
+      const mutationOptions = getToggleAutomationMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+
+export type runAutomationResponse200 = {
+  data: AutomationRow
+  status: 200
+}
+
+export type runAutomationResponseSuccess = (runAutomationResponse200) & {
+  headers: Headers;
+};
+;
+
+export type runAutomationResponse = (runAutomationResponseSuccess)
+
+export const getRunAutomationUrl = (id: string,) => {
+
+
+
+
+  return `/api/dashboard/automations/${id}/run`
+}
+
+export const runAutomation = async (id: string, options?: RequestInit): Promise<runAutomationResponse> => {
+
+  const res = await fetch(getRunAutomationUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: runAutomationResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as runAutomationResponse
+}
+
+
+
+
+export const getRunAutomationMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runAutomation>>, TError,{id: string}, TContext>, fetch?: RequestInit}
+): UseMutationOptions<Awaited<ReturnType<typeof runAutomation>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['runAutomation'];
+const {mutation: mutationOptions, fetch: fetchOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, fetch: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof runAutomation>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  runAutomation(id,fetchOptions)
+        }
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RunAutomationMutationResult = NonNullable<Awaited<ReturnType<typeof runAutomation>>>
+
+    export type RunAutomationMutationError = unknown
+
+    export const useRunAutomation = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runAutomation>>, TError,{id: string}, TContext>, fetch?: RequestInit}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof runAutomation>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+
+      const mutationOptions = getRunAutomationMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+
+export type cleanupMemoryResponse200 = {
+  data: MemoryMaintenanceResponse
+  status: 200
+}
+
+export type cleanupMemoryResponseSuccess = (cleanupMemoryResponse200) & {
+  headers: Headers;
+};
+;
+
+export type cleanupMemoryResponse = (cleanupMemoryResponseSuccess)
+
+export const getCleanupMemoryUrl = () => {
+
+
+
+
+  return `/api/dashboard/memory/cleanup`
+}
+
+export const cleanupMemory = async ( options?: RequestInit): Promise<cleanupMemoryResponse> => {
+
+  const res = await fetch(getCleanupMemoryUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: cleanupMemoryResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as cleanupMemoryResponse
+}
+
+
+
+
+export const getCleanupMemoryMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cleanupMemory>>, TError,void, TContext>, fetch?: RequestInit}
+): UseMutationOptions<Awaited<ReturnType<typeof cleanupMemory>>, TError,void, TContext> => {
+
+const mutationKey = ['cleanupMemory'];
+const {mutation: mutationOptions, fetch: fetchOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, fetch: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cleanupMemory>>, void> = () => {
+
+
+          return  cleanupMemory(fetchOptions)
+        }
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CleanupMemoryMutationResult = NonNullable<Awaited<ReturnType<typeof cleanupMemory>>>
+
+    export type CleanupMemoryMutationError = unknown
+
+    export const useCleanupMemory = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cleanupMemory>>, TError,void, TContext>, fetch?: RequestInit}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof cleanupMemory>>,
+        TError,
+        void,
+        TContext
+      > => {
+
+      const mutationOptions = getCleanupMemoryMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+
+export type consolidateMemoryResponse200 = {
+  data: MemoryMaintenanceResponse
+  status: 200
+}
+
+export type consolidateMemoryResponseSuccess = (consolidateMemoryResponse200) & {
+  headers: Headers;
+};
+;
+
+export type consolidateMemoryResponse = (consolidateMemoryResponseSuccess)
+
+export const getConsolidateMemoryUrl = () => {
+
+
+
+
+  return `/api/dashboard/memory/consolidate`
+}
+
+export const consolidateMemory = async ( options?: RequestInit): Promise<consolidateMemoryResponse> => {
+
+  const res = await fetch(getConsolidateMemoryUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: consolidateMemoryResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as consolidateMemoryResponse
+}
+
+
+
+
+export const getConsolidateMemoryMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof consolidateMemory>>, TError,void, TContext>, fetch?: RequestInit}
+): UseMutationOptions<Awaited<ReturnType<typeof consolidateMemory>>, TError,void, TContext> => {
+
+const mutationKey = ['consolidateMemory'];
+const {mutation: mutationOptions, fetch: fetchOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, fetch: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof consolidateMemory>>, void> = () => {
+
+
+          return  consolidateMemory(fetchOptions)
+        }
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConsolidateMemoryMutationResult = NonNullable<Awaited<ReturnType<typeof consolidateMemory>>>
+
+    export type ConsolidateMemoryMutationError = unknown
+
+    export const useConsolidateMemory = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof consolidateMemory>>, TError,void, TContext>, fetch?: RequestInit}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof consolidateMemory>>,
+        TError,
+        void,
+        TContext
+      > => {
+
+      const mutationOptions = getConsolidateMemoryMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }

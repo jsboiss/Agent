@@ -48,6 +48,25 @@ public static class DashboardEndpoints
                 await service.List(conversationId, filter ?? "All", cancellationToken))
             .WithName("GetRuns");
         group.MapGet(
+            "/traces",
+            async (string? conversationId, int? limit, ITraceDashboardService service, CancellationToken cancellationToken) =>
+                await service.List(conversationId, limit ?? 50, cancellationToken))
+            .WithName("GetTraces");
+        group.MapGet(
+            "/traces/{id}",
+            async (string id, bool? exact, ITraceDashboardService service, CancellationToken cancellationToken) =>
+                await service.GetDetail(id, exact == true, cancellationToken))
+            .WithName("GetTraceDetail");
+        group.MapGet(
+            "/traces/{id}/stream",
+            async (string id, bool? exact, ITraceDashboardService service, HttpResponse response, CancellationToken cancellationToken) =>
+            {
+                response.ContentType = "text/event-stream; charset=utf-8";
+                response.Headers.CacheControl = "no-cache";
+                await service.StreamDetail(id, exact == true, response.Body, cancellationToken);
+            })
+            .WithName("StreamTraceDetail");
+        group.MapGet(
             "/subagents",
             async (ISubAgentDashboardService service, CancellationToken cancellationToken) =>
                 await service.List(cancellationToken))
@@ -243,11 +262,21 @@ public static class DashboardEndpoints
             async (AutomationCreateDto request, IOperationsDashboardService service, CancellationToken cancellationToken) =>
                 await service.CreateAutomation(request, cancellationToken))
             .WithName("CreateAutomation");
+        group.MapPut(
+            "/automations/{id}",
+            async (string id, AutomationUpdateDto request, IOperationsDashboardService service, CancellationToken cancellationToken) =>
+                await service.UpdateAutomation(id, request, cancellationToken))
+            .WithName("UpdateAutomation");
         group.MapPost(
             "/automations/{id}/toggle",
             async (string id, AutomationToggleDto request, IOperationsDashboardService service, CancellationToken cancellationToken) =>
                 await service.ToggleAutomation(id, request, cancellationToken))
             .WithName("ToggleAutomation");
+        group.MapPost(
+            "/automations/{id}/run",
+            async (string id, IOperationsDashboardService service, CancellationToken cancellationToken) =>
+                await service.RunAutomation(id, cancellationToken))
+            .WithName("RunAutomation");
         group.MapDelete(
             "/automations/{id}",
             async (string id, IOperationsDashboardService service, CancellationToken cancellationToken) =>

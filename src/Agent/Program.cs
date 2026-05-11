@@ -189,6 +189,7 @@ builder.Services.AddSingleton<IDashboardPasswordVerifier, ConfigurationDashboard
 builder.Services.AddScoped<IChatDashboardService, ChatDashboardService>();
 builder.Services.AddScoped<IMemoryDashboardService, MemoryDashboardService>();
 builder.Services.AddScoped<IRunTimelineService, RunTimelineService>();
+builder.Services.AddScoped<ITraceDashboardService, TraceDashboardService>();
 builder.Services.AddScoped<ISubAgentDashboardService, SubAgentDashboardService>();
 builder.Services.AddScoped<IMemoryGraphService, MemoryGraphService>();
 builder.Services.AddScoped<ISettingsDashboardService, SettingsDashboardService>();

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bot, BrainCircuit, GitBranch, LogOut, MessageSquareText, Network, Settings, SlidersHorizontal } from "lucide-react";
+import { Activity, Bot, BrainCircuit, CalendarClock, LogOut, MessageSquareText, Network, Settings } from "lucide-react";
+import { ActivityPage } from "./pages/ActivityPage";
+import { AutomationsPage } from "./pages/AutomationsPage";
 import { ChatPage } from "./pages/ChatPage";
 import { GraphPage } from "./pages/GraphPage";
 import { MemoriesPage } from "./pages/MemoriesPage";
@@ -10,11 +12,11 @@ import { OperationsPage } from "./pages/OperationsPage";
 
 const navItems = [
   { path: "/", label: "Chat", icon: MessageSquareText },
-  { path: "/memories", label: "Memories", icon: BrainCircuit },
-  { path: "/runs", label: "Runs", icon: GitBranch },
-  { path: "/subagents", label: "Subagents", icon: Bot },
-  { path: "/operations", label: "Operations", icon: SlidersHorizontal },
+  { path: "/activity", label: "Activity", icon: Activity },
+  { path: "/memories", label: "Memory", icon: BrainCircuit },
+  { path: "/automations", label: "Automations", icon: CalendarClock },
   { path: "/graph", label: "Graph", icon: Network },
+  { path: "/subagents", label: "Agents", icon: Bot },
   { path: "/settings", label: "Settings", icon: Settings }
 ];
 
@@ -30,19 +32,25 @@ export function App() {
 
   const page = useMemo(() => {
     switch (path) {
-      case "/memories":
-        return <MemoriesPage />;
+      case "/activity":
       case "/runs":
       case "/events":
-        return <RunsPage />;
+        return <ActivityPage />;
+      case "/memories":
+        return <MemoriesPage />;
+      case "/automations":
+      case "/operations":
+        return <AutomationsPage />;
       case "/subagents":
         return <SubAgentsPage />;
-      case "/operations":
-        return <OperationsPage />;
       case "/graph":
         return <GraphPage />;
       case "/settings":
         return <SettingsPage />;
+      case "/legacy-runs":
+        return <RunsPage />;
+      case "/legacy-operations":
+        return <OperationsPage />;
       default:
         return <ChatPage />;
     }
@@ -61,7 +69,7 @@ export function App() {
         </button>
         <nav className="rail-nav">
           {navItems.map((item) => (
-            <button className={`rail-link ${path === item.path || (item.path === "/runs" && path === "/events") ? "active" : ""}`} key={item.path} onClick={() => navigate(item.path)} title={item.label}>
+            <button className={`rail-link ${path === item.path || (item.path === "/activity" && (path === "/runs" || path === "/events")) || (item.path === "/automations" && path === "/operations") ? "active" : ""}`} key={item.path} onClick={() => navigate(item.path)} title={item.label}>
               <item.icon aria-hidden="true" size={17} strokeWidth={1.8} />
               <span>{item.label}</span>
             </button>

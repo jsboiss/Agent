@@ -83,7 +83,8 @@ public static class DashboardAuthEndpoints
     {
         return path.StartsWithSegments("/login", StringComparison.OrdinalIgnoreCase)
             || path.StartsWithSegments("/logout", StringComparison.OrdinalIgnoreCase)
-            || path.StartsWithSegments("/api/health", StringComparison.OrdinalIgnoreCase);
+            || path.StartsWithSegments("/api/health", StringComparison.OrdinalIgnoreCase)
+            || path.StartsWithSegments("/openapi", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string RenderLoginPage(string? returnUrl, string? error, bool isConfigurationMissing)

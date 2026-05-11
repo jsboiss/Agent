@@ -803,7 +803,8 @@ public sealed class AgentMessageProcessor(
                 {
                     ["toolCallId"] = toolCall.Id,
                     ["toolName"] = toolCall.Name,
-                    ["ConversationEntryId"] = userEntryId
+                    ["ConversationEntryId"] = userEntryId,
+                    ["arguments"] = JsonSerializer.Serialize(toolCall.Arguments)
                 }));
             await PublishPending(events, eventCursor, cancellationToken);
 
@@ -1098,7 +1099,8 @@ public sealed class AgentMessageProcessor(
                     ["iteration"] = iteration.ToString(),
                     ["toolsetProfile"] = request.Resources.Workspace.ToolsetProfile.ToString(),
                     ["availableToolCount"] = request.AvailableTools.Count.ToString(),
-                    ["instructionSources"] = string.Join(";", request.Resources.Workspace.LoadedInstructionSources)
+                    ["instructionSources"] = string.Join(";", request.Resources.Workspace.LoadedInstructionSources),
+                    ["systemPrompt"] = request.Resources.BuildSystemPrompt()
                 });
     }
 

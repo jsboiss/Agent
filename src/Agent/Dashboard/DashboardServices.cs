@@ -16,6 +16,7 @@ using Agent.Messages;
 using Agent.Settings;
 using Agent.SubAgents;
 using Agent.Tokens;
+using Agent.Tools;
 using Agent.Workspaces;
 using Markdig;
 using Microsoft.Extensions.Options;
@@ -240,12 +241,12 @@ public sealed class ChatDashboardService(
     private static string RepairMojibake(string value)
     {
         return value
-            .Replace("Ãƒâ€Ãƒâ€¡Ãƒâ€“", "'", StringComparison.Ordinal)
-            .Replace("Ãƒâ€Ãƒâ€¡Ã‚Â£", "\"", StringComparison.Ordinal)
-            .Replace("Ãƒâ€Ãƒâ€¡ÃƒËœ", "\"", StringComparison.Ordinal)
-            .Replace("Ãƒâ€Ãƒâ€¡ÃƒÂ´", "-", StringComparison.Ordinal)
-            .Replace("Ãƒâ€Ãƒâ€¡ÃƒÂ¶", "-", StringComparison.Ordinal)
-            .Replace("Ãƒâ€Ãƒâ€¡Ã‚Âª", "...", StringComparison.Ordinal);
+            .Replace("ÃƒÆ’Ã¢â‚¬ÂÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã¢â‚¬â€œ", "'", StringComparison.Ordinal)
+            .Replace("ÃƒÆ’Ã¢â‚¬ÂÃƒÆ’Ã¢â‚¬Â¡Ãƒâ€šÃ‚Â£", "\"", StringComparison.Ordinal)
+            .Replace("ÃƒÆ’Ã¢â‚¬ÂÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã‹Å“", "\"", StringComparison.Ordinal)
+            .Replace("ÃƒÆ’Ã¢â‚¬ÂÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã‚Â´", "-", StringComparison.Ordinal)
+            .Replace("ÃƒÆ’Ã¢â‚¬ÂÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã‚Â¶", "-", StringComparison.Ordinal)
+            .Replace("ÃƒÆ’Ã¢â‚¬ÂÃƒÆ’Ã¢â‚¬Â¡Ãƒâ€šÃ‚Âª", "...", StringComparison.Ordinal);
     }
 }
 
@@ -482,6 +483,474 @@ public sealed class RunTimelineService(IAgentEventStore eventStore) : IRunTimeli
             ? normalized
             : normalized[..length] + "...";
     }
+}
+
+public sealed class TraceDashboardService(
+    IAgentEventStore eventStore,
+    IAgentRunStore runStore,
+    IAutomationRunStore automationRunStore,
+    IAgentTokenTracker tokenTracker,
+    IAgentSettingsResolver settingsResolver,
+    IAgentWorkspaceStore workspaceStore,
+    IWebHostEnvironment environment) : ITraceDashboardService
+{
+    private static JsonSerializerOptions JsonOptions { get; } = new(JsonSerializerDefaults.Web);
+
+    public async Task<TraceListSnapshot> List(
+        string? conversationId,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        var normalizedConversationId = string.IsNullOrWhiteSpace(conversationId) ? "main" : conversationId;
+        var events = await eventStore.List(normalizedConversationId, 800, cancellationToken);
+        var turns = GetTurnEventGroups(events)
+            .OrderByDescending(x => x.StartedAt)
+            .Take(Math.Clamp(limit, 1, 100))
+            .Select(x => ToTurnRow(x.Id, normalizedConversationId, x.Events, x.StartedAt))
+            .ToArray();
+
+        return new TraceListSnapshot(normalizedConversationId, turns);
+    }
+
+    public async Task<TraceDetailSnapshot> GetDetail(
+        string turnId,
+        bool exact,
+        CancellationToken cancellationToken)
+    {
+        var events = await eventStore.List(null, 1200, cancellationToken);
+        var group = GetTurnEventGroups(events)
+            .FirstOrDefault(x => string.Equals(x.Id, turnId, StringComparison.OrdinalIgnoreCase));
+
+        if (group is null)
+        {
+            throw new InvalidOperationException($"Trace turn '{turnId}' was not found.");
+        }
+
+        var rows = group.Events.OrderBy(x => x.CreatedAt).Select(RunTimelineService.ToRow).ToArray();
+        var tokenSummary = TokenUsageDashboardMapper.FromEvents(group.Events, tokenTracker);
+        var provider = group.Events
+            .Select(x => x.Data.GetValueOrDefault("provider"))
+            .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x))
+            ?? "unknown";
+        var model = await GetConfiguredModel(group.ConversationId, cancellationToken);
+        var tools = GetToolRows(group.Events, exact);
+        var memories = GetMemoryRows(group.Events, exact);
+        var agents = await GetAgentRows(group.Events, exact, cancellationToken);
+        var promptSections = GetPromptSections(group.Events, exact);
+        var turn = ToTurnRow(group.Id, group.ConversationId, group.Events, group.StartedAt);
+
+        return new TraceDetailSnapshot(
+            turn,
+            provider,
+            model,
+            tokenSummary,
+            rows.Select(ToTraceStep).ToArray(),
+            promptSections,
+            memories,
+            tools,
+            agents,
+            rows,
+            DateTimeOffset.UtcNow);
+    }
+
+    public async Task StreamDetail(
+        string turnId,
+        bool exact,
+        Stream responseStream,
+        CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            var snapshot = await GetDetail(turnId, exact, cancellationToken);
+            await WriteSse("snapshot", snapshot, responseStream, cancellationToken);
+
+            if (!string.Equals(snapshot.Turn.Status, "Running", StringComparison.OrdinalIgnoreCase))
+            {
+                await WriteSse("done", snapshot, responseStream, cancellationToken);
+                return;
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+        }
+    }
+
+    private async Task<string> GetConfiguredModel(string conversationId, CancellationToken cancellationToken)
+    {
+        var workspaceResolution = await workspaceStore.GetOrCreateActive(
+            WorkspacePathResolver.GetDefaultAgentWorkspacePath(environment.ContentRootPath),
+            cancellationToken);
+        var settings = await settingsResolver.Resolve(
+            new AgentSettingsResolveRequest(
+                new Conversation(
+                    conversationId,
+                    ConversationKind.Main,
+                    null,
+                    null,
+                    DateTimeOffset.UtcNow,
+                    DateTimeOffset.UtcNow),
+                "local-web",
+                workspaceResolution.Workspace.RootPath,
+                new Dictionary<string, string>()),
+            cancellationToken);
+
+        return settings.Get("model") ?? "configured model";
+    }
+
+    private async Task<IReadOnlyList<TraceAgentRunRow>> GetAgentRows(
+        IReadOnlyList<AgentEvent> events,
+        bool exact,
+        CancellationToken cancellationToken)
+    {
+        var runIds = events
+            .SelectMany(x => new[]
+            {
+                x.Data.GetValueOrDefault("runId"),
+                x.Data.GetValueOrDefault("sourceRunId"),
+                x.Data.GetValueOrDefault("subAgentRunId")
+            })
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        List<TraceAgentRunRow> rows = [];
+
+        foreach (var runId in runIds)
+        {
+            var run = await runStore.Get(runId!, cancellationToken);
+
+            if (run is null)
+            {
+                continue;
+            }
+
+            rows.Add(new TraceAgentRunRow(
+                run.Id,
+                run.Status.ToString(),
+                run.Kind.ToString(),
+                run.Channel,
+                exact ? "available" : "redacted",
+                Shorten(run.Prompt, 180),
+                exact ? run.Prompt : null,
+                exact ? run.FinalResponse : Shorten(run.FinalResponse ?? string.Empty, 220),
+                run.Error,
+                run.StartedAt,
+                run.CompletedAt));
+        }
+
+        var automationRunIds = events
+            .Select(x => x.Data.GetValueOrDefault("automationRunId"))
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        foreach (var runId in automationRunIds)
+        {
+            var run = await automationRunStore.Get(runId!, cancellationToken);
+
+            if (run is null)
+            {
+                continue;
+            }
+
+            rows.Add(new TraceAgentRunRow(
+                run.Id,
+                run.Status.ToString(),
+                $"Automation/{run.Trigger}",
+                "automation",
+                exact ? "available" : "redacted",
+                Shorten(run.OutputSummary ?? run.AutomationId, 180),
+                exact ? run.OutputSummary : null,
+                exact ? run.OutputSummary : Shorten(run.OutputSummary ?? string.Empty, 220),
+                run.Error,
+                run.StartedAt,
+                run.CompletedAt));
+        }
+
+        return rows;
+    }
+
+    private static IReadOnlyList<TraceToolCallRow> GetToolRows(IReadOnlyList<AgentEvent> events, bool exact)
+    {
+        var byId = events
+            .Where(x => !string.IsNullOrWhiteSpace(x.Data.GetValueOrDefault("toolCallId")) || !string.IsNullOrWhiteSpace(x.Data.GetValueOrDefault("toolName")))
+            .GroupBy(x => x.Data.GetValueOrDefault("toolCallId") ?? x.Id, StringComparer.OrdinalIgnoreCase);
+        List<TraceToolCallRow> rows = [];
+
+        foreach (var group in byId)
+        {
+            var ordered = group.OrderBy(x => x.CreatedAt).ToArray();
+            var started = ordered.FirstOrDefault(x => x.Kind == AgentEventKind.ToolCallStarted) ?? ordered.First();
+            var output = ordered.LastOrDefault(x => x.Kind == AgentEventKind.ToolCallOutput);
+            var completed = ordered.LastOrDefault(x => x.Kind == AgentEventKind.ToolCallCompleted || x.Kind == AgentEventKind.ProviderError);
+            var name = started.Data.GetValueOrDefault("toolName") ?? started.Data.GetValueOrDefault("providerId") ?? "tool";
+            var arguments = started.Data.GetValueOrDefault("arguments") ?? started.Data.GetValueOrDefault("query") ?? string.Empty;
+            var outputText = output?.Data.GetValueOrDefault("output") ?? string.Empty;
+            var isError = ordered.Any(x => x.Kind == AgentEventKind.ProviderError || !string.IsNullOrWhiteSpace(x.Data.GetValueOrDefault("error")));
+
+            rows.Add(new TraceToolCallRow(
+                group.Key,
+                name,
+                completed is null ? "Running" : isError ? "Failed" : "Completed",
+                exact ? "available" : "redacted",
+                Shorten(arguments, 160),
+                exact ? arguments : null,
+                Shorten(outputText, 220),
+                exact ? outputText : null,
+                isError));
+        }
+
+        return rows;
+    }
+
+    private static IReadOnlyList<TraceMemoryRow> GetMemoryRows(IReadOnlyList<AgentEvent> events, bool exact)
+    {
+        List<TraceMemoryRow> rows = [];
+
+        foreach (var agentEvent in events.Where(x => x.Kind is AgentEventKind.MemoryInjected or AgentEventKind.MemoryRecall or AgentEventKind.MemoryWrite or AgentEventKind.MemoryExtraction or AgentEventKind.MemoryScoutCompleted))
+        {
+            var memoryIds = (agentEvent.Data.GetValueOrDefault("memoryIds")
+                    ?? agentEvent.Data.GetValueOrDefault("memoryId")
+                    ?? string.Empty)
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            if (memoryIds.Length == 0)
+            {
+                rows.Add(new TraceMemoryRow(
+                    agentEvent.Id,
+                    GetMemoryAction(agentEvent.Kind),
+                    agentEvent.Data.GetValueOrDefault("segment") ?? "unknown",
+                    agentEvent.Data.GetValueOrDefault("tier") ?? "unknown",
+                    "unavailable",
+                    RunTimelineService.ToRow(agentEvent).Summary,
+                    null,
+                    agentEvent.Data.GetValueOrDefault("reason") ?? agentEvent.Kind.ToString()));
+                continue;
+            }
+
+            foreach (var memoryId in memoryIds)
+            {
+                var text = agentEvent.Data.GetValueOrDefault("text") ?? agentEvent.Data.GetValueOrDefault("content");
+                rows.Add(new TraceMemoryRow(
+                    memoryId,
+                    GetMemoryAction(agentEvent.Kind),
+                    agentEvent.Data.GetValueOrDefault("segment") ?? "unknown",
+                    agentEvent.Data.GetValueOrDefault("tier") ?? "unknown",
+                    exact && !string.IsNullOrWhiteSpace(text) ? "available" : "redacted",
+                    string.IsNullOrWhiteSpace(text) ? $"Memory {memoryId}" : Shorten(text, 180),
+                    exact ? text : null,
+                    agentEvent.Data.GetValueOrDefault("reason") ?? agentEvent.Kind.ToString()));
+            }
+        }
+
+        return rows;
+    }
+
+    private static IReadOnlyList<TracePromptSection> GetPromptSections(IReadOnlyList<AgentEvent> events, bool exact)
+    {
+        var providerStarts = events
+            .Where(x => x.Kind == AgentEventKind.ProviderRequestStarted)
+            .OrderBy(x => x.CreatedAt)
+            .ToArray();
+        List<TracePromptSection> sections = [];
+
+        foreach (var agentEvent in providerStarts)
+        {
+            var iteration = agentEvent.Data.GetValueOrDefault("iteration") ?? "1";
+            var systemPrompt = agentEvent.Data.GetValueOrDefault("systemPrompt") ?? string.Empty;
+            var summary = string.IsNullOrWhiteSpace(systemPrompt)
+                ? $"Provider request {iteration}. Exact prompt was not recorded for this event."
+                : $"Provider request {iteration}; {systemPrompt.Length:N0} characters.";
+
+            sections.Add(new TracePromptSection(
+                $"provider:{agentEvent.Id}",
+                $"Provider request {iteration}",
+                exact && !string.IsNullOrWhiteSpace(systemPrompt) ? "available" : string.IsNullOrWhiteSpace(systemPrompt) ? "unavailable" : "redacted",
+                summary,
+                exact ? systemPrompt : null));
+
+            var instructions = agentEvent.Data.GetValueOrDefault("instructionSources");
+
+            if (!string.IsNullOrWhiteSpace(instructions))
+            {
+                sections.Add(new TracePromptSection(
+                    $"instructions:{agentEvent.Id}",
+                    "Instruction sources",
+                    "available",
+                    instructions,
+                    instructions));
+            }
+        }
+
+        return sections;
+    }
+
+    private static TraceStepRow ToTraceStep(RunEventRow row)
+    {
+        return new TraceStepRow(
+            row.Id,
+            row.Kind,
+            row.Phase,
+            GetStepTitle(row),
+            row.Summary,
+            row.CreatedAt,
+            row.IsError ? "Failed" : "Completed",
+            row.IsError);
+    }
+
+    private static string GetStepTitle(RunEventRow row)
+    {
+        if (row.Metadata.TryGetValue("toolName", out var toolName) && !string.IsNullOrWhiteSpace(toolName))
+        {
+            return toolName;
+        }
+
+        if (row.Metadata.TryGetValue("provider", out var provider) && !string.IsNullOrWhiteSpace(provider))
+        {
+            return provider;
+        }
+
+        return row.Phase;
+    }
+
+    private static TraceTurnRow ToTurnRow(
+        string turnId,
+        string conversationId,
+        IReadOnlyList<AgentEvent> events,
+        DateTimeOffset startedAt)
+    {
+        var completedAt = events.Max(x => x.CreatedAt);
+        var errorCount = events.Count(x => x.Kind == AgentEventKind.ProviderError || !string.IsNullOrWhiteSpace(x.Data.GetValueOrDefault("error")));
+        var running = !events.Any(x =>
+            x.Kind is AgentEventKind.ProviderTurnCompleted or AgentEventKind.ProviderError
+            || (x.Kind == AgentEventKind.MessagePersisted
+                && string.Equals(x.Data.GetValueOrDefault("role"), ConversationEntryRole.Assistant.ToString(), StringComparison.OrdinalIgnoreCase)));
+        var userMessage = events
+            .FirstOrDefault(x => x.Kind == AgentEventKind.MessagePersisted
+                && string.Equals(x.Data.GetValueOrDefault("role"), ConversationEntryRole.User.ToString(), StringComparison.OrdinalIgnoreCase))
+            ?.Data
+            .GetValueOrDefault("message");
+
+        return new TraceTurnRow(
+            turnId,
+            conversationId,
+            Shorten(userMessage ?? $"Turn {turnId}", 80),
+            errorCount > 0 ? "Failed" : running ? "Running" : "Completed",
+            startedAt,
+            running ? null : completedAt,
+            events.Count,
+            events.Count(x => x.Kind == AgentEventKind.ToolCallStarted),
+            CountMemoryEvents(events),
+            events.Select(x => x.Data.GetValueOrDefault("runId")).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).Count(),
+            errorCount,
+            GetTurnSummary(events));
+    }
+
+    private static string GetTurnSummary(IReadOnlyList<AgentEvent> events)
+    {
+        var tools = events.Count(x => x.Kind == AgentEventKind.ToolCallStarted);
+        var memories = CountMemoryEvents(events);
+        var agents = events.Select(x => x.Data.GetValueOrDefault("runId")).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).Count();
+        List<string> parts = [];
+
+        if (tools > 0)
+        {
+            parts.Add($"{tools} tools");
+        }
+
+        if (memories > 0)
+        {
+            parts.Add($"{memories} memories");
+        }
+
+        if (agents > 0)
+        {
+            parts.Add($"{agents} agent runs");
+        }
+
+        return parts.Count == 0 ? "Provider response" : string.Join(", ", parts);
+    }
+
+    private static int CountMemoryEvents(IReadOnlyList<AgentEvent> events)
+    {
+        return events.Count(x => x.Kind is AgentEventKind.MemoryScoutCompleted or AgentEventKind.MemoryInjected or AgentEventKind.MemoryRecall or AgentEventKind.MemoryWrite or AgentEventKind.MemoryExtraction);
+    }
+
+    private static IReadOnlyList<TurnEventGroup> GetTurnEventGroups(IReadOnlyList<AgentEvent> events)
+    {
+        var ordered = events.OrderBy(x => x.CreatedAt).ToArray();
+        var starts = ordered
+            .Where(x => x.Kind == AgentEventKind.MessagePersisted
+                && string.Equals(x.Data.GetValueOrDefault("role"), ConversationEntryRole.User.ToString(), StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(x.Data.GetValueOrDefault("ConversationEntryId")))
+            .ToArray();
+        List<TurnEventGroup> groups = [];
+
+        for (var x = 0; x < starts.Length; x++)
+        {
+            var start = starts[x];
+            var end = x + 1 < starts.Length ? starts[x + 1].CreatedAt : DateTimeOffset.MaxValue;
+            var id = start.Data.GetValueOrDefault("ConversationEntryId") ?? start.Id;
+            var groupEvents = ordered
+                .Where(y => y.ConversationId == start.ConversationId && y.CreatedAt >= start.CreatedAt && y.CreatedAt < end)
+                .ToArray();
+
+            groups.Add(new TurnEventGroup(id, start.ConversationId, start.CreatedAt, groupEvents));
+        }
+
+        if (groups.Count == 0 && ordered.Length > 0)
+        {
+            groups.Add(new TurnEventGroup(ordered[0].Id, ordered[0].ConversationId, ordered[0].CreatedAt, ordered));
+        }
+
+        return groups;
+    }
+
+    private static string GetMemoryAction(AgentEventKind kind)
+    {
+        return kind switch
+        {
+            AgentEventKind.MemoryInjected => "Injected",
+            AgentEventKind.MemoryRecall => "Fetched",
+            AgentEventKind.MemoryWrite => "Written",
+            AgentEventKind.MemoryExtraction => "Extracted",
+            AgentEventKind.MemoryScoutCompleted => "Considered",
+            _ => "Memory"
+        };
+    }
+
+    private static string Shorten(string value, int length)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var normalized = string.Join(
+            " ",
+            value.Split([' ', '\r', '\n', '\t'], StringSplitOptions.RemoveEmptyEntries));
+
+        return normalized.Length <= length
+            ? normalized
+            : normalized[..length] + "...";
+    }
+
+    private static async Task WriteSse(
+        string eventName,
+        object payload,
+        Stream responseStream,
+        CancellationToken cancellationToken)
+    {
+        var json = JsonSerializer.Serialize(payload, JsonOptions);
+        var content = $"event: {eventName}\ndata: {json}\n\n";
+        var bytes = Encoding.UTF8.GetBytes(content);
+        await responseStream.WriteAsync(bytes, cancellationToken);
+        await responseStream.FlushAsync(cancellationToken);
+    }
+
+    private sealed record TurnEventGroup(
+        string Id,
+        string ConversationId,
+        DateTimeOffset StartedAt,
+        IReadOnlyList<AgentEvent> Events);
 }
 
 public sealed class SubAgentDashboardService(
@@ -813,12 +1282,12 @@ public sealed class SubAgentDashboardService(
     private static string RepairMojibake(string value)
     {
         return value
-            .Replace("ÃƒÆ’Ã¢â‚¬ÂÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã¢â‚¬â€œ", "'", StringComparison.Ordinal)
-            .Replace("ÃƒÆ’Ã¢â‚¬ÂÃƒÆ’Ã¢â‚¬Â¡Ãƒâ€šÃ‚Â£", "\"", StringComparison.Ordinal)
-            .Replace("ÃƒÆ’Ã¢â‚¬ÂÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã‹Å“", "\"", StringComparison.Ordinal)
-            .Replace("ÃƒÆ’Ã¢â‚¬ÂÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã‚Â´", "-", StringComparison.Ordinal)
-            .Replace("ÃƒÆ’Ã¢â‚¬ÂÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã‚Â¶", "-", StringComparison.Ordinal)
-            .Replace("ÃƒÆ’Ã¢â‚¬ÂÃƒÆ’Ã¢â‚¬Â¡Ãƒâ€šÃ‚Âª", "...", StringComparison.Ordinal);
+            .Replace("ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“", "'", StringComparison.Ordinal)
+            .Replace("ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£", "\"", StringComparison.Ordinal)
+            .Replace("ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œ", "\"", StringComparison.Ordinal)
+            .Replace("ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´", "-", StringComparison.Ordinal)
+            .Replace("ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¶", "-", StringComparison.Ordinal)
+            .Replace("ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âª", "...", StringComparison.Ordinal);
     }
 }
 
@@ -1629,6 +2098,8 @@ public sealed class OperationsDashboardService(
     ISubAgentCoordinator subAgentCoordinator,
     IAgentDraftStore draftStore,
     IAutomationStore automationStore,
+    IAutomationRunStore automationRunStore,
+    IAgentToolExecutor toolExecutor,
     IMemoryMaintenanceService memoryMaintenanceService,
     IAgentCapabilityRegistry capabilityRegistry) : IOperationsDashboardService
 {
@@ -1697,8 +2168,14 @@ public sealed class OperationsDashboardService(
     public async Task<IReadOnlyList<AutomationRow>> ListAutomations(CancellationToken cancellationToken)
     {
         var automations = await automationStore.List(cancellationToken);
+        List<AutomationRow> rows = [];
 
-        return automations.Select(ToRow).ToArray();
+        foreach (var automation in automations)
+        {
+            rows.Add(await ToRow(automation, cancellationToken));
+        }
+
+        return rows;
     }
 
     public async Task<AutomationRow> CreateAutomation(
@@ -1714,10 +2191,37 @@ public sealed class OperationsDashboardService(
                 string.IsNullOrWhiteSpace(request.ConversationId) ? "main" : request.ConversationId,
                 string.IsNullOrWhiteSpace(request.Channel) ? "local-web" : request.Channel,
                 request.NotificationTarget,
-                capabilityRegistry.Parse(request.Capabilities)),
+                capabilityRegistry.Parse(request.Capabilities),
+                request.WorkspaceRootPath,
+                request.SkillIds),
             cancellationToken);
 
-        return ToRow(automation);
+        return await ToRow(automation, cancellationToken);
+    }
+
+    public async Task<AutomationRow> UpdateAutomation(
+        string id,
+        AutomationUpdateDto request,
+        CancellationToken cancellationToken)
+    {
+        var existing = await automationStore.Get(id, cancellationToken)
+            ?? throw new InvalidOperationException($"Automation '{id}' was not found.");
+        var automation = await automationStore.Update(
+            id,
+            new AutomationWriteRequest(
+                string.IsNullOrWhiteSpace(request.Name) ? existing.Name : request.Name.Trim(),
+                string.IsNullOrWhiteSpace(request.Task) ? existing.Task : request.Task.Trim(),
+                string.IsNullOrWhiteSpace(request.Schedule) ? existing.Schedule : request.Schedule.Trim(),
+                Enum.TryParse<AutomationExecutionMode>(request.Mode, true, out var mode) ? mode : existing.Mode,
+                string.IsNullOrWhiteSpace(request.ConversationId) ? existing.ConversationId : request.ConversationId,
+                string.IsNullOrWhiteSpace(request.Channel) ? existing.Channel : request.Channel,
+                request.NotificationTarget,
+                capabilityRegistry.Parse(request.Capabilities, existing.Capabilities),
+                string.IsNullOrWhiteSpace(request.WorkspaceRootPath) ? existing.WorkspaceRootPath : request.WorkspaceRootPath,
+                string.IsNullOrWhiteSpace(request.SkillIds) ? existing.SkillIds : request.SkillIds),
+            cancellationToken);
+
+        return await ToRow(automation, cancellationToken);
     }
 
     public async Task<AutomationRow> ToggleAutomation(
@@ -1730,7 +2234,31 @@ public sealed class OperationsDashboardService(
             request.Enabled ? AutomationStatus.Enabled : AutomationStatus.Disabled,
             cancellationToken);
 
-        return ToRow(automation);
+        return await ToRow(automation, cancellationToken);
+    }
+
+    public async Task<AutomationRow> RunAutomation(string id, CancellationToken cancellationToken)
+    {
+        var automation = await automationStore.Get(id, cancellationToken)
+            ?? throw new InvalidOperationException($"Automation '{id}' was not found.");
+
+        await toolExecutor.Execute(
+            new AgentToolRequest(
+                "automation",
+                new Dictionary<string, string>
+                {
+                    ["action"] = "run_now",
+                    ["automationId"] = automation.Id
+                },
+                automation.ConversationId,
+                "local-web",
+                automation.LastRunId ?? automation.Id),
+            cancellationToken);
+
+        return await ToRow(
+            await automationStore.Get(id, cancellationToken)
+                ?? throw new InvalidOperationException($"Automation '{id}' was not found."),
+            cancellationToken);
     }
 
     public async Task DeleteAutomation(string id, CancellationToken cancellationToken)
@@ -1763,8 +2291,12 @@ public sealed class OperationsDashboardService(
             draft.UpdatedAt);
     }
 
-    private static AutomationRow ToRow(AgentAutomation automation)
+    private async Task<AutomationRow> ToRow(
+        AgentAutomation automation,
+        CancellationToken cancellationToken)
     {
+        var runs = await automationRunStore.List(automation.Id, 5, cancellationToken);
+
         return new AutomationRow(
             automation.Id,
             automation.Name,
@@ -1781,7 +2313,24 @@ public sealed class OperationsDashboardService(
             automation.LastRunId,
             automation.LastResult,
             automation.WorkspaceRootPath,
-            automation.SkillIds);
+            automation.SkillIds,
+            runs.Select(ToRunRow).ToArray());
+    }
+
+    private static AutomationRunRow ToRunRow(AgentAutomationRun run)
+    {
+        return new AutomationRunRow(
+            run.Id,
+            run.AutomationId,
+            run.SubAgentRunId,
+            run.Status.ToString(),
+            run.Trigger.ToString(),
+            run.OutputSummary,
+            run.Error,
+            run.WorkspaceRootPath,
+            run.SkillIds,
+            run.StartedAt,
+            run.CompletedAt);
     }
 
     private static MemoryMaintenanceResponse ToResponse(MemoryMaintenanceResult result)
