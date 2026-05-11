@@ -1,6 +1,8 @@
 using Agent.Conversations;
 using Agent.Events;
+using Agent.Automations;
 using Agent.Calendar;
+using Agent.Capabilities;
 using Agent.Notifications;
 using Agent.ProjectNotes;
 using Agent.Providers;
@@ -29,6 +31,7 @@ public sealed class SubAgentRunWorker(
     IProjectNoteStore projectNoteStore,
     IProjectNoteDistiller projectNoteDistiller,
     IAgentNotifier notifier,
+    IAutomationRunStore automationRunStore,
     ILogger<SubAgentRunWorker> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -87,7 +90,16 @@ public sealed class SubAgentRunWorker(
                 }),
             cancellationToken);
         var resources = await resourceLoader.Load(
-            new AgentResourceLoadRequest(conversation, item.Channel, providerType, settings, workspace.RootPath, item.Capabilities),
+            new AgentResourceLoadRequest(
+                conversation,
+                item.Channel,
+                providerType,
+                settings,
+                workspace.RootPath,
+                item.Capabilities,
+                string.Equals(item.Channel, "automation", StringComparison.OrdinalIgnoreCase)
+                    ? ToolsetProfile.AutomationRun
+                    : ToolsetProfile.SubAgentWork),
             cancellationToken);
         var provider = providerSelector.Get(providerType);
 
@@ -108,6 +120,9 @@ public sealed class SubAgentRunWorker(
                 ["routeKind"] = AgentRouteKind.Work.ToString(),
                 ["capabilities"] = item.Capabilities.ToString(),
                 ["requiresConfirmation"] = item.RequiresConfirmation.ToString(),
+                ["toolsetProfile"] = resources.Workspace.ToolsetProfile.ToString(),
+                ["availableToolCount"] = resources.Workspace.AvailableTools.Count.ToString(),
+                ["instructionSources"] = string.Join(";", resources.Workspace.LoadedInstructionSources),
                 ["message"] = "Sub-agent background run started."
             },
             cancellationToken);
@@ -188,6 +203,7 @@ public sealed class SubAgentRunWorker(
         }
 
         await AddConversationResult(item, result, status, cancellationToken);
+        await CompleteAutomationRun(item, status, item.RunId, result.AssistantMessage, result.Error, cancellationToken);
         await RecordProjectActivity(workspace, item, result, status, cancellationToken);
         await Notify(item, result, status, cancellationToken);
         var completedData = new Dictionary<string, string>
@@ -325,6 +341,29 @@ public sealed class SubAgentRunWorker(
             },
             cancellationToken);
         await Notify(item, new AgentProviderResult(content, [], new Dictionary<string, string>(), error), status, cancellationToken);
+        await CompleteAutomationRun(item, status, item.RunId, content, error, cancellationToken);
+    }
+
+    private async Task CompleteAutomationRun(
+        SubAgentWorkItem item,
+        AgentRunStatus status,
+        string? subAgentRunId,
+        string? outputSummary,
+        string? error,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(item.AutomationRunId))
+        {
+            return;
+        }
+
+        await automationRunStore.Complete(
+            item.AutomationRunId,
+            status == AgentRunStatus.Completed ? AutomationRunStatus.Completed : AutomationRunStatus.Failed,
+            subAgentRunId,
+            outputSummary,
+            error,
+            cancellationToken);
     }
 
     private static string GetTaskPrompt(SubAgentWorkItem item)

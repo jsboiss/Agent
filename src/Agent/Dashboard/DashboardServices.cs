@@ -240,12 +240,12 @@ public sealed class ChatDashboardService(
     private static string RepairMojibake(string value)
     {
         return value
-            .Replace("ÔÇÖ", "'", StringComparison.Ordinal)
-            .Replace("ÔÇ£", "\"", StringComparison.Ordinal)
-            .Replace("ÔÇØ", "\"", StringComparison.Ordinal)
-            .Replace("ÔÇô", "-", StringComparison.Ordinal)
-            .Replace("ÔÇö", "-", StringComparison.Ordinal)
-            .Replace("ÔÇª", "...", StringComparison.Ordinal);
+            .Replace("Ãƒâ€Ãƒâ€¡Ãƒâ€“", "'", StringComparison.Ordinal)
+            .Replace("Ãƒâ€Ãƒâ€¡Ã‚Â£", "\"", StringComparison.Ordinal)
+            .Replace("Ãƒâ€Ãƒâ€¡ÃƒËœ", "\"", StringComparison.Ordinal)
+            .Replace("Ãƒâ€Ãƒâ€¡ÃƒÂ´", "-", StringComparison.Ordinal)
+            .Replace("Ãƒâ€Ãƒâ€¡ÃƒÂ¶", "-", StringComparison.Ordinal)
+            .Replace("Ãƒâ€Ãƒâ€¡Ã‚Âª", "...", StringComparison.Ordinal);
     }
 }
 
@@ -813,12 +813,12 @@ public sealed class SubAgentDashboardService(
     private static string RepairMojibake(string value)
     {
         return value
-            .Replace("Ã”Ã‡Ã–", "'", StringComparison.Ordinal)
-            .Replace("Ã”Ã‡Â£", "\"", StringComparison.Ordinal)
-            .Replace("Ã”Ã‡Ã˜", "\"", StringComparison.Ordinal)
-            .Replace("Ã”Ã‡Ã´", "-", StringComparison.Ordinal)
-            .Replace("Ã”Ã‡Ã¶", "-", StringComparison.Ordinal)
-            .Replace("Ã”Ã‡Âª", "...", StringComparison.Ordinal);
+            .Replace("ÃƒÆ’Ã¢â‚¬ÂÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã¢â‚¬â€œ", "'", StringComparison.Ordinal)
+            .Replace("ÃƒÆ’Ã¢â‚¬ÂÃƒÆ’Ã¢â‚¬Â¡Ãƒâ€šÃ‚Â£", "\"", StringComparison.Ordinal)
+            .Replace("ÃƒÆ’Ã¢â‚¬ÂÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã‹Å“", "\"", StringComparison.Ordinal)
+            .Replace("ÃƒÆ’Ã¢â‚¬ÂÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã‚Â´", "-", StringComparison.Ordinal)
+            .Replace("ÃƒÆ’Ã¢â‚¬ÂÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã‚Â¶", "-", StringComparison.Ordinal)
+            .Replace("ÃƒÆ’Ã¢â‚¬ÂÃƒÆ’Ã¢â‚¬Â¡Ãƒâ€šÃ‚Âª", "...", StringComparison.Ordinal);
     }
 }
 
@@ -1710,6 +1710,7 @@ public sealed class OperationsDashboardService(
                 request.Name.Trim(),
                 request.Task.Trim(),
                 request.Schedule.Trim(),
+                Enum.TryParse<AutomationExecutionMode>(request.Mode, true, out var mode) ? mode : AutomationExecutionMode.Agent,
                 string.IsNullOrWhiteSpace(request.ConversationId) ? "main" : request.ConversationId,
                 string.IsNullOrWhiteSpace(request.Channel) ? "local-web" : request.Channel,
                 request.NotificationTarget,
@@ -1770,6 +1771,7 @@ public sealed class OperationsDashboardService(
             automation.Task,
             automation.Schedule,
             automation.Status.ToString(),
+            automation.Mode.ToString(),
             automation.ConversationId,
             automation.Channel,
             automation.NotificationTarget,
@@ -1777,7 +1779,9 @@ public sealed class OperationsDashboardService(
             automation.NextRunAt,
             automation.LastRunAt,
             automation.LastRunId,
-            automation.LastResult);
+            automation.LastResult,
+            automation.WorkspaceRootPath,
+            automation.SkillIds);
     }
 
     private static MemoryMaintenanceResponse ToResponse(MemoryMaintenanceResult result)

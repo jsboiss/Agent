@@ -8,6 +8,8 @@ public sealed record AgentResourceContext(
     string ProviderConstraints,
     string PromptTemplate,
     string ToolContext,
+    string PromptMemoryContext,
+    string SkillContext,
     string ProjectNotesContext,
     string EvidenceContext,
     string ConversationSummary,
@@ -23,6 +25,8 @@ public sealed record AgentResourceContext(
             ProviderConstraints,
             PromptTemplate,
             ToolContext,
+            PromptMemoryContext,
+            SkillContext,
             ProjectNotesContext,
             EvidenceContext,
             ConversationSummary

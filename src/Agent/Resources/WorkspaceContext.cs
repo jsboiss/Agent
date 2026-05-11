@@ -1,3 +1,4 @@
+using Agent.Capabilities;
 using Agent.Tools;
 
 namespace Agent.Resources;
@@ -7,5 +8,7 @@ public sealed record WorkspaceContext(
     string CurrentPath,
     string ProjectName,
     IReadOnlyList<string> LoadedInstructions,
+    IReadOnlyList<string> LoadedInstructionSources,
     IReadOnlyDictionary<string, string> ApplicableSettings,
-    IReadOnlyList<AgentToolDefinition> AvailableTools);
+    IReadOnlyList<AgentToolDefinition> AvailableTools,
+    ToolsetProfile ToolsetProfile);

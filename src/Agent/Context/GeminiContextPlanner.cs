@@ -99,17 +99,21 @@ public sealed class GeminiContextPlanner(
             string.Empty,
             "planner",
             [],
+            [],
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
                 ["model"] = request.Settings.Get("contextPlanner.model") ?? "gemini-3.1-flash-lite"
             },
-            []);
+            [],
+            Agent.Capabilities.ToolsetProfile.AutomationRun);
 
         return new AgentResourceContext(
             workspace,
             GetPlannerPrompt(),
             string.Empty,
             $"Channel: {request.Channel}.",
+            string.Empty,
+            string.Empty,
             string.Empty,
             string.Empty,
             string.Empty,

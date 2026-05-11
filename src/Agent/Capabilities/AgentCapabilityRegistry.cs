@@ -48,14 +48,27 @@ public sealed class AgentCapabilityRegistry : IAgentCapabilityRegistry
             "Matching memory records with ids, tiers, lifecycle state, and content."),
         new AgentToolDefinition(
             "write_memory",
-            "Write a durable memory record when the user gives stable information worth preserving.",
+            "Manage durable memory records when the user gives stable information worth preserving. Supports action add, replace, archive, remove.",
             """
             {
               "type": "object",
               "properties": {
+                "action": {
+                  "type": "string",
+                  "description": "Memory action.",
+                  "enum": ["add", "replace", "archive", "remove"]
+                },
+                "memoryId": {
+                  "type": "string",
+                  "description": "Existing memory id for replace, archive, or remove."
+                },
+                "match": {
+                  "type": "string",
+                  "description": "Unique text substring to find an existing memory when memoryId is not available."
+                },
                 "content": {
                   "type": "string",
-                  "description": "Memory content to store."
+                  "description": "Memory content to store or replacement content."
                 },
                 "tier": {
                   "type": "string",
@@ -76,10 +89,24 @@ public sealed class AgentCapabilityRegistry : IAgentCapabilityRegistry
                   "description": "Confidence from 0 to 1."
                 }
               },
-              "required": ["content"]
+              "required": []
             }
             """,
             "The stored memory record id and metadata."),
+        new AgentToolDefinition(
+            "search_conversations",
+            "Search prior conversation/session entries. Use for historical recall, not durable facts.",
+            """
+            {
+              "type": "object",
+              "properties": {
+                "query": { "type": "string", "description": "Search text for session recall." },
+                "limit": { "type": "integer", "minimum": 1, "maximum": 20 }
+              },
+              "required": ["query"]
+            }
+            """,
+            "Matching conversation entries grouped with conversation ids, roles, timestamps, and snippets."),
         new AgentToolDefinition(
             "spawn_agent",
             "Create a child sub-agent conversation for delegated work. Use explicit permission capabilities for integrations and side effects.",
@@ -171,6 +198,31 @@ public sealed class AgentCapabilityRegistry : IAgentCapabilityRegistry
             "{ \"type\": \"object\", \"properties\": { \"draftId\": { \"type\": \"string\" } }, \"required\": [\"draftId\"] }",
             "Draft rejection status."),
         new AgentToolDefinition(
+            "automation",
+            "Manage scheduled automations with one unified tool. Actions: create, list, edit, pause, resume, run_now, delete.",
+            """
+            {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": ["create", "list", "edit", "pause", "resume", "run_now", "delete"]
+                },
+                "automationId": { "type": "string" },
+                "name": { "type": "string" },
+                "task": { "type": "string" },
+                "schedule": { "type": "string", "description": "TimeSpan, 'every <TimeSpan>', or simple daily 5-field cron." },
+                "mode": { "type": "string", "enum": ["Agent", "Deterministic"] },
+                "capabilities": { "type": "string" },
+                "workspaceRootPath": { "type": "string" },
+                "skillIds": { "type": "string" },
+                "notificationTarget": { "type": "string" }
+              },
+              "required": ["action"]
+            }
+            """,
+            "Automation id, status, next run, last run, and latest output summary."),
+        new AgentToolDefinition(
             "create_automation",
             "Create a scheduled task that spawns a sub-agent when due.",
             """
@@ -202,6 +254,31 @@ public sealed class AgentCapabilityRegistry : IAgentCapabilityRegistry
             "Delete a scheduled automation.",
             "{ \"type\": \"object\", \"properties\": { \"automationId\": { \"type\": \"string\" } }, \"required\": [\"automationId\"] }",
             "Deletion status."),
+        new AgentToolDefinition(
+            "edit_automation",
+            "Edit an existing scheduled automation while preserving its id and run history.",
+            """
+            {
+              "type": "object",
+              "properties": {
+                "automationId": { "type": "string" },
+                "name": { "type": "string" },
+                "task": { "type": "string" },
+                "schedule": { "type": "string" },
+                "capabilities": { "type": "string" },
+                "notificationTarget": { "type": "string" },
+                "workspaceRootPath": { "type": "string" },
+                "skillIds": { "type": "string" }
+              },
+              "required": ["automationId"]
+            }
+            """,
+            "Updated automation summary."),
+        new AgentToolDefinition(
+            "run_automation",
+            "Run an existing automation immediately without changing its normal schedule.",
+            "{ \"type\": \"object\", \"properties\": { \"automationId\": { \"type\": \"string\" } }, \"required\": [\"automationId\"] }",
+            "Triggered automation run summary."),
         new AgentToolDefinition(
             "cancel_run",
             "Cancel a queued or running agent run.",
@@ -365,31 +442,151 @@ public sealed class AgentCapabilityRegistry : IAgentCapabilityRegistry
 
     public IReadOnlyList<AgentToolDefinition> GetToolDefinitions(SubAgentCapabilities capabilities)
     {
+        return GetToolDefinitionsForToolsets(capabilities, GetDefaultToolsets(capabilities));
+    }
+
+    public IReadOnlyList<AgentToolDefinition> GetToolDefinitionsForToolsets(
+        SubAgentCapabilities capabilities,
+        IReadOnlySet<string> toolsets)
+    {
         List<AgentToolDefinition> tools = [.. DispatcherTools];
 
-        if (capabilities == SubAgentCapabilities.None
-            || capabilities.HasFlag(SubAgentCapabilities.CalendarRead))
+        if (toolsets.Contains("calendar")
+            && (capabilities == SubAgentCapabilities.None
+            || capabilities.HasFlag(SubAgentCapabilities.CalendarRead)))
         {
             tools.AddRange(CalendarReadTools);
         }
 
-        if (capabilities == SubAgentCapabilities.None
-            || capabilities.HasFlag(SubAgentCapabilities.EmailRead))
+        if (toolsets.Contains("email")
+            && (capabilities == SubAgentCapabilities.None
+            || capabilities.HasFlag(SubAgentCapabilities.EmailRead)))
         {
             tools.AddRange(EmailReadTools);
         }
 
-        if (capabilities.HasFlag(SubAgentCapabilities.EmailDraft))
+        if (toolsets.Contains("email")
+            && capabilities.HasFlag(SubAgentCapabilities.EmailDraft))
         {
             tools.AddRange(EmailDraftTools);
         }
 
-        if (capabilities.HasFlag(SubAgentCapabilities.EmailSend))
+        if (toolsets.Contains("email")
+            && capabilities.HasFlag(SubAgentCapabilities.EmailSend))
         {
             tools.AddRange(EmailSendTools);
         }
 
-        return tools;
+        return tools
+            .Where(x => IsInToolset(x.Name, toolsets))
+            .DistinctBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    public IReadOnlyList<AgentToolDefinition> GetToolDefinitionsForProfile(
+        SubAgentCapabilities capabilities,
+        ToolsetProfile profile)
+    {
+        return GetToolDefinitionsForToolsets(capabilities, GetToolsets(profile, capabilities));
+    }
+
+    private static IReadOnlySet<string> GetDefaultToolsets(SubAgentCapabilities capabilities)
+    {
+        HashSet<string> toolsets = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "safe",
+            "memory",
+            "session_recall",
+            "subagents",
+            "drafts",
+            "automation"
+        };
+
+        if (capabilities == SubAgentCapabilities.None || capabilities.HasFlag(SubAgentCapabilities.CalendarRead))
+        {
+            toolsets.Add("calendar");
+        }
+
+        if (capabilities == SubAgentCapabilities.None
+            || capabilities.HasFlag(SubAgentCapabilities.EmailRead)
+            || capabilities.HasFlag(SubAgentCapabilities.EmailDraft)
+            || capabilities.HasFlag(SubAgentCapabilities.EmailSend))
+        {
+            toolsets.Add("email");
+        }
+
+        return toolsets;
+    }
+
+    private static bool IsInToolset(string toolName, IReadOnlySet<string> toolsets)
+    {
+        var toolset = toolName switch
+        {
+            "search_memory" or "write_memory" => "memory",
+            "search_conversations" => "session_recall",
+            "spawn_agent" or "cancel_run" or "retry_run" => "subagents",
+            "send_ack" => "safe",
+            "save_draft" or "list_drafts" or "approve_draft" or "reject_draft" => "drafts",
+            "automation" => "automation",
+            "create_automation" or "list_automations" or "toggle_automation" or "delete_automation" or "edit_automation" or "run_automation" => "legacy_automation",
+            "calendar_list_events" or "calendar_search_events" or "calendar_get_availability" => "calendar",
+            "gmail_search_messages" or "gmail_get_message" or "gmail_create_draft" or "gmail_send_draft" => "email",
+            _ => "safe"
+        };
+
+        return toolsets.Contains(toolset);
+    }
+
+    private static IReadOnlySet<string> GetToolsets(
+        ToolsetProfile profile,
+        SubAgentCapabilities capabilities)
+    {
+        HashSet<string> toolsets = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "safe",
+            "memory",
+            "session_recall"
+        };
+
+        if (profile is ToolsetProfile.DashboardChat or ToolsetProfile.MobileChat)
+        {
+            toolsets.Add("drafts");
+            toolsets.Add("automation");
+            toolsets.Add("calendar");
+            toolsets.Add("email");
+        }
+
+        if (profile == ToolsetProfile.SubAgentWork)
+        {
+            toolsets.Add("subagents");
+            AddCapabilityToolsets(toolsets, capabilities);
+        }
+
+        if (profile == ToolsetProfile.AutomationRun)
+        {
+            AddCapabilityToolsets(toolsets, capabilities);
+        }
+
+        return toolsets;
+    }
+
+    private static void AddCapabilityToolsets(
+        ISet<string> toolsets,
+        SubAgentCapabilities capabilities)
+    {
+        if (capabilities == SubAgentCapabilities.None
+            || capabilities.HasFlag(SubAgentCapabilities.CalendarRead))
+        {
+            toolsets.Add("calendar");
+        }
+
+        if (capabilities == SubAgentCapabilities.None
+            || capabilities.HasFlag(SubAgentCapabilities.EmailRead)
+            || capabilities.HasFlag(SubAgentCapabilities.EmailDraft)
+            || capabilities.HasFlag(SubAgentCapabilities.EmailSend))
+        {
+            toolsets.Add("email");
+        }
     }
 
     public bool RequiresDraftForExternalSideEffects(SubAgentCapabilities capabilities)

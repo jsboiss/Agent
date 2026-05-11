@@ -7,4 +7,5 @@ public sealed record SubAgentRunRequest(
     string Channel,
     SubAgentCapabilities Capabilities,
     bool RequiresConfirmation,
-    string? NotificationTarget);
+    string? NotificationTarget,
+    string? AutomationRunId = null);

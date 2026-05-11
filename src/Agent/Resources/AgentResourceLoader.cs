@@ -3,6 +3,8 @@ using Agent.Compaction;
 using Agent.Capabilities;
 using Agent.Providers;
 using Agent.ProjectNotes;
+using Agent.Memory;
+using Agent.Skills;
 using Agent.Tools;
 using Agent.Workspaces;
 
@@ -14,22 +16,27 @@ public sealed class AgentResourceLoader(
     IConversationSummaryStore summaryStore,
     IConversationCompactor conversationCompactor,
     IProjectNoteStore projectNoteStore,
-    IAgentCapabilityRegistry capabilityRegistry) : IAgentResourceLoader
+    IAgentCapabilityRegistry capabilityRegistry,
+    IPromptMemorySnapshotBuilder promptMemorySnapshotBuilder,
+    IAgentSkillStore skillStore) : IAgentResourceLoader
 {
     public async Task<AgentResourceContext> Load(
         AgentResourceLoadRequest request,
         CancellationToken cancellationToken)
     {
         var rootPath = WorkspacePathResolver.NormalizeRootPath(request.WorkspaceRootPath, environment.ContentRootPath);
-        var workspaceInstructions = await ReadInstructions(rootPath, cancellationToken);
-        var availableTools = capabilityRegistry.GetToolDefinitions(request.Capabilities);
+        var instructionFiles = await ReadInstructions(rootPath, cancellationToken);
+        var workspaceInstructions = string.Join(Environment.NewLine + Environment.NewLine, instructionFiles.Select(x => x.Content));
+        var availableTools = capabilityRegistry.GetToolDefinitionsForProfile(request.Capabilities, request.ToolsetProfile);
         var workspace = new WorkspaceContext(
             rootPath,
             environment.ContentRootPath,
             Path.GetFileName(rootPath),
-            string.IsNullOrWhiteSpace(workspaceInstructions) ? [] : [workspaceInstructions],
+            instructionFiles.Select(x => x.Content).ToArray(),
+            instructionFiles.Select(x => x.SourcePath).ToArray(),
             request.Settings.Values,
-            availableTools);
+            availableTools,
+            request.ToolsetProfile);
         var projectNotes = await projectNoteStore.Load(
             new AgentWorkspace(
                 string.Empty,
@@ -42,10 +49,16 @@ public sealed class AgentResourceLoader(
                 DateTimeOffset.UtcNow,
                 DateTimeOffset.UtcNow),
             cancellationToken);
-
         var recentEntryCount = GetRecentEntryCount(request.Settings.Values);
         var compactionThreshold = GetCompactionThreshold(request.Settings.Values);
         var entries = await conversationRepository.ListEntries(request.Conversation.Id, cancellationToken);
+        var skillInput = string.Join(Environment.NewLine, entries.TakeLast(4).Select(x => x.Content));
+        var promptMemory = await promptMemorySnapshotBuilder.Build(request.Settings.Values, cancellationToken);
+        var skills = await skillStore.FindRelevant(
+            rootPath,
+            skillInput,
+            GetSkillLimit(request.Settings.Values),
+            cancellationToken);
         var rollingSummary = await summaryStore.Get(request.Conversation.Id, cancellationToken);
 
         if (ShouldCompact(entries, rollingSummary, recentEntryCount, compactionThreshold))
@@ -68,21 +81,40 @@ public sealed class AgentResourceLoader(
             GetProviderConstraints(request.ProviderType),
             GetPromptTemplate(workspace),
             GetToolContext(availableTools),
+            promptMemory.ToPromptSection(),
+            GetSkillContext(skills),
             projectNotes.ToPromptSection(),
             string.Empty,
             GetConversationSummary(rollingSummary, entries, recentEntryCount));
     }
 
-    private static async Task<string> ReadInstructions(string rootPath, CancellationToken cancellationToken)
+    private static async Task<IReadOnlyList<InstructionFile>> ReadInstructions(string rootPath, CancellationToken cancellationToken)
     {
-        var path = Path.Combine(rootPath, "AGENTS.md");
+        List<string> paths =
+        [
+            Path.Combine(rootPath, "AGENTS.md"),
+            Path.Combine(rootPath, ".mainagent.md"),
+            Path.Combine(rootPath, "CLAUDE.md"),
+            Path.Combine(rootPath, ".cursorrules")
+        ];
+        var cursorRulesDirectory = Path.Combine(rootPath, ".cursor", "rules");
 
-        if (!File.Exists(path))
+        if (Directory.Exists(cursorRulesDirectory))
         {
-            return string.Empty;
+            paths.AddRange(Directory.EnumerateFiles(cursorRulesDirectory, "*.md", SearchOption.TopDirectoryOnly).Order(StringComparer.OrdinalIgnoreCase));
         }
 
-        return await File.ReadAllTextAsync(path, cancellationToken);
+        List<InstructionFile> instructions = [];
+
+        foreach (var path in paths.Where(File.Exists).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var content = await File.ReadAllTextAsync(path, cancellationToken);
+            instructions.Add(new InstructionFile(
+                path,
+                $"Instructions from {Path.GetRelativePath(rootPath, path)}:{Environment.NewLine}{content}"));
+        }
+
+        return instructions;
     }
 
     private static string GetGlobalInstructions(IReadOnlyDictionary<string, string> settings)
@@ -153,7 +185,7 @@ public sealed class AgentResourceLoader(
 
     private static string GetPromptTemplate(WorkspaceContext workspace)
     {
-        return $"Workspace: {workspace.ProjectName}{Environment.NewLine}Root path: {workspace.RootPath}{Environment.NewLine}Current path: {workspace.CurrentPath}";
+        return $"Workspace: {workspace.ProjectName}{Environment.NewLine}Root path: {workspace.RootPath}{Environment.NewLine}Current path: {workspace.CurrentPath}{Environment.NewLine}Toolset profile: {workspace.ToolsetProfile}{Environment.NewLine}Loaded instruction files: {string.Join(", ", workspace.LoadedInstructionSources)}";
     }
 
     private static string GetToolContext(IReadOnlyList<AgentToolDefinition> tools)
@@ -167,6 +199,27 @@ public sealed class AgentResourceLoader(
             $"- {x.Name}: {x.Description}{Environment.NewLine}  Parameters: {x.JsonParameterSchema}{Environment.NewLine}  Result: {x.ResultDescription}");
 
         return "Available tools:" + Environment.NewLine + string.Join(Environment.NewLine, lines);
+    }
+
+    private static string GetSkillContext(IReadOnlyList<AgentSkill> skills)
+    {
+        if (skills.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        return "Relevant procedural skills:"
+            + Environment.NewLine
+            + string.Join(
+                Environment.NewLine + Environment.NewLine,
+                skills.Select(x => $"Skill: {x.Name}{Environment.NewLine}Description: {x.Description}{Environment.NewLine}{x.Body}"));
+    }
+
+    private static int GetSkillLimit(IReadOnlyDictionary<string, string> settings)
+    {
+        return int.TryParse(settings.GetValueOrDefault("skills.prompt.limit"), out var value)
+            ? Math.Max(0, value)
+            : 3;
     }
 
     private static string GetConversationSummary(
@@ -262,4 +315,6 @@ public sealed class AgentResourceLoader(
                 .Select(x => x.Entry)
                 .ToArray();
     }
+
+    private sealed record InstructionFile(string SourcePath, string Content);
 }

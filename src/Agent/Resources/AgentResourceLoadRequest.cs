@@ -1,3 +1,4 @@
+using Agent.Capabilities;
 using Agent.Conversations;
 using Agent.Providers;
 using Agent.Settings;
@@ -11,4 +12,5 @@ public sealed record AgentResourceLoadRequest(
     AgentProviderType ProviderType,
     AgentSettings Settings,
     string WorkspaceRootPath,
-    SubAgentCapabilities Capabilities = SubAgentCapabilities.None);
+    SubAgentCapabilities Capabilities = SubAgentCapabilities.None,
+    ToolsetProfile ToolsetProfile = ToolsetProfile.DashboardChat);

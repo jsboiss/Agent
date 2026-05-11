@@ -11,4 +11,5 @@ public sealed record SubAgentWorkItem(
     bool AllowsMutation,
     SubAgentCapabilities Capabilities,
     bool RequiresConfirmation,
-    string? NotificationTarget);
+    string? NotificationTarget,
+    string? AutomationRunId = null);

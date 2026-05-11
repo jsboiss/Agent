@@ -174,8 +174,10 @@ public sealed class LlmMemoryExtractor(
             string.Empty,
             "memory-extraction",
             [],
+            [],
             settings,
-            []);
+            [],
+            Agent.Capabilities.ToolsetProfile.AutomationRun);
 
         return new AgentResourceContext(
             workspace,
@@ -183,6 +185,8 @@ public sealed class LlmMemoryExtractor(
             string.Empty,
             string.Empty,
             "Provider constraints: structured JSON extraction only.",
+            string.Empty,
+            string.Empty,
             string.Empty,
             string.Empty,
             string.Empty,

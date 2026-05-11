@@ -1,5 +1,6 @@
 using Agent.Conversations;
 using Agent.Calendar;
+using Agent.Capabilities;
 using Agent.Context;
 using Agent.Events;
 using Agent.Memory;
@@ -8,6 +9,7 @@ using Agent.ProjectNotes;
 using Agent.Providers;
 using Agent.Resources;
 using Agent.Settings;
+using Agent.SubAgents;
 using Agent.Tokens;
 using Agent.Tools;
 using Agent.Workspaces;
@@ -200,8 +202,11 @@ public sealed class AgentMessageProcessor(
 
         var providerType = GetProviderType(settings);
         var provider = providerSelector.Get(providerType);
+        var toolsetProfile = IsMobileChannel(request.Channel)
+            ? ToolsetProfile.MobileChat
+            : ToolsetProfile.DashboardChat;
         var resources = await resourceLoader.Load(
-            new AgentResourceLoadRequest(conversation, request.Channel, providerType, settings, workspace.RootPath),
+            new AgentResourceLoadRequest(conversation, request.Channel, providerType, settings, workspace.RootPath, SubAgentCapabilities.None, toolsetProfile),
             cancellationToken);
         var planningRequest = new ContextPlanningRequest(
             conversation.Id,
@@ -1087,11 +1092,14 @@ public sealed class AgentMessageProcessor(
             request.ConversationId,
             new Dictionary<string, string>
             {
-                ["provider"] = request.Kind.ToString(),
-                ["channel"] = channel,
-                ["ConversationEntryId"] = userEntryId,
-                ["iteration"] = iteration.ToString()
-            });
+                    ["provider"] = request.Kind.ToString(),
+                    ["channel"] = channel,
+                    ["ConversationEntryId"] = userEntryId,
+                    ["iteration"] = iteration.ToString(),
+                    ["toolsetProfile"] = request.Resources.Workspace.ToolsetProfile.ToString(),
+                    ["availableToolCount"] = request.AvailableTools.Count.ToString(),
+                    ["instructionSources"] = string.Join(";", request.Resources.Workspace.LoadedInstructionSources)
+                });
     }
 
     private void AddProviderEvents(

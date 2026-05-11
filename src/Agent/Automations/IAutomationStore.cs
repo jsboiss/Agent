@@ -10,6 +10,8 @@ public interface IAutomationStore
 
     Task<AgentAutomation> SetStatus(string id, AutomationStatus status, CancellationToken cancellationToken);
 
+    Task<AgentAutomation> Update(string id, AutomationWriteRequest request, CancellationToken cancellationToken);
+
     Task<AgentAutomation> UpdateRunResult(
         string id,
         DateTimeOffset? nextRunAt,

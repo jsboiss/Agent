@@ -78,7 +78,8 @@ public sealed class SubAgentCoordinator(
                 allowsMutation && !request.RequiresConfirmation,
                 request.Capabilities,
                 request.RequiresConfirmation,
-                request.NotificationTarget),
+                request.NotificationTarget,
+                request.AutomationRunId),
             cancellationToken);
 
         var summary = $"Sub-agent {childConversation.Id} queued as background run {run.Id}: {request.Task}";

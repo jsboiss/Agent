@@ -1,4 +1,5 @@
 using Agent.Workspaces;
+using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Options;
 
@@ -163,6 +164,67 @@ public sealed class SqliteConversationRepository(IOptions<SqliteAgentStateOption
         return entries;
     }
 
+    public async Task<IReadOnlyList<ConversationSearchResult>> SearchEntries(
+        string query,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        await EnsureDatabase(cancellationToken);
+
+        await using var connection = await Open(cancellationToken);
+        await using var command = connection.CreateCommand();
+        var ftsQuery = GetFtsQuery(query);
+        command.CommandText = string.IsNullOrWhiteSpace(ftsQuery)
+            ? """
+            SELECT c.Id, c.Kind, c.ParentConversationId, c.ParentEntryId, c.CreatedAt, c.UpdatedAt,
+                   e.Id, e.ConversationId, e.Role, e.Channel, e.Content, e.ParentEntryId, e.CreatedAt,
+                   0.0 AS Rank
+            FROM ConversationEntries e
+            JOIN Conversations c ON c.Id = e.ConversationId
+            ORDER BY e.CreatedAt DESC
+            LIMIT $limit;
+            """
+            : """
+            SELECT c.Id, c.Kind, c.ParentConversationId, c.ParentEntryId, c.CreatedAt, c.UpdatedAt,
+                   e.Id, e.ConversationId, e.Role, e.Channel, e.Content, e.ParentEntryId, e.CreatedAt,
+                   bm25(ConversationEntriesFts) AS Rank
+            FROM ConversationEntriesFts f
+            JOIN ConversationEntries e ON e.Id = f.Id
+            JOIN Conversations c ON c.Id = e.ConversationId
+            WHERE ConversationEntriesFts MATCH $query
+            ORDER BY bm25(ConversationEntriesFts), e.CreatedAt DESC
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$query", ftsQuery);
+        command.Parameters.AddWithValue("$limit", Math.Max(1, limit));
+
+        List<ConversationSearchResult> results = [];
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var conversation = new Conversation(
+                reader.GetString(0),
+                Enum.Parse<ConversationKind>(reader.GetString(1)),
+                reader.IsDBNull(2) ? null : reader.GetString(2),
+                reader.IsDBNull(3) ? null : reader.GetString(3),
+                DateTimeOffset.Parse(reader.GetString(4)),
+                DateTimeOffset.Parse(reader.GetString(5)));
+            var entry = new ConversationEntry(
+                reader.GetString(6),
+                reader.GetString(7),
+                Enum.Parse<ConversationEntryRole>(reader.GetString(8)),
+                reader.GetString(9),
+                reader.GetString(10),
+                reader.IsDBNull(11) ? null : reader.GetString(11),
+                DateTimeOffset.Parse(reader.GetString(12)));
+
+            results.Add(new ConversationSearchResult(conversation, entry, reader.GetDouble(13)));
+        }
+
+        return results;
+    }
+
     private async Task EnsureDatabase(CancellationToken cancellationToken)
     {
         var builder = new SqliteConnectionStringBuilder(Options.ConnectionString);
@@ -201,8 +263,56 @@ public sealed class SqliteConversationRepository(IOptions<SqliteAgentStateOption
 
             CREATE INDEX IF NOT EXISTS IX_ConversationEntries_Conversation_CreatedAt
             ON ConversationEntries (ConversationId, CreatedAt);
+
+            CREATE VIRTUAL TABLE IF NOT EXISTS ConversationEntriesFts USING fts5(
+                Id UNINDEXED,
+                ConversationId UNINDEXED,
+                Role UNINDEXED,
+                Content,
+                content='ConversationEntries',
+                content_rowid='rowid'
+            );
+
+            CREATE TRIGGER IF NOT EXISTS ConversationEntries_AfterInsert_Fts
+            AFTER INSERT ON ConversationEntries
+            BEGIN
+                INSERT INTO ConversationEntriesFts(rowid, Id, ConversationId, Role, Content)
+                VALUES (new.rowid, new.Id, new.ConversationId, new.Role, new.Content);
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS ConversationEntries_AfterUpdate_Fts
+            AFTER UPDATE ON ConversationEntries
+            BEGIN
+                INSERT INTO ConversationEntriesFts(ConversationEntriesFts, rowid, Id, ConversationId, Role, Content)
+                VALUES ('delete', old.rowid, old.Id, old.ConversationId, old.Role, old.Content);
+                INSERT INTO ConversationEntriesFts(rowid, Id, ConversationId, Role, Content)
+                VALUES (new.rowid, new.Id, new.ConversationId, new.Role, new.Content);
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS ConversationEntries_AfterDelete_Fts
+            AFTER DELETE ON ConversationEntries
+            BEGIN
+                INSERT INTO ConversationEntriesFts(ConversationEntriesFts, rowid, Id, ConversationId, Role, Content)
+                VALUES ('delete', old.rowid, old.Id, old.ConversationId, old.Role, old.Content);
+            END;
+
+            INSERT INTO ConversationEntriesFts(ConversationEntriesFts) VALUES ('rebuild');
             """;
         await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static string GetFtsQuery(string query)
+    {
+        var terms = query
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(x => x.Trim('"', '\'', '.', ',', ';', ':', '!', '?', '(', ')', '[', ']', '{', '}'))
+            .Where(x => x.Length >= 3)
+            .Select(x => $"\"{x.Replace("\"", "\"\"")}\"")
+            .ToArray();
+
+        return terms.Length == 0
+            ? string.Empty
+            : string.Join(" OR ", terms);
     }
 
     private async Task<SqliteConnection> Open(CancellationToken cancellationToken)

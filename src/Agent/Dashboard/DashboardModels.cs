@@ -238,6 +238,7 @@ public sealed record AutomationRow(
     string Task,
     string Schedule,
     string Status,
+    string Mode,
     string ConversationId,
     string Channel,
     string? NotificationTarget,
@@ -245,7 +246,9 @@ public sealed record AutomationRow(
     DateTimeOffset? NextRunAt,
     DateTimeOffset? LastRunAt,
     string? LastRunId,
-    string? LastResult);
+    string? LastResult,
+    string? WorkspaceRootPath,
+    string? SkillIds);
 
 public sealed record AutomationCreateDto(
     string Name,
@@ -254,7 +257,8 @@ public sealed record AutomationCreateDto(
     string Channel,
     string? ConversationId,
     string? NotificationTarget,
-    string? Capabilities);
+    string? Capabilities,
+    string? Mode);
 
 public sealed record AutomationToggleDto(bool Enabled);
 

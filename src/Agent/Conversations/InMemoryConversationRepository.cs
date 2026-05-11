@@ -140,4 +140,25 @@ public sealed class InMemoryConversationRepository : IConversationRepository
             return Task.FromResult<IReadOnlyList<ConversationEntry>>(entries.ToArray());
         }
     }
+
+    public Task<IReadOnlyList<ConversationSearchResult>> SearchEntries(
+        string query,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        lock (SyncRoot)
+        {
+            var results = Entries
+                .SelectMany(x => x.Value)
+                .Where(x => string.IsNullOrWhiteSpace(query) || x.Content.Contains(query, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(Math.Max(1, limit))
+                .Select(x => new ConversationSearchResult(Conversations[x.ConversationId], x, 0))
+                .ToArray();
+
+            return Task.FromResult<IReadOnlyList<ConversationSearchResult>>(results);
+        }
+    }
 }

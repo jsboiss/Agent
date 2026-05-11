@@ -24,6 +24,7 @@ public sealed class SqliteAutomationStore(
             request.Task,
             request.Schedule,
             AutomationStatus.Enabled,
+            request.Mode,
             request.ConversationId,
             request.Channel,
             request.NotificationTarget,
@@ -32,6 +33,8 @@ public sealed class SqliteAutomationStore(
             null,
             null,
             null,
+            request.WorkspaceRootPath,
+            request.SkillIds,
             timestamp,
             timestamp);
 
@@ -39,12 +42,12 @@ public sealed class SqliteAutomationStore(
         await using var command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO AgentAutomations (
-                Id, Name, Task, Schedule, Status, ConversationId, Channel, NotificationTarget,
-                Capabilities, NextRunAt, LastRunAt, LastRunId, LastResult, CreatedAt, UpdatedAt
+                Id, Name, Task, Schedule, Status, Mode, ConversationId, Channel, NotificationTarget,
+                Capabilities, NextRunAt, LastRunAt, LastRunId, LastResult, WorkspaceRootPath, SkillIds, CreatedAt, UpdatedAt
             )
             VALUES (
-                $id, $name, $task, $schedule, $status, $conversationId, $channel, $notificationTarget,
-                $capabilities, $nextRunAt, NULL, NULL, NULL, $createdAt, $updatedAt
+                $id, $name, $task, $schedule, $status, $mode, $conversationId, $channel, $notificationTarget,
+                $capabilities, $nextRunAt, NULL, NULL, NULL, $workspaceRootPath, $skillIds, $createdAt, $updatedAt
             );
             """;
         AddParameters(command, automation);
@@ -60,8 +63,8 @@ public sealed class SqliteAutomationStore(
         await using var connection = await Open(cancellationToken);
         await using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT Id, Name, Task, Schedule, Status, ConversationId, Channel, NotificationTarget,
-                   Capabilities, NextRunAt, LastRunAt, LastRunId, LastResult, CreatedAt, UpdatedAt
+            SELECT Id, Name, Task, Schedule, Status, Mode, ConversationId, Channel, NotificationTarget,
+                   Capabilities, NextRunAt, LastRunAt, LastRunId, LastResult, WorkspaceRootPath, SkillIds, CreatedAt, UpdatedAt
             FROM AgentAutomations
             WHERE Id = $id;
             """;
@@ -78,8 +81,8 @@ public sealed class SqliteAutomationStore(
         await using var connection = await Open(cancellationToken);
         await using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT Id, Name, Task, Schedule, Status, ConversationId, Channel, NotificationTarget,
-                   Capabilities, NextRunAt, LastRunAt, LastRunId, LastResult, CreatedAt, UpdatedAt
+            SELECT Id, Name, Task, Schedule, Status, Mode, ConversationId, Channel, NotificationTarget,
+                   Capabilities, NextRunAt, LastRunAt, LastRunId, LastResult, WorkspaceRootPath, SkillIds, CreatedAt, UpdatedAt
             FROM AgentAutomations
             ORDER BY CreatedAt DESC;
             """;
@@ -160,6 +163,57 @@ public sealed class SqliteAutomationStore(
             ?? throw new InvalidOperationException($"Automation '{id}' was not found.");
     }
 
+    public async Task<AgentAutomation> Update(
+        string id,
+        AutomationWriteRequest request,
+        CancellationToken cancellationToken)
+    {
+        await EnsureDatabase(cancellationToken);
+
+        var existing = await Get(id, cancellationToken)
+            ?? throw new InvalidOperationException($"Automation '{id}' was not found.");
+        var now = DateTimeOffset.UtcNow;
+        var nextRunAt = existing.Status == AutomationStatus.Enabled
+            ? scheduler.GetNextRun(request.Schedule, now)
+            : null;
+
+        await using var connection = await Open(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE AgentAutomations
+            SET Name = $name,
+                Task = $task,
+                Schedule = $schedule,
+                Mode = $mode,
+                ConversationId = $conversationId,
+                Channel = $channel,
+                NotificationTarget = $notificationTarget,
+                Capabilities = $capabilities,
+                WorkspaceRootPath = $workspaceRootPath,
+                SkillIds = $skillIds,
+                NextRunAt = $nextRunAt,
+                UpdatedAt = $updatedAt
+            WHERE Id = $id;
+            """;
+        command.Parameters.AddWithValue("$id", id);
+        command.Parameters.AddWithValue("$name", request.Name);
+        command.Parameters.AddWithValue("$task", request.Task);
+        command.Parameters.AddWithValue("$schedule", request.Schedule);
+        command.Parameters.AddWithValue("$mode", request.Mode.ToString());
+        command.Parameters.AddWithValue("$conversationId", request.ConversationId);
+        command.Parameters.AddWithValue("$channel", request.Channel);
+        command.Parameters.AddWithValue("$notificationTarget", (object?)request.NotificationTarget ?? DBNull.Value);
+        command.Parameters.AddWithValue("$capabilities", (int)request.Capabilities);
+        command.Parameters.AddWithValue("$workspaceRootPath", (object?)request.WorkspaceRootPath ?? DBNull.Value);
+        command.Parameters.AddWithValue("$skillIds", (object?)request.SkillIds ?? DBNull.Value);
+        command.Parameters.AddWithValue("$nextRunAt", (object?)nextRunAt?.ToString("O") ?? DBNull.Value);
+        command.Parameters.AddWithValue("$updatedAt", now.ToString("O"));
+        await command.ExecuteNonQueryAsync(cancellationToken);
+
+        return await Get(id, cancellationToken)
+            ?? throw new InvalidOperationException($"Automation '{id}' was not found.");
+    }
+
     public async Task Delete(string id, CancellationToken cancellationToken)
     {
         await EnsureDatabase(cancellationToken);
@@ -194,6 +248,7 @@ public sealed class SqliteAutomationStore(
                 Task TEXT NOT NULL,
                 Schedule TEXT NOT NULL,
                 Status TEXT NOT NULL,
+                Mode TEXT NOT NULL DEFAULT 'Agent',
                 ConversationId TEXT NOT NULL,
                 Channel TEXT NOT NULL,
                 NotificationTarget TEXT NULL,
@@ -202,6 +257,8 @@ public sealed class SqliteAutomationStore(
                 LastRunAt TEXT NULL,
                 LastRunId TEXT NULL,
                 LastResult TEXT NULL,
+                WorkspaceRootPath TEXT NULL,
+                SkillIds TEXT NULL,
                 CreatedAt TEXT NOT NULL,
                 UpdatedAt TEXT NOT NULL
             );
@@ -209,6 +266,40 @@ public sealed class SqliteAutomationStore(
             CREATE INDEX IF NOT EXISTS IX_AgentAutomations_Status_NextRunAt ON AgentAutomations (Status, NextRunAt);
             """;
         await command.ExecuteNonQueryAsync(cancellationToken);
+        await EnsureColumn(connection, "Mode", "TEXT NOT NULL DEFAULT 'Agent'", cancellationToken);
+        await EnsureColumn(connection, "WorkspaceRootPath", cancellationToken);
+        await EnsureColumn(connection, "SkillIds", cancellationToken);
+    }
+
+    private static Task EnsureColumn(
+        SqliteConnection connection,
+        string column,
+        CancellationToken cancellationToken)
+    {
+        return EnsureColumn(connection, column, "TEXT NULL", cancellationToken);
+    }
+
+    private static async Task EnsureColumn(
+        SqliteConnection connection,
+        string column,
+        string definition,
+        CancellationToken cancellationToken)
+    {
+        await using var check = connection.CreateCommand();
+        check.CommandText = "PRAGMA table_info(AgentAutomations);";
+        await using var reader = await check.ExecuteReaderAsync(cancellationToken);
+
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            if (string.Equals(reader.GetString(1), column, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+        }
+
+        await using var alter = connection.CreateCommand();
+        alter.CommandText = $"ALTER TABLE AgentAutomations ADD COLUMN {column} {definition};";
+        await alter.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private async Task<SqliteConnection> Open(CancellationToken cancellationToken)
@@ -225,11 +316,14 @@ public sealed class SqliteAutomationStore(
         command.Parameters.AddWithValue("$task", automation.Task);
         command.Parameters.AddWithValue("$schedule", automation.Schedule);
         command.Parameters.AddWithValue("$status", automation.Status.ToString());
+        command.Parameters.AddWithValue("$mode", automation.Mode.ToString());
         command.Parameters.AddWithValue("$conversationId", automation.ConversationId);
         command.Parameters.AddWithValue("$channel", automation.Channel);
         command.Parameters.AddWithValue("$notificationTarget", (object?)automation.NotificationTarget ?? DBNull.Value);
         command.Parameters.AddWithValue("$capabilities", (int)automation.Capabilities);
         command.Parameters.AddWithValue("$nextRunAt", (object?)automation.NextRunAt?.ToString("O") ?? DBNull.Value);
+        command.Parameters.AddWithValue("$workspaceRootPath", (object?)automation.WorkspaceRootPath ?? DBNull.Value);
+        command.Parameters.AddWithValue("$skillIds", (object?)automation.SkillIds ?? DBNull.Value);
         command.Parameters.AddWithValue("$createdAt", automation.CreatedAt.ToString("O"));
         command.Parameters.AddWithValue("$updatedAt", automation.UpdatedAt.ToString("O"));
     }
@@ -242,15 +336,18 @@ public sealed class SqliteAutomationStore(
             reader.GetString(2),
             reader.GetString(3),
             Enum.Parse<AutomationStatus>(reader.GetString(4)),
-            reader.GetString(5),
+            Enum.Parse<AutomationExecutionMode>(reader.GetString(5)),
             reader.GetString(6),
-            reader.IsDBNull(7) ? null : reader.GetString(7),
-            (SubAgentCapabilities)reader.GetInt32(8),
-            reader.IsDBNull(9) ? null : DateTimeOffset.Parse(reader.GetString(9)),
+            reader.GetString(7),
+            reader.IsDBNull(8) ? null : reader.GetString(8),
+            (SubAgentCapabilities)reader.GetInt32(9),
             reader.IsDBNull(10) ? null : DateTimeOffset.Parse(reader.GetString(10)),
-            reader.IsDBNull(11) ? null : reader.GetString(11),
+            reader.IsDBNull(11) ? null : DateTimeOffset.Parse(reader.GetString(11)),
             reader.IsDBNull(12) ? null : reader.GetString(12),
-            DateTimeOffset.Parse(reader.GetString(13)),
-            DateTimeOffset.Parse(reader.GetString(14)));
+            reader.IsDBNull(13) ? null : reader.GetString(13),
+            reader.IsDBNull(14) ? null : reader.GetString(14),
+            reader.IsDBNull(15) ? null : reader.GetString(15),
+            DateTimeOffset.Parse(reader.GetString(16)),
+            DateTimeOffset.Parse(reader.GetString(17)));
     }
 }

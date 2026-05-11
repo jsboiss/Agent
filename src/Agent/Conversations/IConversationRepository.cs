@@ -21,4 +21,9 @@ public interface IConversationRepository
         CancellationToken cancellationToken);
 
     Task<IReadOnlyList<ConversationEntry>> ListEntries(string conversationId, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<ConversationSearchResult>> SearchEntries(
+        string query,
+        int limit,
+        CancellationToken cancellationToken);
 }

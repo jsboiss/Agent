@@ -8,6 +8,7 @@ public sealed record AgentAutomation(
     string Task,
     string Schedule,
     AutomationStatus Status,
+    AutomationExecutionMode Mode,
     string ConversationId,
     string Channel,
     string? NotificationTarget,
@@ -16,5 +17,7 @@ public sealed record AgentAutomation(
     DateTimeOffset? LastRunAt,
     string? LastRunId,
     string? LastResult,
+    string? WorkspaceRootPath,
+    string? SkillIds,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
