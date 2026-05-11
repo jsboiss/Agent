@@ -388,6 +388,16 @@ dd,
   overflow-wrap: anywhere;
 }
 
+.transcript-window-note {
+  align-self: center;
+  border: 1px solid rgba(138, 145, 158, 0.42);
+  background: rgba(26, 28, 32, 0.84);
+  color: var(--muted);
+  padding: 4px 8px;
+  font-size: 11px;
+  line-height: 14px;
+}
+
 .message.from-user {
   align-self: flex-end;
   border-color: rgba(46, 144, 250, 0.78);
@@ -1345,6 +1355,88 @@ dd {
   padding: 0 7px;
   font-size: 11px;
   line-height: 14px;
+}
+
+.personality-slider-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.personality-slider {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  background: var(--surface-low);
+  padding: 7px;
+}
+
+.personality-slider > span,
+.personality-slider small {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.personality-slider strong {
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.personality-slider output {
+  display: inline-grid;
+  min-width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 1px solid rgba(46, 144, 250, 0.76);
+  background: rgba(46, 144, 250, 0.12);
+  color: var(--text);
+  font-family: "Space Grotesk", "Cascadia Mono", Consolas, monospace;
+  font-size: 12px;
+  line-height: 12px;
+}
+
+.personality-slider input[type="range"] {
+  min-height: 22px;
+  padding: 0;
+  accent-color: var(--blue);
+}
+
+.personality-slider small {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 12px;
+}
+
+.personality-slider small span:last-child {
+  text-align: right;
+}
+
+.personality-preview {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  margin-top: 8px;
+  border: 1px solid rgba(122, 90, 248, 0.72);
+  background: rgba(122, 90, 248, 0.1);
+  padding: 7px;
+}
+
+.personality-preview svg {
+  margin-top: 1px;
+  color: #cabeff;
+}
+
+.personality-preview code {
+  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  font-size: 11px;
+  line-height: 15px;
 }
 
 .secondary-action {

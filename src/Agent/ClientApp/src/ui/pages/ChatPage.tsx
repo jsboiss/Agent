@@ -5,6 +5,8 @@ import { getGetMainChatQueryKey, getMainChatResponse, sendMainChatMessage, useGe
 import type { ChatDashboardMessage, TokenUsageBreakdown } from "../../api/generated";
 import { EmptyState, ErrorState, formatLocalTime, IconButton, LoadingState, StatusChip, TopBar } from "../components";
 
+const visibleMessageCount = 10;
+
 export function ChatPage() {
   const queryClient = useQueryClient();
   const chatQuery = useGetMainChat({
@@ -18,7 +20,6 @@ export function ChatPage() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
-  const didInitialScrollRef = useRef(false);
   const snapshot = chatQuery.data?.data;
   const messages = useMemo(() => {
     const loaded = snapshot?.messages ?? [];
@@ -46,26 +47,19 @@ export function ChatPage() {
 
     return optimistic;
   }, [pendingPrompt, snapshot?.messages, streamedText]);
+  const visibleMessages = useMemo(() => messages.slice(-visibleMessageCount), [messages]);
 
   useEffect(() => {
     const transcript = transcriptRef.current;
 
-    if (!transcript || messages.length === 0) {
+    if (!transcript || visibleMessages.length === 0) {
       return;
     }
 
-    if (!didInitialScrollRef.current) {
+    requestAnimationFrame(() => {
       transcript.scrollTop = transcript.scrollHeight;
-      didInitialScrollRef.current = true;
-      return;
-    }
-
-    const distanceFromBottom = transcript.scrollHeight - transcript.scrollTop - transcript.clientHeight;
-
-    if (distanceFromBottom <= 160) {
-      transcript.scrollTop = transcript.scrollHeight;
-    }
-  }, [messages.length, streamedText, isStreaming, errorMessage]);
+    });
+  }, [visibleMessages, streamedText, isStreaming, errorMessage]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -158,7 +152,12 @@ export function ChatPage() {
           {!chatQuery.isLoading && !chatQuery.isError && messages.length === 0 && (
             <EmptyState title="No messages yet" body="Start the main local-web conversation." />
           )}
-          {messages.map((message) => (
+          {messages.length > visibleMessages.length && (
+            <div className="transcript-window-note">
+              Showing latest {visibleMessages.length} of {messages.length} messages
+            </div>
+          )}
+          {visibleMessages.map((message) => (
             <article className={`message ${getMessageClass(message.role)}`} key={message.id}>
               <header>
                 <span className="avatar-square">{getAvatar(message.role)}</span>

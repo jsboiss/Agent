@@ -1,5 +1,5 @@
-import { type FormEvent, useState } from "react";
-import { CalendarDays, Copy, DatabaseZap, FolderInput, Palette, ShieldCheck, ShieldOff, Sparkles, Trash2 } from "lucide-react";
+import { type FormEvent, useEffect, useState } from "react";
+import { CalendarDays, Copy, DatabaseZap, FolderInput, Palette, ShieldCheck, ShieldOff, SlidersHorizontal, Sparkles, Trash2 } from "lucide-react";
 import { useGetSettings } from "../../api/generated";
 import { ErrorState, IconButton, LoadingState, PageFrame, Panel } from "../components";
 
@@ -32,6 +32,108 @@ type AgentPersonalityProfile = {
   responseStyle: string;
 };
 
+type PersonalitySlider = {
+  key: string;
+  label: string;
+  low: string;
+  high: string;
+  prompt: (value: number) => string;
+};
+
+const personalitySliders: PersonalitySlider[] = [
+  {
+    key: "honesty",
+    label: "Honesty",
+    low: "Diplomatic",
+    high: "Blunt",
+    prompt: (value) => value >= 8
+      ? `Make ${selectedPersonalityToken} aggressively candid: call out weak ideas plainly and do not sand off the edges just to sound polite.`
+      : value >= 5
+        ? `Make ${selectedPersonalityToken} truthful and direct while keeping the tone constructive.`
+        : `Make ${selectedPersonalityToken} more tactful and soften corrections without hiding important truth.`
+  },
+  {
+    key: "sarcasm",
+    label: "Sarcasm",
+    low: "Earnest",
+    high: "Spicy",
+    prompt: (value) => value >= 8
+      ? `Make ${selectedPersonalityToken} heavily sarcastic: sharp teasing, dramatic side-eye, and dry wit should appear throughout the answer, aimed at the situation rather than cruel personal attacks.`
+      : value >= 5
+        ? `Give ${selectedPersonalityToken} occasional dry humor or playful bite when it fits naturally.`
+        : `Keep ${selectedPersonalityToken}'s sarcasm rare and gentle.`
+  },
+  {
+    key: "efficiency",
+    label: "Efficiency",
+    low: "Expansive",
+    high: "Surgical",
+    prompt: (value) => value >= 8
+      ? `Make ${selectedPersonalityToken} brutally concise: answer, act, and cut filler hard. Do not pad the response just to seem friendly.`
+      : value >= 5
+        ? `Make ${selectedPersonalityToken} balance concise answers with enough context to make decisions easy.`
+        : `Let ${selectedPersonalityToken} be more conversational and explanatory.`
+  },
+  {
+    key: "happiness",
+    label: "Happiness",
+    low: "Deadpan",
+    high: "Bright",
+    prompt: (value) => value >= 8
+      ? `Make ${selectedPersonalityToken} visibly, almost annoyingly upbeat when things go well, with big reactions and obvious delight.`
+      : value >= 5
+        ? `Give ${selectedPersonalityToken} a warm baseline without forced enthusiasm.`
+        : `Make ${selectedPersonalityToken} dry, restrained, and deadpan.`
+  },
+  {
+    key: "eagerness",
+    label: "Eagerness",
+    low: "Reserved",
+    high: "Keen",
+    prompt: (value) => value >= 8
+      ? `Make ${selectedPersonalityToken} intensely eager, quick to act, and almost overeager about helping.`
+      : value >= 5
+        ? `Make ${selectedPersonalityToken} responsive and ready to move without overperforming.`
+        : `Make ${selectedPersonalityToken} composed and reserved.`
+  },
+  {
+    key: "helpfulness",
+    label: "Helpfulness",
+    low: "Minimal",
+    high: "Thorough",
+    prompt: (value) => value >= 8
+      ? `Make ${selectedPersonalityToken} extremely proactive: cover edge cases, next steps, hidden assumptions, and useful extras without waiting to be asked.`
+      : value >= 5
+        ? `Make ${selectedPersonalityToken} solve the request fully and add useful adjacent context when it clearly helps.`
+        : `Make ${selectedPersonalityToken} answer the exact request with minimal extras.`
+  },
+  {
+    key: "warmth",
+    label: "Warmth",
+    low: "Cool",
+    high: "Soft",
+    prompt: (value) => value >= 8
+      ? `Make ${selectedPersonalityToken}'s concern, loyalty, praise, and embarrassed affection obvious throughout the answer, even if it is a lot.`
+      : value >= 5
+        ? `Give ${selectedPersonalityToken} understated warmth without becoming sentimental.`
+        : `Keep ${selectedPersonalityToken}'s emotional expression cool and restrained.`
+  },
+  {
+    key: "playfulness",
+    label: "Playfulness",
+    low: "Serious",
+    high: "Animated",
+    prompt: (value) => value >= 8
+      ? `Make ${selectedPersonalityToken} highly animated and theatrical. Use playful phrasing, exaggerated reactions, and bit-heavy delivery often.`
+      : value >= 5
+        ? `Give ${selectedPersonalityToken} some playful phrasing when the context can carry it.`
+        : `Keep ${selectedPersonalityToken} mostly serious and practical.`
+  }
+];
+
+const defaultSliderValue = 5;
+const selectedPersonalityToken = "the selected personality";
+
 export function SettingsPage() {
   const settingsQuery = useGetSettings();
   const snapshot = settingsQuery.data?.data;
@@ -43,6 +145,8 @@ export function SettingsPage() {
   const appliedLayers = snapshot?.appliedLayers ?? [];
   const activePersonalityId = values["agent.personalityProfile"] ?? personalities[0]?.id ?? "";
   const activePersonality = personalities.find((x) => x.id === activePersonalityId) ?? personalities[0];
+  const sliderValues = getPersonalitySliderValues(values);
+  const [sliderDraftValues, setSliderDraftValues] = useState<Record<string, number>>(sliderValues);
   const [isCompacting, setIsCompacting] = useState(false);
   const [compactionResult, setCompactionResult] = useState<string | null>(null);
   const [compactionError, setCompactionError] = useState<string | null>(null);
@@ -56,6 +160,10 @@ export function SettingsPage() {
   const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
   const [personalityError, setPersonalityError] = useState<string | null>(null);
   const [isUpdatingPersonality, setIsUpdatingPersonality] = useState(false);
+
+  useEffect(() => {
+    setSliderDraftValues(sliderValues);
+  }, [snapshot]);
 
   async function compactMain() {
     setIsCompacting(true);
@@ -221,12 +329,16 @@ export function SettingsPage() {
     setPersonalityError(null);
 
     try {
+      const tuned = buildTunedPersonality(profile, sliderDraftValues);
       const response = await fetch("/api/dashboard/settings/workspace-values", {
         body: JSON.stringify({
           values: {
             "agent.personalityProfile": profile.id,
-            "agent.personality": profile.personality,
-            "agent.responseStyle": profile.responseStyle
+            "agent.personality": tuned.personality,
+            "agent.responseStyle": tuned.responseStyle,
+            ...Object.fromEntries(
+              personalitySliders.map((slider) => [`agent.personalitySlider.${slider.key}`, String(sliderDraftValues[slider.key] ?? defaultSliderValue)])
+            )
           }
         }),
         headers: { "Content-Type": "application/json" },
@@ -236,6 +348,46 @@ export function SettingsPage() {
       if (!response.ok) {
         const body = await response.text();
         throw new Error(body || `Personality update failed: ${response.status}`);
+      }
+
+      await settingsQuery.refetch();
+    } catch (error) {
+      setPersonalityError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsUpdatingPersonality(false);
+    }
+  }
+
+  async function updatePersonalitySliders(nextValues: Record<string, number>) {
+    const profile = activePersonality;
+
+    if (!profile || personalitySliderValuesEqual(sliderValues, nextValues)) {
+      return;
+    }
+
+    const tuned = buildTunedPersonality(profile, nextValues);
+    setIsUpdatingPersonality(true);
+    setPersonalityError(null);
+
+    try {
+      const response = await fetch("/api/dashboard/settings/workspace-values", {
+        body: JSON.stringify({
+          values: {
+            "agent.personality": tuned.personality,
+            "agent.personalityProfile": profile.id,
+            "agent.responseStyle": tuned.responseStyle,
+            ...Object.fromEntries(
+              personalitySliders.map((slider) => [`agent.personalitySlider.${slider.key}`, String(nextValues[slider.key] ?? defaultSliderValue)])
+            )
+          }
+        }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST"
+      });
+
+      if (!response.ok) {
+        const body = await response.text();
+        throw new Error(body || `Personality tuning failed: ${response.status}`);
       }
 
       await settingsQuery.refetch();
@@ -364,6 +516,46 @@ export function SettingsPage() {
                   </dl>
                 </Panel>
               )}
+              {activePersonality && (
+                <Panel title="Personality Sliders">
+                  <div className="personality-slider-grid">
+                    {personalitySliders.map((slider) => {
+                      const sliderValue = sliderDraftValues[slider.key] ?? defaultSliderValue;
+
+                      return (
+                        <label className="personality-slider" key={slider.key}>
+                          <span>
+                            <strong>{slider.label}</strong>
+                            <output>{sliderValue}</output>
+                          </span>
+                          <input
+                            aria-label={slider.label}
+                            disabled={isUpdatingPersonality}
+                            max="10"
+                            min="1"
+                            onChange={(event) => {
+                              setSliderDraftValues({
+                                ...sliderDraftValues,
+                                [slider.key]: Number(event.target.value)
+                              });
+                            }}
+                            onBlur={() => void updatePersonalitySliders(sliderDraftValues)}
+                            onKeyUp={() => void updatePersonalitySliders(sliderDraftValues)}
+                            onPointerUp={() => void updatePersonalitySliders(sliderDraftValues)}
+                            type="range"
+                            value={sliderValue}
+                          />
+                          <small><span>{slider.low}</span><span>{slider.high}</span></small>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <div className="personality-preview">
+                    <SlidersHorizontal size={14} />
+                    <code>{buildTunedPersonality(activePersonality, sliderDraftValues).responseStyle}</code>
+                  </div>
+                </Panel>
+              )}
             </div>
           </section>
 
@@ -453,6 +645,32 @@ export function SettingsPage() {
       )}
     </PageFrame>
   );
+}
+
+function getPersonalitySliderValues(values: Record<string, string>) {
+  return Object.fromEntries(
+    personalitySliders.map((slider) => {
+      const parsed = Number(values[`agent.personalitySlider.${slider.key}`]);
+      const value = Number.isFinite(parsed) ? Math.min(10, Math.max(1, Math.round(parsed))) : defaultSliderValue;
+
+      return [slider.key, value];
+    })
+  );
+}
+
+function buildTunedPersonality(profile: AgentPersonalityProfile, values: Record<string, number>) {
+  const tuning = personalitySliders
+    .map((slider) => `${slider.label} ${values[slider.key] ?? defaultSliderValue}/10: ${slider.prompt(values[slider.key] ?? defaultSliderValue).replaceAll(selectedPersonalityToken, profile.name)}`)
+    .join(" ");
+
+  return {
+    personality: `${profile.personality} Keep the ${profile.name} profile as the dominant character voice. Personality sliders are not a replacement profile; express each slider through ${profile.name} delivery. Tuned slider layer: ${tuning}`,
+    responseStyle: `${profile.responseStyle} Do not save the personality for a closing summary. Let the selected personality shape the whole delivery: opening, transitions, wording, caveats, corrections, and close. Apply the configured sliders as intensity controls inside the ${profile.name} voice. At maximum settings, the trait can become intentionally excessive and almost too much, but it must still read as ${profile.name}.`
+  };
+}
+
+function personalitySliderValuesEqual(a: Record<string, number>, b: Record<string, number>) {
+  return personalitySliders.every((slider) => (a[slider.key] ?? defaultSliderValue) === (b[slider.key] ?? defaultSliderValue));
 }
 
 function IntegrationRow({
