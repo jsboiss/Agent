@@ -134,6 +134,7 @@ public sealed class AgentResourceLoader(
             Do not answer personal calendar or email state from memory or guess current events. If calendar or email context is unavailable, say the check failed instead of saying nothing was found.
             When the user asks to open, start, or launch a local app or program, treat it as an external action and delegate to a sub-agent with ExternalActions capability so it can use the shell, for example Windows Start-Process.
             Mobile-originated risky actions must be staged or proposed and require confirmation before mutation.
+            Do not mention goblins, gremlins, trolls, or orcs unless the user explicitly asks about them.
             Keep outputs useful and appropriately sized for the request.
             """,
                 GetStyleInstructions(settings)

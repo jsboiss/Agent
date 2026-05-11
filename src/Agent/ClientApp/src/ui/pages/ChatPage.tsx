@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, KeyboardEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Activity, ChevronDown, ChevronRight, Eye, EyeOff, Gauge, PanelRightClose, PanelRightOpen, SendHorizontal, Shield } from "lucide-react";
 import { getGetMainChatQueryKey, getMainChatResponse, sendMainChatMessage, useGetMainChat } from "../../api/generated";
 import type { ChatDashboardMessage, TokenUsageBreakdown } from "../../api/generated";
@@ -130,6 +130,7 @@ export function ChatPage() {
   });
   const [prompt, setPrompt] = useState("");
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
+  const [queuedPrompts, setQueuedPrompts] = useState<string[]>([]);
   const [streamedText, setStreamedText] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -137,6 +138,7 @@ export function ChatPage() {
   const [selectedTurnId, setSelectedTurnId] = useState<string | null>(null);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const snapshot = chatQuery.data?.data;
   const messages = useMemo(() => {
     const loaded = (snapshot?.messages ?? []).filter((x) => !isWorkMessage(x));
@@ -152,6 +154,18 @@ export function ChatPage() {
       });
     }
 
+    queuedPrompts.forEach((queuedPrompt, index) => {
+      if (!hasLoadedPrompt(loaded, queuedPrompt)) {
+        optimistic.push({
+          id: `queued:user:${index}:${queuedPrompt}`,
+          role: "You",
+          content: queuedPrompt,
+          htmlContent: queuedPrompt,
+          createdAt: new Date().toISOString()
+        });
+      }
+    });
+
     if (streamedText) {
       optimistic.push({
         id: "pending:assistant",
@@ -163,25 +177,28 @@ export function ChatPage() {
     }
 
     return optimistic;
-  }, [pendingPrompt, snapshot?.messages, streamedText]);
+  }, [pendingPrompt, queuedPrompts, snapshot?.messages, streamedText]);
   const tracesById = useMemo(() => new Map(traces.map((x) => [x.id, x])), [traces]);
   const selectedTrace = selectedTurnId ? tracesById.get(selectedTurnId) ?? traces[0] : traces[0];
+  const lastMessageKey = getLastMessageKey(messages);
 
   useEffect(() => {
     void loadTraces();
   }, [snapshot?.conversationId, isStreaming]);
 
   useEffect(() => {
-    const transcript = transcriptRef.current;
-
-    if (!transcript || messages.length === 0) {
+    if (isStreaming || queuedPrompts.length === 0) {
       return;
     }
 
-    requestAnimationFrame(() => {
-      transcript.scrollTop = transcript.scrollHeight;
-    });
-  }, [messages.length, streamedText, isStreaming, errorMessage]);
+    const [nextPrompt, ...remainingPrompts] = queuedPrompts;
+    setQueuedPrompts(remainingPrompts);
+    void sendPromptValue(nextPrompt);
+  }, [isStreaming, queuedPrompts]);
+
+  useLayoutEffect(() => {
+    scrollTranscriptToBottom();
+  }, [lastMessageKey, chatQuery.dataUpdatedAt, streamedText, isStreaming, errorMessage]);
 
   async function loadTraces() {
     const response = await fetch("/api/dashboard/traces?conversationId=main&limit=80");
@@ -202,11 +219,23 @@ export function ChatPage() {
     event.preventDefault();
     const value = prompt.trim();
 
-    if (!value || isStreaming) {
+    if (!value) {
       return;
     }
 
     setPrompt("");
+
+    if (isStreaming) {
+      setQueuedPrompts((x) => [...x, value]);
+      focusComposer();
+
+      return;
+    }
+
+    await sendPromptValue(value);
+  }
+
+  async function sendPromptValue(value: string) {
     setPendingPrompt(value);
     setStreamedText("");
     setIsStreaming(true);
@@ -258,6 +287,7 @@ export function ChatPage() {
       setPendingPrompt(null);
       setStreamedText("");
       setIsStreaming(false);
+      focusComposer();
     }
   }
 
@@ -273,6 +303,38 @@ export function ChatPage() {
     setInspectorOpen(true);
   }
 
+  function focusComposer() {
+    requestAnimationFrame(() => {
+      composerRef.current?.focus();
+    });
+  }
+
+  function scrollTranscriptToBottom() {
+    const transcript = transcriptRef.current;
+
+    if (!transcript || messages.length === 0) {
+      return;
+    }
+
+    const scroll = () => {
+      const currentTranscript = transcriptRef.current;
+
+      if (!currentTranscript) {
+        return;
+      }
+
+      currentTranscript.scrollTo({
+        top: currentTranscript.scrollHeight - currentTranscript.clientHeight,
+        behavior: "auto"
+      });
+    };
+
+    scroll();
+    requestAnimationFrame(scroll);
+    window.setTimeout(scroll, 80);
+    window.setTimeout(scroll, 180);
+  }
+
   return (
     <section className={`workspace chat-workspace ${inspectorOpen ? "inspector-visible" : ""}`}>
       <div className="pane pane-chat">
@@ -284,7 +346,7 @@ export function ChatPage() {
               <StatusChip label={snapshot.isRunning || isStreaming ? "processing" : "online"} tone={snapshot.isRunning || isStreaming ? "green" : "blue"} />
               <span>{snapshot.provider}</span>
               <strong>{snapshot.model}</strong>
-              <TokenUsageHoverCard tokens={snapshot.tokens} tokenUsage={snapshot.tokenUsage} />
+              <TokenUsageHoverCard tokens={snapshot.tokens} tokenUsage={snapshot.tokenUsage ?? []} />
             </>
           )}
           actions={(
@@ -327,38 +389,27 @@ export function ChatPage() {
               </article>
             );
           })}
-          {isStreaming && !streamedText && (
-            <article className="message from-agent typing-message" aria-live="polite">
-              <header>
-                <span className="avatar-square">AI</span>
-                <strong>Main agent</strong>
-                <time></time>
-              </header>
-              <div className="work-state" aria-label="Waiting for assistant response">
-                <span className="status-square active" />
-                <span>Preparing response</span>
-              </div>
-            </article>
-          )}
         </div>
 
         {errorMessage && <div className="callout error">{errorMessage}</div>}
 
         <form className="composer" onSubmit={submit}>
-          <div className="composer-state" aria-live="polite">
-            <span className={`status-square ${isStreaming ? "active" : ""}`} />
-            <span>{isStreaming ? "Working through the prompt" : "Ready"}</span>
-          </div>
           <textarea
-            disabled={isStreaming}
+            ref={composerRef}
             onChange={(event) => setPrompt(event.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Message the agent"
             value={prompt}
           />
-          <IconButton disabled={!prompt.trim() || isStreaming} title="Send message" type="submit">
-            <SendHorizontal size={17} />
-          </IconButton>
+          <div className="composer-actions">
+            <div className="composer-state" aria-live="polite">
+              <span className={`status-square ${isStreaming ? "active" : ""}`} />
+              <span>{getComposerState(isStreaming, queuedPrompts.length)}</span>
+            </div>
+            <IconButton disabled={!prompt.trim()} title={isStreaming ? "Queue message" : "Send message"} type="submit">
+              <SendHorizontal size={17} />
+            </IconButton>
+          </div>
         </form>
       </div>
 
@@ -661,6 +712,30 @@ function hasLoadedPrompt(messages: ChatDashboardMessage[], prompt: string) {
   return messages.some((x) => x.role === "You" && x.content.trim() === prompt);
 }
 
+function getLastMessageKey(messages: ChatDashboardMessage[]) {
+  const message = messages.at(-1);
+
+  return message
+    ? `${message.id}:${message.createdAt}:${message.content.length}`
+    : "empty";
+}
+
+function getComposerState(isStreaming: boolean, queuedCount: number) {
+  if (isStreaming && queuedCount > 0) {
+    return `Working - ${queuedCount} queued`;
+  }
+
+  if (isStreaming) {
+    return "Working - new messages will queue";
+  }
+
+  if (queuedCount > 0) {
+    return `${queuedCount} queued`;
+  }
+
+  return "Ready";
+}
+
 function MessageBody({ content, htmlContent }: { content: string; htmlContent: string }) {
   if (htmlContent && htmlContent !== content) {
     return <div className="message-body markdown-body" dangerouslySetInnerHTML={{ __html: htmlContent }} />;
@@ -735,8 +810,8 @@ function ProviderUsageRow({ label, usage, showRequests }: { label: string; usage
   );
 }
 
-function getProviderUsage(tokenUsage: TokenUsageBreakdown[], provider: string) {
-  return tokenUsage.find((x) => x.provider.toLowerCase() === provider.toLowerCase());
+function getProviderUsage(tokenUsage: TokenUsageBreakdown[] | undefined, provider: string) {
+  return tokenUsage?.find((x) => x.provider.toLowerCase() === provider.toLowerCase());
 }
 
 function formatTokens(value: number | string) {

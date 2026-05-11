@@ -41,7 +41,8 @@ public sealed class AgentMessageProcessor(
     IAgentTokenTracker tokenTracker,
     IProjectNoteStore projectNoteStore,
     IProjectNoteDistiller projectNoteDistiller,
-    IAgentNotifier notifier) : IMessageProcessor
+    IAgentNotifier notifier,
+    IAgentPostResponseQueue postResponseQueue) : IMessageProcessor
 {
     private static int MaxToolIterations => 3;
 
@@ -303,21 +304,12 @@ public sealed class AgentMessageProcessor(
                     providerResult.AssistantMessage,
                     cancellationToken);
 
-                await RecordProjectActivity(
-                    workspace,
-                    request.UserMessage,
-                    providerResult.AssistantMessage,
-                    cancellationToken);
-
-                await ExtractMemories(
+                postResponseQueue.Enqueue(new AgentPostResponseWorkItem(
                     conversation.Id,
                     userEntry,
                     assistantEntry,
-                    [],
-                    settings,
-                    events,
-                    eventCursor,
-                    cancellationToken);
+                    workspace,
+                    settings));
             }
 
             return await Complete(

@@ -440,6 +440,8 @@ public sealed class CodexProviderClient(IOptions<CodexProviderOptions> options) 
             lines.Add("Response style: " + responseStyle);
         }
 
+        lines.Add("Do not mention goblins, gremlins, trolls, or orcs unless the user explicitly asks about them.");
+
         return lines.Count == 0
             ? string.Empty
             : "Assistant style:" + Environment.NewLine + string.Join(Environment.NewLine, lines);
@@ -489,12 +491,12 @@ public sealed class CodexProviderClient(IOptions<CodexProviderOptions> options) 
     private static string RepairMojibake(string value)
     {
         return value
-            .Replace("ÔÇÖ", "'", StringComparison.Ordinal)
-            .Replace("ÔÇ£", "\"", StringComparison.Ordinal)
-            .Replace("ÔÇØ", "\"", StringComparison.Ordinal)
-            .Replace("ÔÇô", "-", StringComparison.Ordinal)
-            .Replace("ÔÇö", "-", StringComparison.Ordinal)
-            .Replace("ÔÇª", "...", StringComparison.Ordinal);
+            .Replace("Ã”Ã‡Ã–", "'", StringComparison.Ordinal)
+            .Replace("Ã”Ã‡Â£", "\"", StringComparison.Ordinal)
+            .Replace("Ã”Ã‡Ã˜", "\"", StringComparison.Ordinal)
+            .Replace("Ã”Ã‡Ã´", "-", StringComparison.Ordinal)
+            .Replace("Ã”Ã‡Ã¶", "-", StringComparison.Ordinal)
+            .Replace("Ã”Ã‡Âª", "...", StringComparison.Ordinal);
     }
 
     private static AgentProviderResult GetErrorResult(

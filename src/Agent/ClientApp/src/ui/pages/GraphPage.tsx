@@ -66,6 +66,22 @@ export function GraphPage() {
     }
   }, [graphData.nodes.length, stageSize.height, stageSize.width]);
 
+  useEffect(() => {
+    const graph = graphRef.current as ForceGraphMethods & {
+      d3Force?: (forceName: string) => any;
+      d3ReheatSimulation?: () => void;
+    } | undefined;
+
+    if (!graph) {
+      return;
+    }
+
+    graph.d3Force?.("charge")?.strength(-320);
+    graph.d3Force?.("link")?.distance((link: ForceGraphLink) => getLinkDistance(link));
+    graph.d3Force?.("center")?.strength?.(0.02);
+    graph.d3ReheatSimulation?.();
+  }, [graphData.links.length, graphData.nodes.length]);
+
   function fitGraph() {
     graphRef.current?.zoomToFit(450, 48);
   }
@@ -140,8 +156,8 @@ export function GraphPage() {
                     nodeCanvasObject={(node: any, context, globalScale) => drawNode(node, context, globalScale, node.id === selectedNodeId, node.id === hoveredNodeId)}
                     nodePointerAreaPaint={(node: any, color, context) => paintPointerArea(node, color, context)}
                     d3AlphaDecay={0.02}
-                    d3VelocityDecay={0.3}
-                    cooldownTicks={120}
+                    d3VelocityDecay={0.42}
+                    cooldownTicks={180}
                     onEngineStop={fitGraph}
                   />
                 )}
@@ -362,6 +378,27 @@ function getLinkWidth(link: { kind?: string; target?: GraphNode }) {
   return Math.max(0.75, Math.min(2.2, 0.8 + toNumber(target.metadata.confidence ?? 0)));
 }
 
+type ForceGraphLink = {
+  kind?: string;
+  source?: string | GraphNode;
+  target?: string | GraphNode;
+};
+
+function getLinkDistance(link: ForceGraphLink) {
+  const source = typeof link.source === "object" ? link.source : undefined;
+  const target = typeof link.target === "object" ? link.target : undefined;
+
+  if (source?.kind === "memory" && target?.kind === "memory") {
+    return 190;
+  }
+
+  if (source?.kind === "memory" || target?.kind === "memory") {
+    return 145;
+  }
+
+  return 165;
+}
+
 function getNodeTooltip(node: GraphNode) {
   if (node.kind === "memory") {
     return `<div class="graph-tooltip"><strong>${escapeHtml(node.text)}</strong><span>${escapeHtml(node.segment)} / ${escapeHtml(node.tier)}</span><span>Importance ${toNumber(node.importance).toFixed(2)} / Confidence ${toNumber(node.metadata.confidence ?? 0).toFixed(2)} / Access ${toNumber(node.count)}</span></div>`;
@@ -398,7 +435,7 @@ function drawNode(node: GraphNode & { x: number; y: number }, context: CanvasRen
     context.arc(node.x, node.y, radius, 0, Math.PI * 2);
     context.stroke();
     drawLabel(context, node.label, node.x, node.y + radius + 7, globalScale, true);
-  } else if (isSelected || isHovered || globalScale > 1.55) {
+  } else if (isSelected || isHovered || globalScale > 2.8) {
     drawLabel(context, node.label, node.x, node.y + radius + 5, globalScale, false);
   }
 
@@ -406,10 +443,11 @@ function drawNode(node: GraphNode & { x: number; y: number }, context: CanvasRen
 }
 
 function drawLabel(context: CanvasRenderingContext2D, label: string, x: number, y: number, globalScale: number, isStrong: boolean) {
-  const fontSize = Math.max(10, (isStrong ? 13 : 11) / globalScale);
-  const displayLabel = truncate(label, isStrong ? 24 : 42);
-  const paddingX = 5 / globalScale;
-  const paddingY = 3 / globalScale;
+  const screenFontSize = isStrong ? 10 : 8;
+  const fontSize = screenFontSize / globalScale;
+  const displayLabel = truncate(label, isStrong ? 18 : 28);
+  const paddingX = 4 / globalScale;
+  const paddingY = 2 / globalScale;
 
   context.font = `${isStrong ? "700 " : ""}${fontSize}px Inter, sans-serif`;
   const textWidth = context.measureText(displayLabel).width;
@@ -420,7 +458,7 @@ function drawLabel(context: CanvasRenderingContext2D, label: string, x: number, 
   context.strokeStyle = "rgba(138, 145, 158, 0.45)";
   context.lineWidth = 1 / globalScale;
   context.beginPath();
-  context.roundRect(x - width / 2, y, width, height, 4 / globalScale);
+  context.roundRect(x - width / 2, y, width, height, 3 / globalScale);
   context.fill();
   context.stroke();
 

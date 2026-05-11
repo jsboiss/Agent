@@ -83,6 +83,7 @@ public static class DashboardAuthEndpoints
     {
         return path.StartsWithSegments("/login", StringComparison.OrdinalIgnoreCase)
             || path.StartsWithSegments("/logout", StringComparison.OrdinalIgnoreCase)
+            || path.StartsWithSegments("/api/dev/frontend", StringComparison.OrdinalIgnoreCase)
             || path.StartsWithSegments("/api/health", StringComparison.OrdinalIgnoreCase)
             || path.StartsWithSegments("/openapi", StringComparison.OrdinalIgnoreCase);
     }

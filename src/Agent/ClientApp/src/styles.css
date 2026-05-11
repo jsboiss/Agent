@@ -1853,21 +1853,37 @@ pre,
 }
 
 .composer {
-  grid-template-columns: minmax(120px, auto) minmax(0, 1fr) 40px;
+  grid-template-columns: minmax(0, 1fr) 72px;
   align-items: end;
   border-top-color: rgba(255, 255, 255, 0.07);
   background: rgba(23, 26, 34, 0.96);
   padding: 10px;
 }
 
+.composer-actions {
+  display: grid;
+  grid-template-rows: 18px 40px;
+  justify-items: end;
+  align-items: end;
+  min-width: 0;
+}
+
 .composer-state {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  min-height: 40px;
+  justify-content: flex-end;
+  gap: 5px;
+  min-height: 18px;
+  max-width: 72px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
+  line-height: 14px;
   white-space: nowrap;
+}
+
+.composer-state span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .composer textarea {

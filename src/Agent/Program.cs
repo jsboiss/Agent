@@ -145,6 +145,9 @@ builder.Services.AddSingleton<IProjectNoteStore, FileProjectNoteStore>();
 builder.Services.AddSingleton<IProjectNoteDistiller, RuleBasedProjectNoteDistiller>();
 builder.Services.AddSingleton<IAgentSkillStore, FileAgentSkillStore>();
 builder.Services.AddSingleton<IConversationPromptQueue, InMemoryConversationPromptQueue>();
+builder.Services.AddSingleton<IAgentPostResponseQueue, AgentPostResponseQueue>();
+builder.Services.AddSingleton<IAgentPostResponseProcessor, AgentPostResponseProcessor>();
+builder.Services.AddHostedService<AgentPostResponseWorker>();
 builder.Services.AddSingleton<IAgentSettingsResolver, ConfigurationAgentSettingsResolver>();
 builder.Services.AddSingleton<ISubAgentWorkQueue, SubAgentWorkQueue>();
 builder.Services.AddSingleton<ISubAgentCoordinator, SubAgentCoordinator>();
@@ -214,6 +217,9 @@ if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 }
 
+var developmentFrontendOptions = app.Services.GetRequiredService<IOptions<DevelopmentFrontendOptions>>().Value;
+var useDevelopmentFrontend = app.Environment.IsDevelopment() && developmentFrontendOptions.Enabled;
+
 app.MapOpenApi();
 app.UseAuthentication();
 app.Use(async (context, next) =>
@@ -241,11 +247,56 @@ app.UseAuthorization();
 app.MapDashboardAuthEndpoints();
 if (app.Environment.IsDevelopment())
 {
-    app.MapGet("/dev", (IOptions<DevelopmentFrontendOptions> options) =>
-        Results.Redirect(options.Value.Url));
+    app.MapGet("/api/dev/frontend", () =>
+    {
+        var target = "/dev";
+        var html = $$"""
+            <!doctype html>
+            <html lang="en">
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1">
+              <title>MainAgent Dev Frontend</title>
+            </head>
+            <body>
+              <script>
+                const target = {{System.Text.Json.JsonSerializer.Serialize(target)}};
+
+                async function clearDevelopmentClientState() {
+                  if ("serviceWorker" in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    await Promise.all(registrations.map((registration) => registration.unregister()));
+                  }
+
+                  if ("caches" in window) {
+                    const keys = await caches.keys();
+                    await Promise.all(keys.map((key) => caches.delete(key)));
+                  }
+
+                  window.location.replace(target);
+                }
+
+                clearDevelopmentClientState().catch(() => window.location.replace(target));
+              </script>
+              <p>Opening development frontend...</p>
+            </body>
+            </html>
+            """;
+
+        return Results.Content(html, "text/html; charset=utf-8");
+    });
+    app.MapGet("/dev", () =>
+        Results.Redirect(developmentFrontendOptions.Url));
+    app.MapGet("/", () =>
+        Results.Redirect(developmentFrontendOptions.Url));
 }
-app.UseDefaultFiles();
-app.UseStaticFiles();
+
+if (!useDevelopmentFrontend)
+{
+    app.UseDefaultFiles();
+    app.UseStaticFiles();
+}
+
 app.UseSession();
 app.MapDashboardEndpoints();
 app.MapFallback(async context =>
@@ -254,6 +305,14 @@ app.MapFallback(async context =>
         || context.Request.Path.StartsWithSegments("/openapi", StringComparison.OrdinalIgnoreCase))
     {
         context.Response.StatusCode = StatusCodes.Status404NotFound;
+
+        return;
+    }
+
+    if (useDevelopmentFrontend)
+    {
+        var target = new Uri(new Uri(developmentFrontendOptions.Url), context.Request.Path + context.Request.QueryString);
+        context.Response.Redirect(target.ToString());
 
         return;
     }

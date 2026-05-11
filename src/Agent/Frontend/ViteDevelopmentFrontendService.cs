@@ -46,7 +46,7 @@ public sealed class ViteDevelopmentFrontendService(
         var startInfo = new ProcessStartInfo
         {
             FileName = "node",
-            Arguments = $"\"{viteEntryPoint}\" --host 127.0.0.1 --port 5173",
+            Arguments = $"\"{viteEntryPoint}\" --host localhost --port 5173",
             WorkingDirectory = clientAppPath,
             UseShellExecute = false,
             CreateNoWindow = true,

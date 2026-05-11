@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --host 127.0.0.1 --port 5173",
+    "dev": "vite --host localhost --port 5173",
     "generate-api": "orval --config orval.config.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit && vite build",
