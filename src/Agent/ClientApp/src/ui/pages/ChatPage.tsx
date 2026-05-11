@@ -139,6 +139,7 @@ export function ChatPage() {
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  const previousLastMessageKeyRef = useRef<string | null>(null);
   const snapshot = chatQuery.data?.data;
   const messages = useMemo(() => {
     const loaded = (snapshot?.messages ?? []).filter((x) => !isWorkMessage(x));
@@ -197,8 +198,18 @@ export function ChatPage() {
   }, [isStreaming, queuedPrompts]);
 
   useLayoutEffect(() => {
+    if (messages.length === 0) {
+      previousLastMessageKeyRef.current = lastMessageKey;
+      return;
+    }
+
+    if (previousLastMessageKeyRef.current === lastMessageKey) {
+      return;
+    }
+
+    previousLastMessageKeyRef.current = lastMessageKey;
     scrollTranscriptToBottom();
-  }, [lastMessageKey, chatQuery.dataUpdatedAt, streamedText, isStreaming, errorMessage]);
+  }, [lastMessageKey, messages.length]);
 
   async function loadTraces() {
     const response = await fetch("/api/dashboard/traces?conversationId=main&limit=80");
@@ -716,7 +727,7 @@ function getLastMessageKey(messages: ChatDashboardMessage[]) {
   const message = messages.at(-1);
 
   return message
-    ? `${message.id}:${message.createdAt}:${message.content.length}`
+    ? `${message.id}:${message.createdAt}`
     : "empty";
 }
 
