@@ -77,8 +77,8 @@ public sealed class AgentCapabilityRegistry : IAgentCapabilityRegistry
                 },
                 "segment": {
                   "type": "string",
-                  "description": "Memory segment.",
-                  "enum": ["Identity", "Preference", "Correction", "Relationship", "Project", "Knowledge", "Context"]
+                  "description": "Memory segment. Use agent-scoped segments for facts about the agent, and user-scoped segments for facts about the user.",
+                  "enum": ["Identity", "Preference", "Correction", "Relationship", "AgentIdentity", "AgentPreference", "AgentRelationship", "Project", "Knowledge", "Context"]
                 },
                 "importance": {
                   "type": "number",

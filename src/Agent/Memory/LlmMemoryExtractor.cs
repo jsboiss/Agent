@@ -130,22 +130,24 @@ public sealed class LlmMemoryExtractor(
     private static string GetExtractionPrompt(MemoryExtractionRequest request)
     {
         return $$"""
-        Extract durable user-authored memories from every completed turn, even when the user did not ask you to remember anything.
-        Do not infer facts from assistant text; use assistant text only as context for interpreting the user's message.
+        Extract durable memories from every completed turn, even when the user did not ask you to remember anything.
+        Keep attribution strict. User-authored facts must use user-scoped segments. Assistant-authored facts about the assistant must use agent-scoped segments.
+        Never rewrite assistant statements as facts about the user. If the assistant says "my favorite X is Y", store "The agent's favorite X is Y" with AgentPreference, not "The user's favorite X is Y".
         Store stable personal facts, identity details, preferences, relationships, recurring workflow instructions, corrections, project facts, and useful long-lived context.
         Personal facts are allowed when they are stable and useful. Do not store secrets such as API keys, tokens, passwords, private credentials, or recovery codes.
         Do not store transient requests, one-off tasks, temporary debugging state, calendar lookups, generated content, greetings, tool output, provider errors, assistant failures, or vague emotional chatter without durable value.
         Treat phrases like "remember this", "save this", "don't forget it", and "keep this in mind" as an importance and confidence boost, not as the memory content.
         Let the memory itself be the underlying durable fact from natural language, even when it is phrased casually or without punctuation.
         Choose the tier, segment, importance, and confidence yourself. Use Short for near-term project context, Long for stable preferences or facts, and Permanent for durable identity, correction, or major relationship facts.
-        Rewrite memories as clear third-person facts about the user or the user's world.
+        Rewrite user-authored memories as clear third-person facts about the user or the user's world.
+        Rewrite assistant-authored self memories as clear third-person facts about the agent.
         Return JSON only with this schema:
         {
           "memories": [
             {
               "text": "durable memory text",
               "tier": "Short|Long|Permanent",
-              "segment": "Identity|Preference|Correction|Relationship|Project|Knowledge|Context",
+              "segment": "Identity|Preference|Correction|Relationship|AgentIdentity|AgentPreference|AgentRelationship|Project|Knowledge|Context",
               "importance": 0.0,
               "confidence": 0.0
             }

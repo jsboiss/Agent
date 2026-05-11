@@ -304,6 +304,8 @@ public sealed class CompactionMemoryExtractor(
         return $$"""
         Extract sparse durable memory candidates from the conversation span that is about to be compacted.
         Extract stable user-authored facts even when no memory keyword appears.
+        Keep attribution strict. User-authored facts must use user-scoped segments. Assistant-authored facts about the assistant must use agent-scoped segments.
+        Never rewrite assistant statements as facts about the user. If the assistant says "my favorite X is Y", store "The agent's favorite X is Y" with AgentPreference, not "The user's favorite X is Y".
         Prefer personal facts, preferences, relationships, corrections, recurring workflow instructions, and clear project decisions.
         Personal facts are allowed when stable and useful. Do not store secrets such as API keys, tokens, passwords, private credentials, or recovery codes.
         Do not store transient tasks, one-off lookups, temporary debugging state, greetings, assistant speculation, generated content, raw tool output, or vague inferred preferences.
@@ -316,7 +318,7 @@ public sealed class CompactionMemoryExtractor(
             {
               "text": "durable memory text",
               "tier": "Short|Long|Permanent",
-              "segment": "Identity|Preference|Correction|Relationship|Project|Knowledge|Context",
+              "segment": "Identity|Preference|Correction|Relationship|AgentIdentity|AgentPreference|AgentRelationship|Project|Knowledge|Context",
               "importance": 0.0,
               "confidence": 0.0,
               "sourceEntryId": "entry id most responsible for this memory, or the last entry id if it spans multiple entries"

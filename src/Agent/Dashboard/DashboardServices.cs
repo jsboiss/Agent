@@ -1600,6 +1600,13 @@ public sealed class MemoryGraphService(IMemoryStore memoryStore) : IMemoryGraphS
             return "Project scoped";
         }
 
+        if (memory.Segment is MemorySegment.AgentIdentity
+            or MemorySegment.AgentPreference
+            or MemorySegment.AgentRelationship)
+        {
+            return "Agent scoped";
+        }
+
         if (memory.Segment is MemorySegment.Relationship or MemorySegment.Identity)
         {
             return "Person scoped";

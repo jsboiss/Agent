@@ -100,8 +100,11 @@ public sealed class MemoryCandidateReviewer(IMemoryStore memoryStore) : IMemoryC
         {
             MemorySegment.Correction => 0.14,
             MemorySegment.Identity => 0.12,
+            MemorySegment.AgentIdentity => 0.12,
             MemorySegment.Relationship => 0.12,
+            MemorySegment.AgentRelationship => 0.1,
             MemorySegment.Preference => 0.12,
+            MemorySegment.AgentPreference => 0.1,
             MemorySegment.Project => 0.08,
             _ => 0
         };
@@ -137,7 +140,11 @@ public sealed class MemoryCandidateReviewer(IMemoryStore memoryStore) : IMemoryC
         }
 
         return HasOpposingTerm(existingTerms, candidateTerms)
-            || candidate.Segment is MemorySegment.Preference or MemorySegment.Identity or MemorySegment.Correction;
+            || candidate.Segment is MemorySegment.Preference
+                or MemorySegment.Identity
+                or MemorySegment.AgentPreference
+                or MemorySegment.AgentIdentity
+                or MemorySegment.Correction;
     }
 
     private static bool IsDuplicate(
@@ -200,7 +207,7 @@ public sealed class MemoryCandidateReviewer(IMemoryStore memoryStore) : IMemoryC
     {
         var normalized = Normalize(text);
 
-        if (segment == MemorySegment.Preference)
+        if (segment is MemorySegment.Preference or MemorySegment.AgentPreference)
         {
             var favoriteIndex = normalized.IndexOf("favorite", StringComparison.OrdinalIgnoreCase);
 

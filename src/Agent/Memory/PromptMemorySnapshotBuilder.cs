@@ -81,7 +81,13 @@ public sealed class PromptMemorySnapshotBuilder(IMemoryStore memoryStore) : IPro
 
     private static bool IsAgentNote(MemoryRecord memory)
     {
-        return memory.Segment is MemorySegment.Project or MemorySegment.Knowledge or MemorySegment.Context or MemorySegment.Correction;
+        return memory.Segment is MemorySegment.AgentIdentity
+            or MemorySegment.AgentPreference
+            or MemorySegment.AgentRelationship
+            or MemorySegment.Project
+            or MemorySegment.Knowledge
+            or MemorySegment.Context
+            or MemorySegment.Correction;
     }
 
     private static bool IsUserProfile(MemoryRecord memory)

@@ -6,6 +6,9 @@ public enum MemorySegment
     Preference,
     Correction,
     Relationship,
+    AgentIdentity,
+    AgentPreference,
+    AgentRelationship,
     Project,
     Knowledge,
     Context
