@@ -993,6 +993,14 @@ internal static class TokenUsageDashboardMapper
 
 public sealed class MemoryGraphService(IMemoryStore memoryStore) : IMemoryGraphService
 {
+    private static int MaxTopicNodes => 80;
+
+    private static int MaxEntityNodes => 80;
+
+    private static int MaxTopicLinksPerMemory => 4;
+
+    private static int MaxEntityLinksPerMemory => 4;
+
     public async Task<MemoryGraphSnapshot> Build(CancellationToken cancellationToken)
     {
         var memories = await memoryStore.Search(
@@ -1011,6 +1019,9 @@ public sealed class MemoryGraphService(IMemoryStore memoryStore) : IMemoryGraphS
         List<MemoryGraphNode> nodes = [];
         List<MemoryGraphEdge> edges = [];
         HashSet<string> nodeIds = [];
+        HashSet<string> edgeIds = [];
+        var topicCounts = GetTopicCounts(memories);
+        var entityCounts = GetEntityCounts(memories);
 
         foreach (var memory in memories)
         {
@@ -1036,19 +1047,29 @@ public sealed class MemoryGraphService(IMemoryStore memoryStore) : IMemoryGraphS
                     ["supersedes"] = memory.Supersedes ?? string.Empty
                 });
             AddNode(nodes, nodeIds, $"segment:{memory.Segment}", memory.Segment.ToString(), "segment", memory.Segment.ToString(), string.Empty, string.Empty, 1, memory.Segment.ToString(), 0, 18, new Dictionary<string, string>());
-            AddNode(nodes, nodeIds, $"tier:{memory.Tier}", memory.Tier.ToString(), "tier", string.Empty, memory.Tier.ToString(), string.Empty, 1, memory.Tier.ToString(), 0, 14, new Dictionary<string, string>());
-            edges.Add(new MemoryGraphEdge($"edge:segment:{memory.Id}", $"segment:{memory.Segment}", $"memory:{memory.Id}", "segment", "segment"));
-            edges.Add(new MemoryGraphEdge($"edge:tier:{memory.Id}", $"tier:{memory.Tier}", $"memory:{memory.Id}", "tier", "tier"));
-
-            if (!string.IsNullOrWhiteSpace(memory.SourceMessageId))
-            {
-                AddNode(nodes, nodeIds, $"source:{memory.SourceMessageId}", $"Source {Shorten(memory.SourceMessageId, 10)}", "source", string.Empty, string.Empty, string.Empty, 1, memory.SourceMessageId, 0, 10, new Dictionary<string, string>());
-                edges.Add(new MemoryGraphEdge($"edge:source:{memory.Id}", $"source:{memory.SourceMessageId}", $"memory:{memory.Id}", "source", "source"));
-            }
+            AddNode(nodes, nodeIds, $"tier:{memory.Segment}:{memory.Tier}", memory.Tier.ToString(), "tier", memory.Segment.ToString(), memory.Tier.ToString(), string.Empty, 1, $"{memory.Segment} / {memory.Tier}", 0, 14, new Dictionary<string, string>());
+            AddEdge(edges, edgeIds, $"edge:segment-tier:{memory.Segment}:{memory.Tier}", $"segment:{memory.Segment}", $"tier:{memory.Segment}:{memory.Tier}", "tier", "tier");
+            AddEdge(edges, edgeIds, $"edge:tier-memory:{memory.Id}", $"tier:{memory.Segment}:{memory.Tier}", $"memory:{memory.Id}", "tier", "tier");
+            AddScope(nodes, edges, nodeIds, edgeIds, memory);
 
             if (!string.IsNullOrWhiteSpace(memory.Supersedes))
             {
-                edges.Add(new MemoryGraphEdge($"edge:supersedes:{memory.Id}", $"memory:{memory.Id}", $"memory:{memory.Supersedes}", "supersedes", "supersedes"));
+                foreach (var supersededMemoryId in SplitIds(memory.Supersedes))
+                {
+                    AddEdge(edges, edgeIds, $"edge:supersedes:{memory.Id}:{supersededMemoryId}", $"memory:{memory.Id}", $"memory:{supersededMemoryId}", "supersedes", "updates");
+                }
+            }
+
+            foreach (var topic in GetTopics(memory.Text, topicCounts).Take(MaxTopicLinksPerMemory))
+            {
+                AddNode(nodes, nodeIds, $"topic:{topic}", topic, "topic", string.Empty, string.Empty, string.Empty, 1, topic, topicCounts.GetValueOrDefault(topic), 10 + topicCounts.GetValueOrDefault(topic), new Dictionary<string, string>());
+                AddEdge(edges, edgeIds, $"edge:topic:{topic}:{memory.Id}", $"topic:{topic}", $"memory:{memory.Id}", "topic", "topic");
+            }
+
+            foreach (var entity in GetEntities(memory.Text, entityCounts).Take(MaxEntityLinksPerMemory))
+            {
+                AddNode(nodes, nodeIds, $"entity:{entity}", entity, "entity", string.Empty, string.Empty, string.Empty, 1, entity, entityCounts.GetValueOrDefault(entity), 10 + entityCounts.GetValueOrDefault(entity), new Dictionary<string, string>());
+                AddEdge(edges, edgeIds, $"edge:entity:{entity}:{memory.Id}", $"entity:{entity}", $"memory:{memory.Id}", "entity", "entity");
             }
         }
 
@@ -1076,12 +1097,193 @@ public sealed class MemoryGraphService(IMemoryStore memoryStore) : IMemoryGraphS
         }
     }
 
+    private static void AddEdge(
+        ICollection<MemoryGraphEdge> edges,
+        ISet<string> edgeIds,
+        string id,
+        string sourceId,
+        string targetId,
+        string kind,
+        string label)
+    {
+        if (edgeIds.Add(id))
+        {
+            edges.Add(new MemoryGraphEdge(id, sourceId, targetId, kind, label));
+        }
+    }
+
+    private static void AddScope(
+        ICollection<MemoryGraphNode> nodes,
+        ICollection<MemoryGraphEdge> edges,
+        ISet<string> nodeIds,
+        ISet<string> edgeIds,
+        MemoryRecord memory)
+    {
+        var scope = GetScope(memory);
+        AddNode(nodes, nodeIds, $"scope:{scope}", scope, "scope", string.Empty, string.Empty, string.Empty, 1, scope, 0, 12, new Dictionary<string, string>());
+        AddEdge(edges, edgeIds, $"edge:scope:{scope}:{memory.Id}", $"scope:{scope}", $"memory:{memory.Id}", "scope", "scope");
+    }
+
+    private static string GetScope(MemoryRecord memory)
+    {
+        if (memory.Segment is MemorySegment.Project)
+        {
+            return "Project scoped";
+        }
+
+        if (memory.Segment is MemorySegment.Relationship or MemorySegment.Identity)
+        {
+            return "Person scoped";
+        }
+
+        if (memory.Segment is MemorySegment.Preference or MemorySegment.Correction)
+        {
+            return "Global scoped";
+        }
+
+        return memory.Tier is MemoryTier.Short
+            ? "Session scoped"
+            : "Context scoped";
+    }
+
+    private static Dictionary<string, int> GetTopicCounts(IEnumerable<MemoryRecord> memories)
+    {
+        Dictionary<string, int> counts = new(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var memory in memories)
+        {
+            foreach (var topic in GetCandidateTopics(memory.Text).Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                counts[topic] = counts.GetValueOrDefault(topic) + 1;
+            }
+        }
+
+        return counts
+            .OrderByDescending(x => x.Value)
+            .ThenBy(x => x.Key)
+            .Take(MaxTopicNodes)
+            .ToDictionary(x => x.Key, x => x.Value, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static Dictionary<string, int> GetEntityCounts(IEnumerable<MemoryRecord> memories)
+    {
+        Dictionary<string, int> counts = new(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var memory in memories)
+        {
+            foreach (var entity in GetCandidateEntities(memory.Text).Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                counts[entity] = counts.GetValueOrDefault(entity) + 1;
+            }
+        }
+
+        return counts
+            .OrderByDescending(x => x.Value)
+            .ThenBy(x => x.Key)
+            .Take(MaxEntityNodes)
+            .ToDictionary(x => x.Key, x => x.Value, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static IEnumerable<string> GetTopics(string text, IReadOnlyDictionary<string, int> topicCounts)
+    {
+        return GetCandidateTopics(text)
+            .Where(x => topicCounts.ContainsKey(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(x => topicCounts[x])
+            .ThenBy(x => x);
+    }
+
+    private static IEnumerable<string> GetEntities(string text, IReadOnlyDictionary<string, int> entityCounts)
+    {
+        return GetCandidateEntities(text)
+            .Where(x => entityCounts.ContainsKey(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(x => entityCounts[x])
+            .ThenBy(x => x);
+    }
+
+    private static IEnumerable<string> GetCandidateTopics(string text)
+    {
+        return text
+            .Split([' ', '\r', '\n', '\t', '.', ',', ';', ':', '!', '?', '"', '\'', '(', ')', '[', ']', '{', '}', '/', '\\', '|'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(x => x.Trim('-', '_').ToLowerInvariant())
+            .Where(x => x.Length >= 4 && !MemoryGraphStopWords.Contains(x))
+            .Select(x => x.Length > 32 ? x[..32] : x);
+    }
+
+    private static IEnumerable<string> GetCandidateEntities(string text)
+    {
+        var words = text.Split([' ', '\r', '\n', '\t', '.', ',', ';', ':', '!', '?', '"', '\'', '(', ')', '[', ']', '{', '}', '/', '\\', '|'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        foreach (var word in words)
+        {
+            var entity = word.Trim('-', '_');
+            if (entity.Length >= 3 && char.IsUpper(entity[0]) && !MemoryGraphEntityStopWords.Contains(entity))
+            {
+                yield return entity.Length > 40 ? entity[..40] : entity;
+            }
+        }
+    }
+
+    private static IEnumerable<string> SplitIds(string value)
+    {
+        return value
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(x => !string.IsNullOrWhiteSpace(x));
+    }
+
     private static string Shorten(string value, int length)
     {
         return value.Length <= length
             ? value
             : value[..length] + "...";
     }
+
+    private static ISet<string> MemoryGraphStopWords { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "about",
+        "after",
+        "also",
+        "because",
+        "been",
+        "before",
+        "being",
+        "could",
+        "does",
+        "from",
+        "have",
+        "into",
+        "know",
+        "like",
+        "memory",
+        "more",
+        "needs",
+        "only",
+        "should",
+        "that",
+        "their",
+        "there",
+        "these",
+        "they",
+        "this",
+        "under",
+        "using",
+        "when",
+        "where",
+        "with",
+        "would",
+        "your"
+    };
+
+    private static ISet<string> MemoryGraphEntityStopWords { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "The",
+        "This",
+        "That",
+        "When",
+        "Where",
+        "User"
+    };
 }
 
 public sealed class SettingsDashboardService(
@@ -1117,7 +1319,8 @@ public sealed class SettingsDashboardService(
             memoryOptions.Value.ConnectionString,
             ToStatus(workspaceResolution.Workspace, null),
             ToCalendarStatus(await googleCalendarClient.GetStatus(cancellationToken)),
-            ToEmailStatus(await emailProvider.GetStatus(cancellationToken)));
+            ToEmailStatus(await emailProvider.GetStatus(cancellationToken)),
+            GetPersonalityProfiles());
     }
 
     public async Task<WorkspaceStatus> UpdateWorkspacePermissions(
@@ -1151,6 +1354,62 @@ public sealed class SettingsDashboardService(
         return ToStatus(workspace, null);
     }
 
+    public async Task<SettingsDashboardSnapshot> UpdateWorkspaceSettings(
+        WorkspaceSettingsUpdateDto request,
+        CancellationToken cancellationToken)
+    {
+        var workspaceResolution = await workspaceStore.GetOrCreateActive(
+            WorkspacePathResolver.GetDefaultAgentWorkspacePath(environment.ContentRootPath),
+            cancellationToken);
+        var path = Path.Combine(workspaceResolution.Workspace.RootPath, ".mainagent.settings.json");
+        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        if (File.Exists(path))
+        {
+            await using var readStream = new FileStream(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite);
+            var existing = await JsonSerializer.DeserializeAsync<Dictionary<string, string>>(
+                readStream,
+                cancellationToken: cancellationToken);
+
+            if (existing is not null)
+            {
+                values = new Dictionary<string, string>(existing, StringComparer.OrdinalIgnoreCase);
+            }
+        }
+
+        foreach (var item in request.Values)
+        {
+            if (string.IsNullOrWhiteSpace(item.Value))
+            {
+                values.Remove(item.Key);
+            }
+            else
+            {
+                values[item.Key] = item.Value;
+            }
+        }
+
+        Directory.CreateDirectory(Path.GetDirectoryName(path) ?? workspaceResolution.Workspace.RootPath);
+        await using (var writeStream = new FileStream(
+            path,
+            FileMode.Create,
+            FileAccess.Write,
+            FileShare.Read))
+        {
+            await JsonSerializer.SerializeAsync(
+                writeStream,
+                values.OrderBy(x => x.Key, StringComparer.OrdinalIgnoreCase).ToDictionary(x => x.Key, x => x.Value),
+                new JsonSerializerOptions { WriteIndented = true },
+                cancellationToken);
+        }
+
+        return await Load(cancellationToken);
+    }
+
     private static WorkspaceStatus ToStatus(AgentWorkspace workspace, AgentRun? activeRun)
     {
         return new WorkspaceStatus(
@@ -1181,6 +1440,18 @@ public sealed class SettingsDashboardService(
             status.Connected,
             status.AccountEmail,
             status.UpdatedAt);
+    }
+
+    private static IReadOnlyList<AgentPersonalityProfileDto> GetPersonalityProfiles()
+    {
+        return AgentPersonalityCatalogue.Profiles
+            .Select(x => new AgentPersonalityProfileDto(
+                x.Id,
+                x.Name,
+                x.Description,
+                x.Personality,
+                x.ResponseStyle))
+            .ToArray();
     }
 
 }

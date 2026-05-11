@@ -1245,6 +1245,108 @@ dd {
   line-height: 14px;
 }
 
+.settings-page-layout {
+  display: grid;
+  gap: 8px;
+  max-width: 1540px;
+}
+
+.settings-section {
+  display: grid;
+  gap: 5px;
+}
+
+.settings-section > header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  border-bottom: 1px solid rgba(64, 71, 83, 0.72);
+  padding-bottom: 4px;
+}
+
+.settings-section > header h2 {
+  margin: 0;
+  font-size: 14px;
+  line-height: 18px;
+}
+
+.settings-section-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(360px, 1fr));
+  gap: 6px;
+  align-items: start;
+}
+
+.settings-section-grid .panel {
+  min-width: 0;
+  padding: 8px;
+}
+
+.settings-section-grid .panel-heading {
+  margin-bottom: 6px;
+}
+
+.settings-section-grid .panel h2 {
+  font-size: 14px;
+  line-height: 18px;
+}
+
+.settings-list-comfortable {
+  grid-template-columns: minmax(132px, 0.28fr) minmax(0, 1fr);
+  gap: 4px 7px;
+}
+
+.settings-list-comfortable dt {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+  margin: 0;
+  font-size: 10px;
+  line-height: 11px;
+}
+
+.settings-list-comfortable dd {
+  min-height: 28px;
+  padding: 4px 6px;
+  font-size: 11px;
+  line-height: 14px;
+}
+
+.settings-list-comfortable code {
+  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  line-height: 15px;
+}
+
+.settings-row-stack dd {
+  align-items: start;
+  padding: 5px 6px;
+}
+
+.settings-section-grid .workspace-path-form {
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.settings-section-grid .workspace-path-form input {
+  min-height: 28px;
+  padding: 4px 6px;
+  font-size: 11px;
+}
+
+.settings-section-grid .icon-button {
+  width: 24px;
+  min-width: 24px;
+  min-height: 24px;
+}
+
+.settings-section-grid .secondary-action {
+  min-height: 24px;
+  gap: 4px;
+  padding: 0 7px;
+  font-size: 11px;
+  line-height: 14px;
+}
+
 .secondary-action {
   align-items: center;
   background: var(--surface-low);
@@ -1382,6 +1484,7 @@ dd {
 @media (max-width: 1100px) {
   .runs-layout,
   .graph-layout,
+  .settings-section-grid,
   .settings-grid,
   .metric-grid {
     grid-template-columns: 1fr;

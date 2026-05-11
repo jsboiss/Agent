@@ -34,7 +34,10 @@ public sealed class ConfigurationAgentSettingsResolver(IConfiguration configurat
         ["codex.sandbox"] = "danger-full-access",
         ["codex.approvalPolicy"] = "never",
         ["codex.mode"] = "mcp",
-        ["channel.delivery"] = "default"
+        ["channel.delivery"] = "default",
+        ["agent.personalityProfile"] = AgentPersonalityCatalogue.Default.Id,
+        ["agent.personality"] = AgentPersonalityCatalogue.Default.Personality,
+        ["agent.responseStyle"] = AgentPersonalityCatalogue.Default.ResponseStyle
     };
 
     public async Task<AgentSettings> Resolve(
@@ -108,7 +111,11 @@ public sealed class ConfigurationAgentSettingsResolver(IConfiguration configurat
             return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         }
 
-        await using var stream = File.OpenRead(path);
+        await using var stream = new FileStream(
+            path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.ReadWrite);
         var values = await JsonSerializer.DeserializeAsync<Dictionary<string, string>>(
             stream,
             cancellationToken: cancellationToken);

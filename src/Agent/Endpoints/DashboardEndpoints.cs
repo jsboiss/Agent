@@ -195,6 +195,11 @@ public static class DashboardEndpoints
                 await service.UpdateWorkspaceRootPath(request, cancellationToken))
             .WithName("UpdateWorkspaceRootPath");
         group.MapPost(
+            "/settings/workspace-values",
+            async (WorkspaceSettingsUpdateDto request, ISettingsDashboardService service, CancellationToken cancellationToken) =>
+                await service.UpdateWorkspaceSettings(request, cancellationToken))
+            .WithName("UpdateWorkspaceSettings");
+        group.MapPost(
             "/compaction/main",
             async (ICompactionDashboardService service, CancellationToken cancellationToken) =>
                 await service.CompactMain(cancellationToken))

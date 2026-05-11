@@ -381,6 +381,13 @@ public sealed class CodexProviderClient(IOptions<CodexProviderOptions> options) 
             sections.Add(request.ChannelNotes);
         }
 
+        var styleInstructions = GetStyleInstructions(request.Resources.Workspace.ApplicableSettings);
+
+        if (!string.IsNullOrWhiteSpace(styleInstructions))
+        {
+            sections.Add(styleInstructions);
+        }
+
         if (!string.IsNullOrWhiteSpace(request.MemoryContext))
         {
             sections.Add("Relevant memory:" + Environment.NewLine + request.MemoryContext);
@@ -409,6 +416,27 @@ public sealed class CodexProviderClient(IOptions<CodexProviderOptions> options) 
         return string.Join(
             Environment.NewLine,
             toolResults.Select(x => $"- {x.Name} ({x.ToolCallId}): {x.Content}"));
+    }
+
+    private static string GetStyleInstructions(IReadOnlyDictionary<string, string> settings)
+    {
+        List<string> lines = [];
+        var personality = settings.GetValueOrDefault("agent.personality");
+        var responseStyle = settings.GetValueOrDefault("agent.responseStyle");
+
+        if (!string.IsNullOrWhiteSpace(personality))
+        {
+            lines.Add("Personality: " + personality);
+        }
+
+        if (!string.IsNullOrWhiteSpace(responseStyle))
+        {
+            lines.Add("Response style: " + responseStyle);
+        }
+
+        return lines.Count == 0
+            ? string.Empty
+            : "Assistant style:" + Environment.NewLine + string.Join(Environment.NewLine, lines);
     }
 
     private static AgentProviderResult GetProviderResult(JsonObject response, string? fallbackThreadId)

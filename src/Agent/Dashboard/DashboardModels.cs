@@ -172,7 +172,15 @@ public sealed record SettingsDashboardSnapshot(
     string MemoryConnectionString,
     WorkspaceStatus Workspace,
     CalendarStatusResponse Calendar,
-    EmailStatusResponse Email);
+    EmailStatusResponse Email,
+    IReadOnlyList<AgentPersonalityProfileDto> Personalities);
+
+public sealed record AgentPersonalityProfileDto(
+    string Id,
+    string Name,
+    string Description,
+    string Personality,
+    string ResponseStyle);
 
 public sealed record CalendarStatusResponse(
     bool Configured,
@@ -189,6 +197,8 @@ public sealed record EmailStatusResponse(
 public sealed record WorkspacePermissionUpdateDto(bool RemoteExecutionAllowed);
 
 public sealed record WorkspaceRootPathUpdateDto(string RootPath);
+
+public sealed record WorkspaceSettingsUpdateDto(IReadOnlyDictionary<string, string> Values);
 
 public sealed record ManualCompactionResponse(
     string ConversationId,
@@ -322,6 +332,10 @@ public interface ISettingsDashboardService
 
     Task<WorkspaceStatus> UpdateWorkspaceRootPath(
         WorkspaceRootPathUpdateDto request,
+        CancellationToken cancellationToken);
+
+    Task<SettingsDashboardSnapshot> UpdateWorkspaceSettings(
+        WorkspaceSettingsUpdateDto request,
         CancellationToken cancellationToken);
 }
 

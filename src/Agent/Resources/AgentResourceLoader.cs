@@ -62,7 +62,7 @@ public sealed class AgentResourceLoader(
 
         return new AgentResourceContext(
             workspace,
-            GetGlobalInstructions(),
+            GetGlobalInstructions(request.Settings.Values),
             workspaceInstructions,
             GetChannelInstructions(request.Channel),
             GetProviderConstraints(request.ProviderType),
@@ -85,20 +85,48 @@ public sealed class AgentResourceLoader(
         return await File.ReadAllTextAsync(path, cancellationToken);
     }
 
-    private static string GetGlobalInstructions()
+    private static string GetGlobalInstructions(IReadOnlyDictionary<string, string> settings)
     {
-        return """
-            You are the dispatcher for the MainAgent harness.
-            Answer quick control, memory, status, and conversational turns directly.
-            For code changes, file changes, web research, slow work, automations, app/program launching, shell commands, or risky actions, call send_ack first when useful, then spawn_agent with a crisp self-contained task.
+        return string.Join(
+            Environment.NewLine + Environment.NewLine,
+            new[]
+            {
+                """
+            You are Main Agent, the user's primary general assistant.
+            You can answer normal conversation, planning, personal context, memory, status, and quick control turns directly.
+            You can also create sub-agents for long-running, code-heavy, file-changing, research-heavy, automation, app/program launching, shell-command, or risky actions.
+            For those larger tasks, call send_ack first when useful, then spawn_agent with a crisp self-contained task.
             For Google Calendar, Gmail, schedule, availability, inbox, receipt, invoice, booking, confirmation, or email questions, use prefetched evidence or read tools directly and answer in the same turn. Do not delegate simple read-only personal-context lookups.
             Valid calendar tools are calendar_list_events, calendar_search_events, and calendar_get_availability. Never invent names like calendar_search.
             Use Gmail read tools for inbox/email searches when needed. Do not create drafts or send email unless the user explicitly asks, and respect draft/approval policy for side effects.
             Do not answer personal calendar or email state from memory or guess current events. If calendar or email context is unavailable, say the check failed instead of saying nothing was found.
             When the user asks to open, start, or launch a local app or program, treat it as an external action and delegate to a sub-agent with ExternalActions capability so it can use the shell, for example Windows Start-Process.
             Mobile-originated risky actions must be staged or proposed and require confirmation before mutation.
-            Keep outputs concise unless more detail is requested.
-            """;
+            Keep outputs useful and appropriately sized for the request.
+            """,
+                GetStyleInstructions(settings)
+            }.Where(x => !string.IsNullOrWhiteSpace(x)));
+    }
+
+    private static string GetStyleInstructions(IReadOnlyDictionary<string, string> settings)
+    {
+        List<string> lines = [];
+        var personality = settings.GetValueOrDefault("agent.personality");
+        var responseStyle = settings.GetValueOrDefault("agent.responseStyle");
+
+        if (!string.IsNullOrWhiteSpace(personality))
+        {
+            lines.Add("Personality: " + personality);
+        }
+
+        if (!string.IsNullOrWhiteSpace(responseStyle))
+        {
+            lines.Add("Response style: " + responseStyle);
+        }
+
+        return lines.Count == 0
+            ? string.Empty
+            : "Assistant style:" + Environment.NewLine + string.Join(Environment.NewLine, lines);
     }
 
     private static string GetChannelInstructions(string channel)

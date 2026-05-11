@@ -1,34 +1,32 @@
 import ForceGraph2D, { ForceGraphMethods } from "react-force-graph-2d";
 import { RefCallback, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Crosshair, RefreshCcw, Search } from "lucide-react";
-import { MemoryRow, useGetMemories } from "../../api/generated";
+import { MemoryGraphEdge, MemoryGraphNode, useGetGraph } from "../../api/generated";
 import { EmptyState, ErrorState, IconButton, LoadingState, PageFrame, toNumber } from "../components";
 
-type SegmentHubNode = {
-  id: string;
-  kind: "segment";
-  label: string;
-  segment: string;
-  memoryCount: number;
-};
-
-type MemoryNode = {
-  id: string;
-  kind: "memory";
-  label: string;
-  memory: MemoryRow;
-  segment: string;
-};
-
-type GraphNode = SegmentHubNode | MemoryNode;
+type GraphNode = MemoryGraphNode;
 
 type GraphLink = {
+  id: string;
   source: string;
   target: string;
+  kind: string;
+  label: string;
+};
+
+const kindColors: Record<string, string> = {
+  entity: "#f59e0b",
+  memory: "#38bdf8",
+  scope: "#22c55e",
+  segment: "#f43f5e",
+  source: "#a78bfa",
+  tier: "#14b8a6",
+  topic: "#60a5fa"
 };
 
 const segmentColors: Record<string, string> = {
   Context: "#64748b",
+  Correction: "#ef4444",
   Identity: "#f43f5e",
   Knowledge: "#3b82f6",
   Preference: "#14b8a6",
@@ -38,10 +36,9 @@ const segmentColors: Record<string, string> = {
 };
 
 const fallbackColors = ["#38bdf8", "#a78bfa", "#f59e0b", "#10b981", "#fb7185", "#60a5fa"];
-const graphParams = { lifecycle: "Active" };
 
 export function GraphPage() {
-  const graphQuery = useGetMemories(graphParams);
+  const graphQuery = useGetGraph();
   const graphRef = useRef<ForceGraphMethods | undefined>(undefined);
   const [stageRef, stageElement, stageSize] = useElementSize<HTMLDivElement>();
   const [query, setQuery] = useState("");
@@ -50,34 +47,11 @@ export function GraphPage() {
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const snapshot = graphQuery.data?.data;
-  const memories = snapshot?.memories ?? [];
-  const segments = snapshot?.segments ?? ["All"];
-  const tiers = snapshot?.tiers ?? ["All"];
-  const filteredMemories = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-
-    return memories.filter((memory) => {
-      if (segment !== "All" && memory.segment !== segment) {
-        return false;
-      }
-
-      if (tier !== "All" && memory.tier !== tier) {
-        return false;
-      }
-
-      if (normalizedQuery) {
-        return (
-          memory.text.toLowerCase().includes(normalizedQuery) ||
-          memory.segment.toLowerCase().includes(normalizedQuery) ||
-          memory.tier.toLowerCase().includes(normalizedQuery) ||
-          memory.id.toLowerCase().includes(normalizedQuery)
-        );
-      }
-
-      return true;
-    });
-  }, [memories, query, segment, tier]);
-  const graphData = useMemo(() => buildGraph(filteredMemories), [filteredMemories]);
+  const graphData = useMemo(() => filterGraph(snapshot?.nodes ?? [], snapshot?.edges ?? [], query, segment, tier), [query, segment, snapshot?.edges, snapshot?.nodes, tier]);
+  const memoryCount = (snapshot?.nodes ?? []).filter((node) => node.kind === "memory").length;
+  const filteredMemoryCount = graphData.nodes.filter((node) => node.kind === "memory").length;
+  const segments = useMemo(() => ["All", ...uniqueSorted((snapshot?.nodes ?? []).filter((node) => node.kind === "segment").map((node) => node.label))], [snapshot?.nodes]);
+  const tiers = useMemo(() => ["All", ...uniqueSorted((snapshot?.nodes ?? []).filter((node) => node.kind === "tier").map((node) => node.tier || node.label))], [snapshot?.nodes]);
   const selectedNode = graphData.nodes.find((node) => node.id === selectedNodeId) ?? null;
 
   useEffect(() => {
@@ -132,17 +106,17 @@ export function GraphPage() {
                 <option key={item}>{item === "All" ? "All tiers" : item}</option>
               ))}
             </select>
-            <span className="graph-count mono">{filteredMemories.length}/{memories.length}</span>
+            <span className="graph-count mono">{filteredMemoryCount}/{memoryCount}</span>
           </div>
 
           {graphQuery.isLoading && <LoadingState />}
           {graphQuery.isError && <ErrorState error={graphQuery.error} />}
-          {snapshot && memories.length === 0 && <EmptyState title="No graph data" body="No active memories have been captured yet." />}
-          {snapshot && memories.length > 0 && filteredMemories.length === 0 && <EmptyState title="No matching memories" body="No active memories match the current graph filters." />}
-          {filteredMemories.length > 0 && (
+          {snapshot && memoryCount === 0 && <EmptyState title="No graph data" body={snapshot.emptyReason || "No memories have been captured yet."} />}
+          {snapshot && memoryCount > 0 && filteredMemoryCount === 0 && <EmptyState title="No matching memories" body="No memories match the current graph filters." />}
+          {filteredMemoryCount > 0 && (
             <>
               <div className="graph-legend">
-                {graphData.hubs.slice(0, 6).map((hub) => (
+                {graphData.hubs.slice(0, 8).map((hub) => (
                   <span className="graph-segment-chip" key={hub.id}>
                     <span style={{ background: getNodeColor(hub) }} />
                     {hub.label}
@@ -158,7 +132,7 @@ export function GraphPage() {
                     height={stageSize.height}
                     backgroundColor="#0c0e12"
                     nodeRelSize={1}
-                    linkColor={() => "rgba(138, 145, 158, 0.22)"}
+                    linkColor={(link: any) => getLinkColor(link)}
                     linkWidth={(link: any) => getLinkWidth(link)}
                     nodeLabel={(node: any) => getNodeTooltip(node)}
                     onNodeClick={(node: any) => setSelectedNodeId(node.id)}
@@ -167,7 +141,7 @@ export function GraphPage() {
                     nodePointerAreaPaint={(node: any, color, context) => paintPointerArea(node, color, context)}
                     d3AlphaDecay={0.02}
                     d3VelocityDecay={0.3}
-                    cooldownTicks={110}
+                    cooldownTicks={120}
                     onEngineStop={fitGraph}
                   />
                 )}
@@ -184,7 +158,7 @@ export function GraphPage() {
             </div>
             <Search size={15} />
           </div>
-          {!selectedNode && <p className="muted">Select a segment or memory node to inspect it.</p>}
+          {!selectedNode && <p className="muted">Select a segment, tier, topic, entity, scope, or memory node to inspect it.</p>}
           {selectedNode && <NodeInspector node={selectedNode} />}
         </aside>
       </div>
@@ -193,90 +167,98 @@ export function GraphPage() {
 }
 
 function NodeInspector({ node }: { node: GraphNode }) {
-  if (node.kind === "segment") {
-    return (
-      <dl className="metadata-grid">
-        <dt>Segment</dt>
-        <dd>{node.label}</dd>
-        <dt>Memories</dt>
-        <dd>{node.memoryCount}</dd>
-        <dt>Id</dt>
-        <dd>{node.id}</dd>
-      </dl>
-    );
-  }
-
-  const memory = node.memory;
-
   return (
     <dl className="metadata-grid">
-      <dt>Memory</dt>
-      <dd>{memory.text}</dd>
+      <dt>Label</dt>
+      <dd>{node.label}</dd>
+      <dt>Kind</dt>
+      <dd>{node.kind}</dd>
       <dt>Segment</dt>
-      <dd>{memory.segment}</dd>
+      <dd>{node.segment || "none"}</dd>
       <dt>Tier</dt>
-      <dd>{memory.tier}</dd>
+      <dd>{node.tier || "none"}</dd>
       <dt>Lifecycle</dt>
-      <dd>{memory.lifecycle}</dd>
-      <dt>Scores</dt>
-      <dd>{toNumber(memory.importance).toFixed(2)} / {toNumber(memory.confidence).toFixed(2)}</dd>
-      <dt>Access</dt>
-      <dd>{toNumber(memory.accessCount)}</dd>
-      <dt>Created</dt>
-      <dd>{new Date(memory.createdAt).toLocaleString()}</dd>
-      <dt>Updated</dt>
-      <dd>{new Date(memory.updatedAt).toLocaleString()}</dd>
-      <dt>Last accessed</dt>
-      <dd>{memory.lastAccessedAt ? new Date(memory.lastAccessedAt).toLocaleString() : "never"}</dd>
-      <dt>Source</dt>
-      <dd>{memory.sourceMessageId ?? "none"}</dd>
+      <dd>{node.lifecycle || "none"}</dd>
+      <dt>Count</dt>
+      <dd>{toNumber(node.count)}</dd>
+      <dt>Importance</dt>
+      <dd>{toNumber(node.importance).toFixed(2)}</dd>
+      <dt>Text</dt>
+      <dd>{node.text || "none"}</dd>
+      {Object.entries(node.metadata).map(([key, value]) => (
+        <div className="metadata-pair" key={key}>
+          <dt>{key}</dt>
+          <dd>{value || "none"}</dd>
+        </div>
+      ))}
     </dl>
   );
 }
 
-function buildGraph(memories: MemoryRow[]) {
-  const bySegment = new Map<string, MemoryRow[]>();
+function filterGraph(nodes: MemoryGraphNode[], edges: MemoryGraphEdge[], query: string, segment: string, tier: string) {
+  const normalizedQuery = query.trim().toLowerCase();
+  const nodesById = new Map(nodes.map((node) => [node.id, node]));
+  const includedIds = new Set<string>();
 
-  memories.forEach((memory) => {
-    const key = memory.segment || "Uncategorized";
-    const existing = bySegment.get(key);
-
-    if (existing) {
-      existing.push(memory);
-    } else {
-      bySegment.set(key, [memory]);
-    }
+  nodes.filter((node) => node.kind === "memory" && matchesMemory(node, normalizedQuery, segment, tier)).forEach((node) => {
+    includedIds.add(node.id);
   });
 
-  const nodes: GraphNode[] = [];
-  const links: GraphLink[] = [];
-  const hubs: SegmentHubNode[] = [];
+  let changed = true;
+  while (changed) {
+    changed = false;
+    edges.forEach((edge) => {
+      if (includedIds.has(edge.sourceId) && !includedIds.has(edge.targetId) && nodesById.has(edge.targetId)) {
+        includedIds.add(edge.targetId);
+        changed = true;
+      }
 
-  Array.from(bySegment.entries()).sort(([x], [y]) => x.localeCompare(y)).forEach(([name, segmentMemories]) => {
-    const hub: SegmentHubNode = {
-      id: `segment:${name}`,
-      kind: "segment",
-      label: name,
-      segment: name,
-      memoryCount: segmentMemories.length
-    };
-    hubs.push(hub);
-    nodes.push(hub);
-
-    segmentMemories.forEach((memory) => {
-      const node: MemoryNode = {
-        id: `memory:${memory.id}`,
-        kind: "memory",
-        label: truncate(memory.text, 54),
-        memory,
-        segment: name
-      };
-      nodes.push(node);
-      links.push({ source: hub.id, target: node.id });
+      if (includedIds.has(edge.targetId) && !includedIds.has(edge.sourceId) && nodesById.has(edge.sourceId)) {
+        includedIds.add(edge.sourceId);
+        changed = true;
+      }
     });
-  });
+  }
 
-  return { nodes, links, hubs };
+  const filteredNodes = nodes.filter((node) => includedIds.has(node.id));
+  const filteredLinks = edges
+    .filter((edge) => includedIds.has(edge.sourceId) && includedIds.has(edge.targetId))
+    .map((edge) => ({
+      id: edge.id,
+      source: edge.sourceId,
+      target: edge.targetId,
+      kind: edge.kind,
+      label: edge.label
+    }));
+  const hubs = filteredNodes
+    .filter((node) => node.kind !== "memory")
+    .sort((x, y) => getKindRank(x.kind) - getKindRank(y.kind) || x.label.localeCompare(y.label));
+
+  return { nodes: filteredNodes, links: filteredLinks, hubs };
+}
+
+function matchesMemory(node: MemoryGraphNode, normalizedQuery: string, segment: string, tier: string) {
+  if (segment !== "All" && node.segment !== segment) {
+    return false;
+  }
+
+  if (tier !== "All" && node.tier !== tier) {
+    return false;
+  }
+
+  if (!normalizedQuery) {
+    return true;
+  }
+
+  return [
+    node.id,
+    node.label,
+    node.text,
+    node.segment,
+    node.tier,
+    node.lifecycle,
+    ...Object.values(node.metadata)
+  ].some((value) => value.toLowerCase().includes(normalizedQuery));
 }
 
 function useElementSize<T extends HTMLElement>() {
@@ -322,52 +304,76 @@ function useElementSize<T extends HTMLElement>() {
 }
 
 function getNodeRadius(node: GraphNode) {
-  if (node.kind === "segment") {
-    return Math.max(18, Math.min(42, 16 + Math.log2(node.memoryCount + 1) * 7));
+  if (node.kind === "memory") {
+    const importance = toNumber(node.importance);
+    const confidence = toNumber(node.metadata.confidence ?? 0);
+    const accessCount = toNumber(node.count);
+
+    return Math.max(6, Math.min(14, 5 + importance * 6 + confidence * 2 + Math.log2(accessCount + 1)));
   }
 
-  const importance = toNumber(node.memory.importance);
-  const confidence = toNumber(node.memory.confidence);
-  const accessCount = toNumber(node.memory.accessCount);
+  const count = toNumber(node.count);
+  const size = toNumber(node.size);
 
-  return Math.max(6, Math.min(14, 5 + importance * 6 + confidence * 2 + Math.log2(accessCount + 1)));
+  return Math.max(9, Math.min(42, size + Math.log2(count + 1) * 4));
 }
 
 function getNodeColor(node: GraphNode) {
-  const segment = node.segment || "Context";
-  const knownColor = segmentColors[segment];
+  const knownSegmentColor = node.segment ? segmentColors[node.segment] : undefined;
 
-  if (knownColor) {
-    return knownColor;
+  if (knownSegmentColor) {
+    return knownSegmentColor;
   }
 
-  const index = Math.abs(hashString(segment)) % fallbackColors.length;
+  const knownKindColor = kindColors[node.kind];
+
+  if (knownKindColor) {
+    return knownKindColor;
+  }
+
+  const index = Math.abs(hashString(node.kind || node.label)) % fallbackColors.length;
 
   return fallbackColors[index];
 }
 
-function getLinkWidth(link: { source?: GraphNode; target?: GraphNode }) {
+function getLinkColor(link: GraphLink) {
+  if (link.kind === "supersedes") {
+    return "rgba(248, 113, 113, 0.62)";
+  }
+
+  if (link.kind === "topic" || link.kind === "entity") {
+    return "rgba(96, 165, 250, 0.32)";
+  }
+
+  return "rgba(138, 145, 158, 0.24)";
+}
+
+function getLinkWidth(link: { kind?: string; target?: GraphNode }) {
+  if (link.kind === "supersedes") {
+    return 2.2;
+  }
+
   const target = link.target;
 
   if (target?.kind !== "memory") {
-    return 1;
+    return 1.1;
   }
 
-  return Math.max(0.75, Math.min(2.2, 0.8 + toNumber(target.memory.confidence)));
+  return Math.max(0.75, Math.min(2.2, 0.8 + toNumber(target.metadata.confidence ?? 0)));
 }
 
 function getNodeTooltip(node: GraphNode) {
-  if (node.kind === "segment") {
-    return `<div class="graph-tooltip"><strong>${escapeHtml(node.label)}</strong><span>${node.memoryCount} memories</span></div>`;
+  if (node.kind === "memory") {
+    return `<div class="graph-tooltip"><strong>${escapeHtml(node.text)}</strong><span>${escapeHtml(node.segment)} / ${escapeHtml(node.tier)}</span><span>Importance ${toNumber(node.importance).toFixed(2)} / Confidence ${toNumber(node.metadata.confidence ?? 0).toFixed(2)} / Access ${toNumber(node.count)}</span></div>`;
   }
 
-  return `<div class="graph-tooltip"><strong>${escapeHtml(node.memory.text)}</strong><span>${escapeHtml(node.memory.segment)} / ${escapeHtml(node.memory.tier)}</span><span>Importance ${toNumber(node.memory.importance).toFixed(2)} / Confidence ${toNumber(node.memory.confidence).toFixed(2)} / Access ${toNumber(node.memory.accessCount)}</span></div>`;
+  return `<div class="graph-tooltip"><strong>${escapeHtml(node.label)}</strong><span>${escapeHtml(node.kind)}${node.count ? ` / ${toNumber(node.count)} linked` : ""}</span></div>`;
 }
 
 function drawNode(node: GraphNode & { x: number; y: number }, context: CanvasRenderingContext2D, globalScale: number, isSelected: boolean, isHovered: boolean) {
   const color = getNodeColor(node);
   const radius = getNodeRadius(node);
-  const alpha = node.kind === "segment" ? 0.94 : 0.78;
+  const alpha = node.kind === "memory" ? 0.78 : 0.94;
 
   context.save();
   context.globalAlpha = alpha;
@@ -385,7 +391,7 @@ function drawNode(node: GraphNode & { x: number; y: number }, context: CanvasRen
     context.stroke();
   }
 
-  if (node.kind === "segment") {
+  if (node.kind !== "memory") {
     context.strokeStyle = "rgba(248, 250, 252, 0.78)";
     context.lineWidth = 1 / globalScale;
     context.beginPath();
@@ -431,6 +437,16 @@ function paintPointerArea(node: GraphNode & { x: number; y: number }, color: str
   context.beginPath();
   context.arc(node.x, node.y, radius, 0, Math.PI * 2);
   context.fill();
+}
+
+function getKindRank(kind: string) {
+  const index = ["segment", "tier", "scope", "topic", "entity"].indexOf(kind);
+
+  return index === -1 ? 99 : index;
+}
+
+function uniqueSorted(values: string[]) {
+  return Array.from(new Set(values.filter(Boolean))).sort((x, y) => x.localeCompare(y));
 }
 
 function truncate(value: string, length: number) {
